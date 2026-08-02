@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Your personal Atulyash home for fresh-batch deliveries, weekly atta plans and thoughtful customer care.">
+  <meta name="theme-color" content="#0b2721">
+  <title>My Atulyash | Your Freshness Home</title>
+  <link rel="icon" href="images/brand-mark.webp" type="image/webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="account.css?v=20260802-17">
+  <link rel="stylesheet" href="commerce-shared.css?v=20260802-3">
+</head>
+<body>
+  <a class="skip-link" id="skipLink" href="#authTitle">Skip to sign in</a>
+
+  <main class="auth-shell" id="authShell">
+    <section class="auth-story" aria-labelledby="authStoryTitle">
+      <a class="auth-brand" href="index.html" aria-label="Atulyash home">
+        <img src="images/brand-mark.webp" width="630" height="550" alt="">
+        <img src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash — Incomparable Purity. No Compromise.">
+      </a>
+      <div class="auth-story-copy">
+        <p class="section-label section-label-light">Your freshness account</p>
+        <h1 id="authStoryTitle">Your atta, made around your week.</h1>
+        <p>See every fresh batch, adjust upcoming deliveries and keep your household rhythm in one considered place.</p>
+        <ul class="auth-promises" aria-label="Account benefits">
+          <li><span>01</span>Follow every order</li>
+          <li><span>02</span>Shape your weekly plan</li>
+          <li><span>03</span>Pause without worry</li>
+        </ul>
+      </div>
+      <div class="auth-product" aria-hidden="true">
+        <span class="auth-product-orbit"></span>
+        <img src="images/atta-packet-2026.webp" width="1553" height="2302" alt="">
+      </div>
+      <p class="auth-story-note">Slow natural-stone milled · Fresh small batches</p>
+    </section>
+
+    <section class="auth-entry" aria-labelledby="authTitle">
+      <div class="auth-entry-inner">
+        <a class="back-home" href="index.html#shop"><span aria-hidden="true">←</span> Shop atta — no sign-in needed</a>
+        <div class="auth-mobile-brand" aria-hidden="true">
+          <img class="auth-mobile-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+          <img class="auth-mobile-wordmark" src="images/brand-wordmark.webp" width="900" height="220" alt="">
+          <span>My Atulyash</span>
+        </div>
+
+        <div class="auth-step" id="mobileStep">
+          <aside class="auth-return-notice" id="authReturnNotice" aria-live="polite" hidden>
+            <strong>Your bag is ready to reopen.</strong>
+            <span>Sign in with your mobile number and we’ll take you straight back to it.</span>
+          </aside>
+          <p class="section-label">Orders &amp; weekly plans</p>
+          <h2 id="authTitle">Manage what <br>comes home.</h2>
+          <p class="auth-intro">Sign in to see deliveries, repeat an order or shape your weekly plan.</p>
+          <form class="auth-form" id="mobileForm" novalidate>
+            <label for="mobileNumber">Mobile number</label>
+            <div class="phone-field">
+              <span aria-hidden="true">+91</span>
+              <input id="mobileNumber" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[6-9][0-9]{9}" placeholder="98765 43210" required aria-describedby="mobileHint mobileError">
+            </div>
+            <p class="field-hint" id="mobileHint">We’ll send a 4-digit verification code to this number.</p>
+            <p class="field-error" id="mobileError" role="alert"></p>
+            <button class="primary-button auth-submit" type="submit">
+              <span>Send 4-digit code</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+          <p class="auth-legal">Secure sign-in with no password needed. Standard carrier charges may apply.</p>
+          <aside class="shop-first-card" aria-label="Shop without signing in">
+            <span class="shop-first-number" aria-hidden="true">01</span>
+            <div>
+              <strong>Here to place a new order?</strong>
+              <p>Choose your atta first. We’ll verify your mobile only when you checkout.</p>
+            </div>
+            <a href="index.html#shop">Choose a pack <span aria-hidden="true">→</span></a>
+          </aside>
+        </div>
+
+        <div class="auth-step" id="otpStep" hidden>
+          <button class="quiet-back" id="changeMobileButton" type="button"><span aria-hidden="true">←</span> Change number</button>
+          <p class="section-label">Check your phone</p>
+          <h2>Enter your <br>4-digit code.</h2>
+          <p class="auth-intro">We sent a secure code to <strong id="otpMobileDisplay"></strong>.</p>
+          <form class="auth-form" id="otpForm" novalidate>
+            <label for="otpCode">One-time code</label>
+            <input class="otp-field" id="otpCode" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" placeholder="••••" required aria-describedby="otpHint otpError">
+            <p class="field-hint" id="otpHint">The code is valid for a limited time.</p>
+            <p class="field-error" id="otpError" role="alert"></p>
+            <button class="primary-button auth-submit" type="submit">
+              <span>Open My Atulyash</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+          <button class="resend-button" id="resendOtpButton" type="button" disabled>Resend code in <span id="resendCountdown">30</span>s</button>
+        </div>
+
+        <div class="auth-service-note">
+          <span aria-hidden="true"></span>
+          <p><strong>Need a little help?</strong><br>Call our customer care team on <a href="tel:+919818588996">+91 98185 88996</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="account-shell" id="accountShell" hidden>
+    <header class="portal-header">
+      <div class="portal-header-inner">
+        <a class="portal-brand" href="index.html" aria-label="Atulyash home">
+          <img class="portal-brand-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+          <img class="portal-brand-wordmark" src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash">
+          <span class="portal-brand-context">My Atulyash</span>
+        </a>
+        <div class="portal-header-actions">
+          <button class="shop-link" type="button" data-go-view="shop">Order fresh atta <span aria-hidden="true">→</span></button>
+          <button class="portal-bag-shortcut" id="portalBagShortcut" type="button" aria-label="Open My Bag" aria-controls="accountBagDrawer" aria-expanded="false">
+            <span class="portal-bag-icon" aria-hidden="true"></span>
+            <span class="portal-bag-label">My bag</span>
+            <b id="portalBagCount" hidden>0</b>
+          </button>
+          <button class="notification-shortcut" id="notificationShortcut" type="button" aria-label="Open notifications">
+            <span class="notification-bell" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z"></path><path d="M9.8 20a2.5 2.5 0 0 0 4.4 0"></path></svg>
+            </span>
+            <b id="notificationBadge" hidden>0</b>
+          </button>
+          <details class="profile-menu" id="profileMenu">
+            <summary class="profile-shortcut" id="profileShortcut" aria-label="Open profile menu">
+              <span class="avatar" id="headerAvatar" aria-hidden="true">A</span>
+              <span><small>Namaste</small><strong id="headerName">Atulyash family</strong></span>
+              <i aria-hidden="true">⌄</i>
+            </summary>
+            <div class="profile-menu-popover" aria-label="Profile options">
+              <button type="button" data-view="profile"><span aria-hidden="true">◇</span><span><strong>My details</strong><small>Profile and contact information</small></span></button>
+              <button type="button" data-view="wallet"><span aria-hidden="true">◈</span><span><strong>My wallet</strong><small>Balance and recharge history</small></span></button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <div class="account-bag-backdrop unified-bag-backdrop" id="accountBagBackdrop" hidden></div>
+    <aside class="account-bag-drawer unified-bag" id="accountBagDrawer" role="dialog" aria-modal="true" aria-labelledby="accountBagTitle" aria-hidden="true" inert>
+      <header class="account-bag-header unified-bag-header">
+        <div>
+          <p>Your Atulyash order</p>
+          <h2 id="accountBagTitle">My bag <span id="accountBagTitleCount">(0)</span></h2>
+        </div>
+        <button id="accountBagCloseButton" type="button" aria-label="Close shopping bag"><span aria-hidden="true">×</span></button>
+      </header>
+      <div class="account-bag-body unified-bag-content">
+        <div class="account-bag-status unified-bag-status" id="accountBagStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+          <span aria-hidden="true"></span>
+          <p id="accountBagStatusText">Refreshing your secure bag…</p>
+          <button id="accountBagRetryButton" type="button" hidden>Try again</button>
+        </div>
+        <div class="account-bag-empty unified-bag-empty" id="accountBagEmpty" hidden>
+          <div class="account-bag-empty-visual unified-bag-empty-visual" aria-hidden="true">
+            <img src="images/sack5g.webp" width="490" height="512" alt="">
+          </div>
+          <p class="account-bag-eyebrow">Your bag is waiting</p>
+          <h3>Begin with one fresh batch.</h3>
+          <p>Choose the pack size that suits the rhythm of your home.</p>
+          <button type="button" data-account-bag-shop>Choose a pack</button>
+        </div>
+        <div class="account-bag-items unified-bag-items" id="accountBagItems" aria-live="polite"></div>
+        <aside class="account-bag-promise unified-bag-promise" id="accountBagPromise" hidden aria-label="Fresh-batch promise">
+          <p>Included with every pack</p>
+          <ul>
+            <li><span>01</span>Natural-stone milled</li>
+            <li><span>02</span>Natural chokar retained</li>
+            <li><span>03</span>Schedule confirmed first</li>
+          </ul>
+        </aside>
+      </div>
+      <footer class="account-bag-footer unified-bag-footer" id="accountBagFooter" hidden>
+        <div class="account-bag-subtotal unified-bag-subtotal">
+          <span id="accountBagSubtotalLabel">Subtotal</span>
+          <strong id="accountBagSubtotal">₹0</strong>
+        </div>
+        <div class="account-bag-credit unified-bag-credit" id="accountBagCreditRow" hidden>
+          <span>Your first Atulyash experience</span>
+          <strong id="accountBagCredit">−₹0</strong>
+        </div>
+        <div class="account-bag-total unified-bag-total">
+          <span id="accountBagTotalLabel">Total after credit</span>
+          <strong id="accountBagTotal">₹0</strong>
+        </div>
+        <p>No delivery charges. Availability and the fresh-batch schedule are confirmed from your address.</p>
+        <button id="accountBagCheckoutButton" type="button">Proceed to delivery <span aria-hidden="true">→</span></button>
+        <button class="account-bag-continue unified-bag-continue" id="accountBagContinueButton" type="button">Continue shopping</button>
+      </footer>
+    </aside>
+
+    <div class="portal-layout">
+      <aside class="portal-sidebar customer-menu">
+        <div class="sidebar-greeting">
+          <p>Your Atulyash home</p>
+          <strong id="sidebarName">Atulyash family</strong>
+          <span id="sidebarMobile"></span>
+        </div>
+        <button class="mobile-account-nav-toggle" id="mobileAccountNavToggle" type="button" aria-label="Open account menu" aria-controls="portalAccountNav" aria-expanded="false">
+          <span class="mobile-account-nav-current">
+            <small>My Atulyash</small>
+            <strong id="mobileAccountNavLabel">Order atta</strong>
+          </span>
+          <span class="mobile-account-nav-action" aria-hidden="true">
+            <span>Menu</span>
+            <i class="mobile-account-nav-hamburger"><b></b><b></b></i>
+          </span>
+        </button>
+        <nav class="portal-nav" id="portalAccountNav" aria-label="Customer account">
+          <button class="nav-item is-active" type="button" data-view="shop" aria-label="Order atta" aria-current="page">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 9.5h10l1 10H6l1-10Z"></path><path d="M9 9.5V7a3 3 0 0 1 6 0v2.5"></path></svg></span>
+            <span class="nav-copy"><strong>Order atta</strong><small>Fresh batch</small></span>
+          </button>
+          <button class="nav-item" type="button" data-view="orders" aria-label="Orders">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h10v17l-2-1.5-3 1.5L9 19l-2 1.5v-17Z"></path><path d="M9.5 8h5M9.5 12h5M9.5 16h3"></path></svg></span>
+            <span class="nav-copy"><strong>Orders</strong><small>Track batches</small></span>
+          </button>
+          <button class="nav-item" type="button" data-view="subscriptions" aria-label="Weekly plan">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 8a8 8 0 0 0-13.5-2L4 8"></path><path d="M4 4v4h4M5 16a8 8 0 0 0 13.5 2L20 16"></path><path d="M20 20v-4h-4"></path></svg></span>
+            <span class="nav-copy"><strong>Weekly plan</strong><small>Your rhythm</small></span>
+          </button>
+          <button class="nav-item" type="button" data-view="addresses" aria-label="Delivery">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path><circle cx="12" cy="10" r="2.25"></circle></svg></span>
+            <span class="nav-copy"><strong>Delivery</strong><small>Saved homes</small></span>
+          </button>
+          <button class="nav-item" type="button" data-view="support" aria-label="Help">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8Z"></path><path d="M9.8 9a2.3 2.3 0 1 1 3.4 2c-.8.4-1.2.9-1.2 1.7M12 15.5h.01"></path></svg></span>
+            <span class="nav-copy"><strong>Help</strong><small>Customer care</small></span>
+          </button>
+        </nav>
+        <div class="sidebar-bottom">
+          <p>Fresh flour, without the fuss.</p>
+          <button id="logoutButton" type="button">Sign out <span aria-hidden="true">→</span></button>
+        </div>
+      </aside>
+
+      <main class="portal-main" id="portalMain" tabindex="-1">
+        <section class="portal-view is-active account-shop-view" id="view-shop" data-view-panel="shop" aria-labelledby="accountShopTitle">
+          <div class="account-shop-intro">
+            <div>
+              <p class="section-label">Fresh from the stone, for your home</p>
+              <h1 id="accountShopTitle">What does your kitchen need this week?</h1>
+            </div>
+            <p>One honest atta. Choose the quantity your home needs and continue straight to delivery—your mobile is already verified.</p>
+          </div>
+
+          <form class="quick-order" id="accountQuickOrderForm" data-order-mode="once">
+            <div class="quick-order-visual" id="quickOrderVisual">
+              <div class="quick-order-halo" aria-hidden="true"></div>
+              <p class="quick-order-kicker">100% MP Sharbati wheat</p>
+              <div class="quick-order-chapati-fill" id="quickOrderChapatiFill" aria-hidden="true"></div>
+              <img class="quick-order-pack" id="quickOrderPackArt" src="images/atta-packet-2026.webp" width="1553" height="2302" alt="Atulyash whole wheat atta pack">
+              <img class="quick-order-veer" src="images/veer-mascot-2026.webp" width="1536" height="2048" alt="" aria-hidden="true">
+              <span class="quick-order-weight" id="quickOrderWeightBadge">2 kg</span>
+              <div class="quick-order-proof" aria-label="Atulyash product qualities">
+                <span><b>01</b> Slow stone-milled</span>
+                <span><b>02</b> Bran kept intact</span>
+                <span><b>03</b> Fresh small batches</span>
+              </div>
+            </div>
+
+            <div class="quick-order-config">
+              <div class="quick-order-step">
+                <span>01</span>
+                <div><strong>How would you like to order?</strong><small>Choose a one-time pack or a regular weekly delivery.</small></div>
+              </div>
+              <fieldset class="quick-order-modes" id="quickOrderModes">
+                <legend class="sr-only">Purchase type</legend>
+                <label>
+                  <input type="radio" name="quickOrderMode" value="once" checked>
+                  <span><strong>Buy once</strong><small>For today’s household need</small></span>
+                </label>
+                <label>
+                  <input type="radio" name="quickOrderMode" value="weekly" disabled>
+                  <span><strong>Weekly delivery</strong><small>Fresh atta arrives every week</small></span>
+                </label>
+              </fieldset>
+
+              <div id="quickOrderOnceFields">
+                <div class="quick-order-step compact">
+                  <span>02</span>
+                  <div><strong>Choose your pack</strong><small>Made for real household rhythms.</small></div>
+                </div>
+                <div class="quick-catalog-status" id="quickOrderCatalogStatus" role="status" aria-live="polite" aria-atomic="true">
+                  <span id="quickOrderCatalogMessage">Loading today’s live pack sizes…</span>
+                  <button id="quickOrderCatalogRetry" type="button" hidden>Try again</button>
+                </div>
+                <fieldset class="quick-pack-grid" id="accountPackSelector" disabled>
+                  <legend class="sr-only">Atta pack size</legend>
+                </fieldset>
+
+                <div class="quick-quantity-row">
+                  <div><strong>Number of packs</strong><small>Up to 10 packs in one order</small></div>
+                  <div class="quick-quantity" role="group" aria-label="Pack quantity">
+                    <button id="quickOrderMinus" type="button" aria-label="Decrease quantity">−</button>
+                    <output id="quickOrderQuantity" aria-live="polite">1</output>
+                    <button id="quickOrderPlus" type="button" aria-label="Increase quantity">＋</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="quick-weekly-fields" id="quickOrderWeeklyFields" hidden>
+                <div class="quick-order-step compact">
+                  <span>02</span>
+                  <div><strong>How much atta do you need each week?</strong><small>Choose the weekly quantity. You will select the delivery day during checkout.</small></div>
+                </div>
+                <label class="quick-select-field" for="quickOrderPlan">Weekly quantity
+                  <select id="quickOrderPlan" name="quickOrderPlan" disabled>
+                    <option value="" selected disabled>Loading live weekly plans…</option>
+                  </select>
+                </label>
+                <section class="weekly-choice-summary" id="weeklyChoiceSummary" aria-label="Selected weekly plan" aria-live="polite" hidden>
+                  <div class="weekly-choice-heading">
+                    <div><span>Your plan</span><strong><b id="weeklyChoiceQuantity">—</b> every week</strong><small id="weeklyChoiceCoverage">— across the first four deliveries</small></div>
+                    <span class="weekly-choice-live"><i></i> Live plan</span>
+                  </div>
+                  <div class="weekly-choice-prices">
+                    <div><span>Each weekly delivery</span><strong id="weeklyChoicePerDelivery">—</strong><small>Price for one delivery</small></div>
+                    <div><span>Paid when plan starts</span><strong id="weeklyChoiceFirstMonth">—</strong><small>Covers the first 4 deliveries</small></div>
+                  </div>
+                  <div class="weekly-choice-explanation">
+                    <span aria-hidden="true">✓</span>
+                    <p><strong>One clear first payment</strong><small id="weeklyChoicePaymentCopy">Your first-month payment covers four weekly deliveries.</small></p>
+                  </div>
+                </section>
+                <details class="quick-calculator" id="accountCalculatorDetails">
+                  <summary class="quick-calculator-head">
+                    <span><strong>Not sure how much your home needs?</strong><small>Estimate it from the number of rotis cooked each day</small></span>
+                    <b>Open calculator <span aria-hidden="true">＋</span></b>
+                  </summary>
+                  <article class="account-atta-calculator" aria-labelledby="accountCalculatorTitle">
+                    <h3 class="sr-only" id="accountCalculatorTitle">Weekly atta calculator</h3>
+                    <div class="account-calculator-controls">
+                      <div class="account-roti-control">
+                        <span>Rotis cooked per day</span>
+                        <div class="account-stepper">
+                          <button id="accountRotisMinus" type="button" aria-label="Decrease daily rotis">−</button>
+                          <label><span class="sr-only">Daily rotis, minimum 8</span><input id="accountDailyRotis" type="number" inputmode="numeric" min="8" step="1" value="8"></label>
+                          <small>rotis / day</small>
+                          <button id="accountRotisPlus" type="button" aria-label="Increase daily rotis">+</button>
+                        </div>
+                        <small>Minimum 8 rotis for the household</small>
+                      </div>
+                      <fieldset class="account-buffer-options">
+                        <legend>Extra atta for other favourites</legend>
+                        <label><input type="radio" name="accountAttaBuffer" value="0" checked><span><strong>No extra</strong><small>Mostly rotis</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="10"><span><strong>+10%</strong><small>Occasional extras</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="20"><span><strong>+20%</strong><small>Frequent extras</small></span></label>
+                      </fieldset>
+                    </div>
+                    <div class="account-calculator-result" aria-live="polite">
+                      <span>Your estimated requirement</span>
+                      <strong id="accountCalculatorKg">1.68 <small>kg/week</small></strong>
+                      <p id="accountCalculatorPlan">Finding the closest live weekly plan…</p>
+                      <small id="accountCalculatorFormula">8 rotis × 30 g × 7 days</small>
+                    </div>
+                  </article>
+                </details>
+              </div>
+
+              <div class="quick-order-total" id="quickOrderTotal" aria-live="polite">
+                <div>
+                  <span>Your selection</span>
+                  <strong id="quickOrderSelection">2 kg · one-time order</strong>
+                  <small>Live price and availability are confirmed before checkout.</small>
+                </div>
+                <strong id="quickOrderPrice">₹180</strong>
+              </div>
+              <button class="quick-order-submit" type="submit">
+                <span id="quickOrderCtaLabel">Loading live availability…</span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <p class="quick-order-assurance" id="quickOrderAssurance"><span aria-hidden="true">✓</span><span id="quickOrderAssuranceText">Added here, reviewed here. Choose delivery and payment only when you are ready.</span></p>
+            </div>
+          </form>
+        </section>
+
+        <section class="portal-view" id="view-overview" data-view-panel="overview" aria-labelledby="overviewTitle" hidden>
+          <div class="overview-hero">
+            <div class="overview-hero-copy">
+              <p class="section-label section-label-light">Welcome home</p>
+              <h1 id="overviewTitle">Your next fresh batch, beautifully on time.</h1>
+              <p>See what is arriving next, shape your weekly rhythm and bring home slow stone-milled atta whenever you need it.</p>
+              <button class="light-button" type="button" data-go-view="shop">Order fresh atta <span aria-hidden="true">→</span></button>
+              <div class="hero-assurances" aria-label="Atulyash product qualities">
+                <span>100% MP Sharbati</span>
+                <span>Natural stone milled</span>
+                <span>Fresh small batches</span>
+              </div>
+            </div>
+            <div class="overview-hero-art" aria-hidden="true">
+              <span class="hero-ring"></span>
+              <span class="hero-grain-line"></span>
+              <img class="hero-pack" src="images/atta-packet-2026.webp" width="1553" height="2302" alt="">
+              <img class="hero-veer" src="images/veer-mascot-2026.webp" width="1536" height="2048" alt="">
+            </div>
+          </div>
+
+          <div class="overview-grid">
+            <section class="content-card upcoming-card" aria-labelledby="upcomingTitle">
+              <div class="card-heading">
+                <div><p class="section-label">Your next fresh batch</p><h2 id="upcomingTitle">Coming home next</h2></div>
+                <button class="text-button" type="button" data-go-view="subscriptions">View weekly plan →</button>
+              </div>
+              <div id="upcomingDelivery"><div class="skeleton-block skeleton-tall"></div></div>
+            </section>
+            <aside class="content-card promise-card">
+              <p class="section-label section-label-light">Why families choose Atulyash</p>
+              <blockquote>“Slow stone-milled in small batches, close to the day it reaches you.”</blockquote>
+              <div><span aria-hidden="true">✓</span><p><strong>No delivery charges</strong><br>on scheduled weekly orders</p></div>
+            </aside>
+          </div>
+
+          <section class="home-details" aria-labelledby="homeDetailsTitle">
+            <div class="home-details-heading">
+              <div><p class="section-label">Made around your home</p><h2 id="homeDetailsTitle">Your Atulyash, at a glance</h2></div>
+              <p>Just the useful things—your weekly rhythm, available balance and anything new for you.</p>
+            </div>
+            <div class="metric-grid" id="overviewMetrics" aria-live="polite">
+              <article class="metric-card"><span>Ready for your next batch</span><strong>—</strong><small>Loading your wallet</small></article>
+              <article class="metric-card"><span>Your weekly rhythm</span><strong>—</strong><small>Loading your plans</small></article>
+              <article class="metric-card"><span>New for you</span><strong>—</strong><small>Loading your updates</small></article>
+            </div>
+          </section>
+
+          <section class="content-card overview-orders" aria-labelledby="recentOrdersTitle">
+            <div class="card-heading">
+              <div><p class="section-label">From your kitchen</p><h2 id="recentOrdersTitle">Your recent batches</h2></div>
+              <button class="text-button" type="button" data-go-view="orders">See order history →</button>
+            </div>
+            <div id="overviewOrders"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>
+          </section>
+        </section>
+
+        <section class="portal-view" id="view-orders" data-view-panel="orders" aria-labelledby="ordersTitle" hidden>
+          <div class="view-heading">
+            <div><p class="section-label">Every batch, remembered</p><h1 id="ordersTitle">Your orders</h1><p>Track what is on its way, revisit earlier batches or bring a favourite order home again.</p></div>
+            <label class="filter-control">Show
+              <select id="orderFilter">
+                <option value="">All orders</option>
+                <option value="true">One-time orders</option>
+                <option value="false">Subscription orders</option>
+              </select>
+            </label>
+          </div>
+          <div class="list-region" id="ordersList" aria-live="polite"></div>
+          <button class="secondary-button load-more" id="ordersLoadMore" type="button" hidden>Show more orders</button>
+        </section>
+
+        <section class="portal-view weekly-plan-view" id="view-subscriptions" data-view-panel="subscriptions" aria-labelledby="subscriptionsTitle" hidden>
+          <div class="view-heading weekly-plan-heading">
+            <div><p class="section-label">Atta made around your week</p><h1 id="subscriptionsTitle">Your weekly plan</h1><p>See what comes next, skip a week or pause deliveries while you are away.</p></div>
+            <button class="primary-button compact-button" id="chooseWeeklyPlanButton" type="button" data-go-view="shop" data-shop-mode="weekly">Choose a weekly plan <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="weekly-plan-stage">
+            <aside class="weekly-plan-guide" aria-labelledby="weeklyPlanGuideTitle">
+              <div class="weekly-plan-guide-copy">
+                <span class="weekly-plan-guide-kicker">A fresh rhythm for home</span>
+                <h2 id="weeklyPlanGuideTitle">Fresh atta arrives. You stay in control.</h2>
+                <p>Your plan prepares a new natural stone-milled batch around your chosen delivery day—without making your week rigid.</p>
+                <ul class="weekly-plan-benefits" aria-label="Weekly plan benefits">
+                  <li><span>01</span><strong>Prepared every week</strong><small>A fresh batch, close to delivery</small></li>
+                  <li><span>02</span><strong>Easy to adjust</strong><small>Skip or manage upcoming dates</small></li>
+                  <li><span>03</span><strong>Pause for travel</strong><small>Your plan waits when you are away</small></li>
+                </ul>
+              </div>
+              <div class="weekly-plan-veer" aria-hidden="true">
+                <span>“I’ll help keep your atta aligned with your week.”</span>
+                <img src="images/veer-mascot-2026.webp" width="1536" height="2048" alt="">
+              </div>
+            </aside>
+
+            <section class="weekly-plan-workspace" aria-labelledby="weeklyPlanWorkspaceTitle">
+              <div class="weekly-plan-workspace-head">
+                <div><span>Your live plan</span><h2 id="weeklyPlanWorkspaceTitle">Freshness schedule</h2></div>
+                <p><strong id="weeklyPlanCount">—</strong><span id="weeklyPlanCountLabel">Checking plans</span></p>
+              </div>
+              <div class="list-region subscription-list" id="subscriptionsList" aria-live="polite"></div>
+              <div class="weekly-plan-tools">
+                <aside class="weekly-fit-prompt">
+                  <div><span aria-hidden="true">≈</span><p><strong>Has your household rhythm changed?</strong><br>Use the atta calculator only when you need a new estimate.</p></div>
+                  <button class="secondary-button" type="button" data-go-view="shop" data-shop-mode="weekly" data-open-calculator="true">Open calculator <span aria-hidden="true">→</span></button>
+                </aside>
+                <div class="vacation-banner" id="vacationBanner">
+                  <div><span class="vacation-mark" aria-hidden="true">☼</span><p><strong>Travelling?</strong><br>Pause scheduled deliveries for the dates you are away.</p></div>
+                  <button class="secondary-button" id="setVacationButton" type="button">Pause for travel</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="portal-view" id="view-addresses" data-view-panel="addresses" aria-labelledby="addressesTitle" hidden>
+          <div class="view-heading delivery-home-heading">
+            <div><p class="section-label">Where freshness arrives</p><h1 id="addressesTitle">Your delivery homes</h1><p>Save the doorsteps your family uses. You will choose the right one when reviewing each fresh-batch delivery.</p></div>
+            <button class="primary-button compact-button" id="addAddressButton" type="button">Add a delivery home <span aria-hidden="true">+</span></button>
+          </div>
+          <div class="delivery-home-stage">
+            <aside class="delivery-home-guide" aria-labelledby="deliveryHomeGuideTitle">
+              <span class="delivery-home-guide-kicker">Freshness, to the right door</span>
+              <h2 id="deliveryHomeGuideTitle">Every delivery begins with a clear address.</h2>
+              <p>Keep recipient, mobile number and doorstep details accurate so the delivery team can arrive without unnecessary calls.</p>
+              <div class="delivery-home-count">
+                <strong id="deliveryHomeCount">—</strong>
+                <span id="deliveryHomeCountLabel">Saved delivery homes</span>
+              </div>
+              <ul class="delivery-home-promises" aria-label="Delivery address benefits">
+                <li><span aria-hidden="true">✓</span>Choose the address during checkout</li>
+                <li><span aria-hidden="true">✓</span>Edit instructions whenever needed</li>
+                <li><span aria-hidden="true">✓</span>PIN availability checked before delivery</li>
+              </ul>
+            </aside>
+            <section class="delivery-home-collection" aria-labelledby="savedDeliveryHomesTitle">
+              <div class="delivery-home-list-heading">
+                <div><span>Saved places</span><h2 id="savedDeliveryHomesTitle">Ready for your next batch</h2></div>
+                <p>Select the address later when you order.</p>
+              </div>
+              <div class="address-grid" id="addressesList" aria-live="polite"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="portal-view" id="view-wallet" data-view-panel="wallet" aria-labelledby="walletTitle" hidden>
+          <div class="view-heading">
+            <div><p class="section-label">Prepared for the next batch</p><h1 id="walletTitle">Your Atulyash wallet</h1><p>Keep upcoming deliveries effortless and see every recharge, payment and refund clearly.</p></div>
+          </div>
+          <div class="wallet-layout">
+            <article class="wallet-card">
+              <p>Available balance</p>
+              <strong id="walletBalance">₹—</strong>
+              <span>Securely linked to your Atulyash account</span>
+              <div class="wallet-emblem" aria-hidden="true">A</div>
+            </article>
+            <form class="recharge-card" id="rechargeForm">
+              <p class="section-label">Add money</p>
+              <h2>Keep the next batch ready.</h2>
+              <label for="rechargeAmount">Recharge amount</label>
+              <div class="money-field"><span>₹</span><input id="rechargeAmount" name="amount" type="number" inputmode="decimal" min="1" step="1" placeholder="1000" required></div>
+              <div class="amount-chips" id="rechargeOptions" aria-label="Suggested recharge amounts">
+                <button type="button" data-amount="500">₹500</button>
+                <button type="button" data-amount="1000">₹1,000</button>
+                <button type="button" data-amount="2000">₹2,000</button>
+              </div>
+              <div class="recharge-preview" id="rechargePreview" hidden></div>
+              <button class="primary-button" id="previewRechargeButton" type="submit">Review recharge <span aria-hidden="true">→</span></button>
+              <button class="primary-button rust-button" id="initiateRechargeButton" type="button" hidden>Continue to secure payment <span aria-hidden="true">↗</span></button>
+            </form>
+          </div>
+          <section class="content-card transaction-card" aria-labelledby="transactionsTitle">
+            <div class="card-heading"><div><p class="section-label">Clear and complete</p><h2 id="transactionsTitle">Wallet activity</h2></div></div>
+            <div id="walletTransactions" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <section class="portal-view" id="view-notifications" data-view-panel="notifications" aria-labelledby="notificationsTitle" hidden>
+          <div class="view-heading">
+            <div><p class="section-label">A little note from us</p><h1 id="notificationsTitle">Your updates</h1><p>Delivery reminders, order progress and occasional Atulyash news.</p></div>
+            <button class="secondary-button" id="markAllReadButton" type="button">Mark everything read</button>
+          </div>
+          <div class="notification-filters">
+            <label>Category
+              <select id="notificationCategory">
+                <option value="">All updates</option>
+                <option value="orders">Orders</option>
+                <option value="updates">Account updates</option>
+                <option value="promotions">Offers</option>
+              </select>
+            </label>
+            <label class="check-control"><input id="unreadOnly" type="checkbox"> Unread only</label>
+          </div>
+          <div class="list-region" id="notificationsList" aria-live="polite"></div>
+        </section>
+
+        <section class="portal-view" id="view-profile" data-view-panel="profile" aria-labelledby="profileTitle" hidden>
+          <div class="view-heading">
+            <div><p class="section-label">Known and cared for</p><h1 id="profileTitle">Your details</h1><p>Keep the details we use to care for your orders up to date.</p></div>
+          </div>
+          <form class="profile-card" id="profileForm">
+            <div class="profile-avatar" id="profileAvatar" aria-hidden="true">A</div>
+            <div class="profile-fields">
+              <div class="field-group"><label for="profileName">Full name</label><input id="profileName" name="name" type="text" autocomplete="name" maxlength="80" required></div>
+              <div class="field-group"><label for="profileEmail">Email address</label><input id="profileEmail" name="email" type="email" autocomplete="email"></div>
+              <div class="field-group"><label for="profileMobile">Mobile number</label><input id="profileMobile" name="mobile" type="tel" readonly aria-describedby="profileMobileHint"><small id="profileMobileHint">Your verified sign-in number cannot be edited here.</small></div>
+              <button class="primary-button compact-button" type="submit">Save changes <span aria-hidden="true">→</span></button>
+            </div>
+          </form>
+          <section class="danger-zone" aria-labelledby="privacyTitle">
+            <div><p class="section-label">Your privacy</p><h2 id="privacyTitle">You are always in control.</h2><p>You can request permanent account deletion. Our team will verify the request before your data is removed.</p></div>
+            <button class="danger-button" id="requestDeletionButton" type="button">Request account deletion</button>
+          </section>
+        </section>
+
+        <section class="portal-view" id="view-support" data-view-panel="support" aria-labelledby="supportTitle" hidden>
+          <div class="support-hero">
+            <div><p class="section-label section-label-light">Thoughtful help</p><h1 id="supportTitle">How can we help today?</h1><p>Questions about your atta, next delivery, weekly plan or account? Our team is close by.</p></div>
+            <img src="images/veer-ask-what-matters.webp" width="825" height="998" alt="Veer, the Atulyash guide, holding wheat">
+          </div>
+          <div class="support-grid" id="contactCards">
+            <article class="contact-card"><span>Call us</span><strong>+91 98185 88996</strong><a href="tel:+919818588996">Speak to our team →</a></article>
+            <article class="contact-card"><span>Email us</span><strong>Customer care</strong><a href="mailto:info@atulyash.com">info@atulyash.com →</a></article>
+          </div>
+          <section class="truth-book-card" id="truthBookCard">
+            <div><p class="section-label section-label-light">Know your everyday food</p><h2>The Atulyash Truth Book.</h2><p>Ingredients, process and quality information—shared clearly.</p></div>
+            <span class="truth-seal" aria-hidden="true">100%<small>transparent</small></span>
+          </section>
+          <section class="faq-section" aria-labelledby="faqTitle">
+            <div class="card-heading"><div><p class="section-label">Ask what matters</p><h2 id="faqTitle">Frequently asked questions</h2></div></div>
+            <div class="faq-list" id="faqList" aria-live="polite"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <footer class="portal-footer">
+      <div>
+        <img src="images/brand-mark.webp" width="630" height="550" alt="">
+        <p><strong>Made fresh for the way your home eats.</strong><br>Slow natural-stone milled in thoughtful small batches.</p>
+      </div>
+      <div class="portal-footer-links">
+        <a href="index.html#way">The Atulyash way</a>
+        <a href="index.html#questions">Ask what matters</a>
+        <a href="tel:+919818588996">Customer care</a>
+      </div>
+    </footer>
+  </div>
+
+  <dialog class="portal-dialog" id="portalDialog" aria-labelledby="dialogTitle">
+    <div class="dialog-frame">
+      <div class="dialog-head">
+        <div><p class="section-label" id="dialogEyebrow">My Atulyash</p><h2 id="dialogTitle">Details</h2></div>
+        <button class="dialog-close" id="dialogCloseButton" type="button" aria-label="Close dialog">×</button>
+      </div>
+      <div class="dialog-body" id="dialogBody"></div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="portalToast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+  <div class="sr-only" id="globalStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="api-client.js?v=20260801-7"></script>
+  <script src="account.js?v=20260802-22"></script>
+</body>
+</html>

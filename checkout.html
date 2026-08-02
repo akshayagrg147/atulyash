@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Complete your Atulyash fresh-batch atta order securely.">
+  <meta name="theme-color" content="#0b2721">
+  <title>Secure Checkout | Atulyash</title>
+  <link rel="icon" href="images/brand-mark.webp" type="image/webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260730-4">
+  <link rel="stylesheet" href="ecommerce.css?v=20260802-14">
+  <link rel="stylesheet" href="checkout-page.css?v=20260802-5">
+</head>
+<body class="checkout-page checkout-handoff-open" data-commerce-page="checkout">
+  <a class="skip-link" href="#checkoutTitle">Skip to checkout</a>
+
+  <div class="checkout-handoff checkout-route-state" id="checkoutHandoff" role="status" aria-live="polite" aria-atomic="true">
+    <div class="checkout-handoff-card">
+      <img src="images/brand-mark.webp" width="630" height="550" alt="">
+      <p>Your Atulyash order</p>
+      <h1 id="checkoutHandoffTitle">Preparing your delivery.</h1>
+      <span id="checkoutHandoffStatus">Connecting your bag to secure checkout…</span>
+      <div class="checkout-handoff-progress" aria-hidden="true"><i></i></div>
+      <div class="checkout-handoff-actions" id="checkoutHandoffActions" hidden>
+        <a id="checkoutHandoffReturn" href="index.html#shop">Return to bag</a>
+        <button id="checkoutHandoffReview" type="button">Try again</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="checkout-route-main" id="checkoutMount">
+    <section class="checkout-modal checkout-page-surface" id="checkoutModal" role="main" aria-labelledby="checkoutTitle" aria-hidden="true" inert>
+      <div class="checkout-shell">
+        <header class="checkout-header">
+          <a class="checkout-brand" href="index.html#home" aria-label="Atulyash home">
+            <img src="images/brand-mark.webp" width="630" height="550" alt="">
+            <img src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash">
+          </a>
+          <div class="checkout-progress" aria-label="Checkout progress">
+            <span class="is-active" data-checkout-indicator="1"><b>1</b> Your details <em class="sr-only">Step 1 of 3.</em></span>
+            <i aria-hidden="true"></i>
+            <span data-checkout-indicator="2"><b>2</b> Delivery <em class="sr-only">Step 2 of 3.</em></span>
+            <i aria-hidden="true"></i>
+            <span data-checkout-indicator="3"><b>3</b> Review <em class="sr-only">Step 3 of 3.</em></span>
+          </div>
+          <button class="commerce-close checkout-page-return" id="checkoutCloseButton" type="button" aria-label="Back to your bag">
+            <span aria-hidden="true">←</span><strong id="checkoutReturnLabel">Back to shop</strong>
+          </button>
+        </header>
+
+        <div class="checkout-body">
+          <div class="checkout-main">
+            <form id="checkoutForm" novalidate>
+              <aside class="checkout-purchase-clarity" id="checkoutPurchaseClarity" data-mode="once" aria-live="polite">
+                <span class="checkout-purchase-clarity-label">Purchase type</span>
+                <div>
+                  <strong id="checkoutPurchaseClarityTitle">One-time purchase</strong>
+                  <p id="checkoutPurchaseClarityDescription">Delivered once. No automatic repeat order or weekly billing.</p>
+                </div>
+                <a id="checkoutPurchaseClarityChange" href="index.html#shop">Change selection</a>
+              </aside>
+              <div class="checkout-error-summary" id="checkoutErrorSummary" role="alert" tabindex="-1" hidden></div>
+
+              <section class="checkout-step is-active" data-checkout-step="1" aria-labelledby="checkoutTitle">
+                <p class="checkout-kicker">Secure sign in</p>
+                <h2 id="checkoutTitle">Begin with your mobile number.</h2>
+                <p>We will send a one-time password by SMS so your address, order and payment stay connected to your Atulyash account.</p>
+
+                <aside class="checkout-auth-notice" id="checkoutAuthNotice" aria-label="Mobile verification information">
+                  <span class="checkout-auth-notice-icon" aria-hidden="true"></span>
+                  <div>
+                    <strong>Private, password-free access</strong>
+                    <p>The OTP is valid for a limited time. Atulyash will never ask you to share it over a call or WhatsApp.</p>
+                  </div>
+                </aside>
+
+                <div id="checkoutIdentityDetailsView">
+                  <fieldset class="checkout-fieldset">
+                    <legend>Your details</legend>
+                    <div class="checkout-fields checkout-fields-two">
+                      <label class="checkout-field">
+                        <span>Full name</span>
+                        <input id="checkoutName" name="name" type="text" autocomplete="name" required>
+                        <small class="field-error"></small>
+                      </label>
+                      <label class="checkout-field">
+                        <span>Mobile number</span>
+                        <input id="checkoutPhone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" pattern="[0-9]{10}" maxlength="10" required>
+                        <small class="field-error"></small>
+                      </label>
+                      <label class="checkout-field checkout-field-wide">
+                        <span>Email <em>Optional</em></span>
+                        <input id="checkoutEmail" name="email" type="email" autocomplete="email">
+                        <small class="field-error"></small>
+                      </label>
+                    </div>
+                  </fieldset>
+                </div>
+
+                <section class="checkout-otp-card" id="checkoutOtpView" aria-labelledby="checkoutOtpTitle" hidden inert>
+                  <div class="checkout-otp-card-head">
+                    <div>
+                      <span>SMS verification</span>
+                      <h3 id="checkoutOtpTitle">Enter the 4-digit code.</h3>
+                      <p>We sent an OTP to <strong id="checkoutOtpPhone">+91 ••••••0000</strong>.</p>
+                    </div>
+                    <button class="checkout-otp-text-button" id="checkoutChangeNumberButton" type="button">Change number</button>
+                  </div>
+                  <div class="checkout-otp-entry">
+                    <label class="checkout-field checkout-otp-code-field">
+                      <span>One-time password</span>
+                      <input id="checkoutOtp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4}" maxlength="4" aria-describedby="checkoutOtpHelp checkoutOtpError">
+                      <small class="checkout-field-help" id="checkoutOtpHelp">Enter the latest code sent to your mobile.</small>
+                      <small class="checkout-otp-error" id="checkoutOtpError" role="alert"></small>
+                    </label>
+                    <button class="button button-dark checkout-otp-verify" id="checkoutOtpVerifyButton" type="button" aria-busy="false">
+                      <span id="checkoutOtpVerifyLabel">Verify OTP</span>
+                      <span class="api-button-spinner" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <div class="checkout-otp-resend">
+                    <span id="checkoutOtpResendStatus">Didn’t receive the code?</span>
+                    <button class="checkout-otp-reset" id="checkoutResetOtpButton" type="button"><span id="checkoutResendOtpLabel">Resend OTP</span></button>
+                    <time id="checkoutOtpResendTimer" datetime="PT0S" hidden></time>
+                  </div>
+                </section>
+
+                <section class="checkout-otp-verified" id="checkoutOtpVerifiedView" aria-labelledby="checkoutOtpVerifiedTitle" hidden inert>
+                  <span class="checkout-otp-check" aria-hidden="true">✓</span>
+                  <div>
+                    <h3 id="checkoutOtpVerifiedTitle" tabindex="-1">Mobile number verified.</h3>
+                    <p><strong id="checkoutVerifiedPhone">+91 ••••••0000</strong> · Signed in securely.</p>
+                  </div>
+                  <button class="checkout-otp-text-button" id="checkoutVerifiedChangeButton" type="button">Change number</button>
+                </section>
+
+                <p class="checkout-otp-status" id="checkoutOtpStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+                <button class="button button-dark checkout-next api-async-button" id="checkoutIdentitySubmit" type="submit" aria-busy="false">
+                  <span id="checkoutIdentitySubmitLabel">Send secure OTP</span>
+                  <span class="api-button-spinner" aria-hidden="true"></span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              </section>
+
+              <section class="checkout-step" data-checkout-step="2" aria-labelledby="checkoutDeliveryTitle" hidden>
+                <p class="checkout-kicker">Fresh-batch delivery</p>
+                <h2 id="checkoutDeliveryTitle">Choose where and when.</h2>
+                <p id="checkoutDeliveryIntro">Select a saved address or add a new one. Available fresh-batch dates will be checked for that location.</p>
+
+                <div class="checkout-address-status" id="checkoutAddressStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+                  <span class="api-status-spinner" aria-hidden="true"></span>
+                  <span id="checkoutAddressStatusLabel">Loading your saved addresses…</span>
+                  <button id="checkoutAddressRetryButton" type="button" hidden>Try again</button>
+                </div>
+
+                <section class="checkout-saved-addresses" id="checkoutSavedAddressSection" aria-labelledby="checkoutSavedAddressTitle" hidden>
+                  <div class="checkout-subsection-heading">
+                    <div><span>Saved addresses</span><h3 id="checkoutSavedAddressTitle">Where should we deliver?</h3></div>
+                    <button id="checkoutAddAddressButton" type="button" aria-expanded="false" aria-controls="checkoutNewAddressFields">Add a new address</button>
+                  </div>
+                  <div class="checkout-address-list" id="checkoutAddressList" role="radiogroup" aria-label="Saved delivery addresses"></div>
+                  <p class="checkout-address-empty" id="checkoutAddressEmpty" hidden>No saved address yet. Add one below to continue.</p>
+                </section>
+
+                <fieldset class="checkout-fieldset checkout-new-address" id="checkoutNewAddressFields">
+                  <legend id="checkoutNewAddressTitle">Add a delivery address</legend>
+                  <p class="checkout-fieldset-intro">This address will be saved to your account for future Atulyash deliveries.</p>
+                  <div class="checkout-fields checkout-fields-two">
+                    <label class="checkout-field checkout-field-wide">
+                      <span>House or flat number</span>
+                      <textarea id="checkoutAddress" name="house_name" rows="2" maxlength="255" autocomplete="address-line1" required></textarea>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field checkout-field-wide">
+                      <span>Building, street or area</span>
+                      <input id="checkoutBuilding" name="tower_wing" type="text" maxlength="50" autocomplete="address-line2" required>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field checkout-field-wide">
+                      <span>Landmark <em>Optional</em></span>
+                      <input id="checkoutLandmark" name="landmark" type="text" maxlength="255">
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field">
+                      <span>PIN code</span>
+                      <input id="checkoutPincode" name="pincode" type="text" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{6}" maxlength="6" required>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field">
+                      <span>City</span>
+                      <input id="checkoutCity" name="city" type="text" maxlength="100" autocomplete="address-level2" required>
+                      <small class="field-error"></small>
+                    </label>
+                    <div class="checkout-pincode-serviceability" id="checkoutPincodeServiceability" data-state="idle">
+                      <span class="checkout-pincode-dot" aria-hidden="true"></span>
+                      <p><strong id="checkoutPincodeTitle">Check delivery availability</strong><small id="checkoutPincodeStatus">Enter your six-digit PIN code.</small></p>
+                      <button id="checkoutPincodeCheckButton" type="button">Check PIN code</button>
+                      <a id="checkoutPincodeLoginLink" href="account.html?return=checkout#login" hidden>Sign in to check</a>
+                    </div>
+                    <label class="checkout-field">
+                      <span>State</span>
+                      <select id="checkoutState" name="state" autocomplete="address-level1" required>
+                        <option value="">Select state</option>
+                        <option>Delhi</option><option>Haryana</option><option>Punjab</option><option>Rajasthan</option><option>Uttar Pradesh</option><option>Other</option>
+                      </select>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field">
+                      <span>Address type</span>
+                      <select id="checkoutAddressType" name="address_type" required>
+                        <option value="HOME">Home</option><option value="WORK">Work</option><option value="OTHER">Other</option>
+                      </select>
+                      <small class="field-error"></small>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <section class="checkout-delivery-availability" id="checkoutDeliveryAvailability" aria-labelledby="checkoutDeliveryAvailabilityTitle">
+                  <div class="checkout-subsection-heading">
+                    <div><span>Fresh-batch availability</span><h3 id="checkoutDeliveryAvailabilityTitle">Select a delivery date</h3></div>
+                    <button id="checkoutRefreshAvailabilityButton" type="button">Check dates</button>
+                  </div>
+                  <p id="checkoutDeliveryAvailabilityStatus" role="status" aria-live="polite" aria-atomic="true">Choose an address to see available delivery dates.</p>
+                  <div class="checkout-fields checkout-fields-two">
+                    <label class="checkout-field" id="checkoutWeeklyScheduleField" hidden>
+                      <span>Preferred weekly day</span>
+                      <select id="checkoutDeliveryDay" name="delivery_day">
+                        <option value="">Choose a day</option>
+                        <option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+                      </select>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field">
+                      <span>Preferred delivery date</span>
+                      <select id="checkoutDeliveryDate" name="delivery_date" required>
+                        <option value="">Choose an address first</option>
+                      </select>
+                      <small class="field-error" id="checkoutDeliveryDateError"></small>
+                    </label>
+                  </div>
+                </section>
+
+                <div class="checkout-step-actions">
+                  <button class="checkout-back" id="checkoutDeliveryBackButton" type="button">Back to your details</button>
+                  <button class="button button-dark checkout-next api-async-button" id="checkoutDeliverySubmit" type="submit" aria-busy="false">
+                    <span id="checkoutDeliverySubmitLabel">Review my order</span>
+                    <span class="api-button-spinner" aria-hidden="true"></span>
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="checkout-step" data-checkout-step="3" aria-labelledby="reviewTitle" hidden>
+                <p class="checkout-kicker">Review &amp; payment</p>
+                <h2 id="reviewTitle">Everything, clearly before you pay.</h2>
+                <p>Review the address, fresh-batch date and wallet balance. Your order is created only after you confirm below.</p>
+
+                <div class="checkout-review-address" id="checkoutReviewAddress" aria-label="Delivery summary"></div>
+
+                <fieldset class="checkout-fieldset checkout-payment-methods checkout-wallet-only" id="checkoutPaymentMethods">
+                  <legend>Pay with Atulyash Wallet</legend>
+                  <input id="checkoutPaymentWallet" type="hidden" name="payment_method" value="wallet">
+                  <div class="checkout-wallet-card" id="checkoutWalletCard" aria-live="polite">
+                    <div class="checkout-wallet-card-head">
+                      <span class="checkout-wallet-emblem" aria-hidden="true">A</span>
+                      <div>
+                        <strong>Atulyash Wallet</strong>
+                        <small>Every Atulyash order is paid securely from your wallet.</small>
+                      </div>
+                      <span class="checkout-wallet-state" id="checkoutWalletState">Checking</span>
+                    </div>
+                    <dl class="checkout-wallet-figures">
+                      <div><dt>Available balance</dt><dd id="checkoutWalletBalance">Checking…</dd></div>
+                      <div><dt id="checkoutWalletOrderLabel">Order total</dt><dd id="checkoutWalletOrderTotal">₹0</dd></div>
+                      <div id="checkoutWalletRequirementRow" hidden><dt id="checkoutWalletRequirementLabel">Plan covers</dt><dd id="checkoutWalletRequirement">4 deliveries</dd></div>
+                      <div class="checkout-wallet-shortfall" id="checkoutWalletShortfallRow" hidden><dt>Amount needed</dt><dd id="checkoutWalletShortfall">₹0</dd></div>
+                    </dl>
+                    <p class="checkout-wallet-explanation" id="checkoutWalletExplanation">We are checking whether your wallet covers this order.</p>
+                    <div class="checkout-wallet-actions">
+                      <button class="button button-dark api-async-button" id="checkoutWalletAddButton" type="button" hidden aria-busy="false">
+                        <span id="checkoutWalletAddButtonLabel">Add money to wallet</span>
+                        <span class="api-button-spinner" aria-hidden="true"></span>
+                        <span aria-hidden="true">→</span>
+                      </button>
+                      <button class="checkout-wallet-refresh" id="checkoutWalletRefreshButton" type="button">Refresh balance</button>
+                    </div>
+                    <section class="checkout-wallet-topup" id="checkoutWalletTopup" aria-labelledby="checkoutWalletTopupTitle" hidden>
+                      <p class="checkout-kicker">Add money securely</p>
+                      <h3 id="checkoutWalletTopupTitle">Review wallet recharge</h3>
+                      <dl id="checkoutWalletTopupSummary"></dl>
+                      <p>Razorpay is used only to add money to your wallet. Your atta order itself is paid only from the Atulyash Wallet.</p>
+                      <div class="checkout-wallet-topup-actions">
+                        <button class="checkout-back" id="checkoutWalletTopupCancel" type="button">Cancel</button>
+                        <button class="button button-dark api-async-button" id="checkoutWalletTopupConfirm" type="button" aria-busy="false">
+                          <span id="checkoutWalletTopupConfirmLabel">Continue to add money</span>
+                          <span class="api-button-spinner" aria-hidden="true"></span>
+                          <span aria-hidden="true">↗</span>
+                        </button>
+                      </div>
+                    </section>
+                  </div>
+                  <p class="checkout-payment-status" id="checkoutPaymentStatus" role="status" aria-live="polite">Checking your live wallet balance…</p>
+                </fieldset>
+
+                <label class="checkout-field checkout-order-notes">
+                  <span>Order note <em><output id="checkoutOrderNotesCount">0</output>/250</em></span>
+                  <textarea id="checkoutOrderNotes" name="notes" rows="3" maxlength="250" placeholder="Anything our delivery team should know? (Optional)"></textarea>
+                </label>
+
+                <aside class="checkout-payment-note">
+                  <span aria-hidden="true">₹</span>
+                  <div><strong id="checkoutWalletPolicyTitle">Wallet-only order payment</strong><p id="checkoutWalletPolicyDescription">This one-time order is debited once from your Atulyash Wallet. If the balance is low, you can add the exact shortfall first.</p></div>
+                </aside>
+
+                <label class="checkout-consent">
+                  <input id="checkoutConsent" type="checkbox" required>
+                  <span id="checkoutConsentText">I confirm this one-time order, delivery address, date and Atulyash Wallet payment.</span>
+                </label>
+                <small class="checkout-consent-error" id="checkoutConsentError" role="alert"></small>
+                <div class="checkout-place-order-status" id="checkoutPlaceOrderStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+                  <span class="api-status-spinner" aria-hidden="true"></span><span id="checkoutPlaceOrderStatusLabel">Creating your secure order…</span>
+                </div>
+                <div class="checkout-review-actions">
+                  <button class="checkout-back" id="checkoutBackButton" type="button">Back to delivery</button>
+                  <button class="button button-dark api-async-button" id="placeOrderButton" type="button" aria-busy="false">
+                    <span id="placeOrderButtonLabel">Place one-time order</span>
+                    <span class="api-button-spinner" aria-hidden="true"></span>
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </section>
+            </form>
+
+            <section class="checkout-success" id="checkoutSuccess" aria-live="polite" hidden>
+              <div class="checkout-success-celebration" id="checkoutSuccessCelebration" aria-hidden="true">
+                <div class="checkout-success-orbit"></div>
+                <div class="checkout-success-stone"><span></span></div>
+                <div class="checkout-success-flour"><i></i><i></i><i></i></div>
+                <div class="checkout-success-grains">
+                  <i style="--tx:-152px;--ty:-58px;--r:-72deg;--d:.03s"></i>
+                  <i style="--tx:-126px;--ty:-112px;--r:-38deg;--d:.1s"></i>
+                  <i style="--tx:-76px;--ty:-142px;--r:18deg;--d:.16s"></i>
+                  <i style="--tx:-22px;--ty:-154px;--r:54deg;--d:.08s"></i>
+                  <i style="--tx:55px;--ty:-148px;--r:82deg;--d:.2s"></i>
+                  <i style="--tx:118px;--ty:-116px;--r:116deg;--d:.12s"></i>
+                  <i style="--tx:154px;--ty:-62px;--r:148deg;--d:.18s"></i>
+                  <i style="--tx:-162px;--ty:4px;--r:-98deg;--d:.2s"></i>
+                  <i style="--tx:164px;--ty:1px;--r:112deg;--d:.05s"></i>
+                  <i style="--tx:-105px;--ty:35px;--r:-128deg;--d:.14s"></i>
+                  <i style="--tx:112px;--ty:40px;--r:132deg;--d:.23s"></i>
+                </div>
+                <img class="checkout-success-pack" src="images/atta-packet-2026.webp" width="1553" height="2302" alt="">
+                <img class="checkout-success-veer" src="images/veer-mascot-2026.webp" width="1536" height="2048" alt="">
+                <div class="checkout-success-mark">
+                  <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21"></circle><path d="m14.5 24.5 6.2 6.2 13.4-14"></path></svg>
+                </div>
+                <span class="checkout-success-ribbon">Fresh batch confirmed</span>
+              </div>
+              <p class="checkout-kicker">Order confirmed</p>
+              <h2 id="checkoutSuccessTitle" tabindex="-1">Your fresh batch is on its way.</h2>
+              <p id="checkoutSuccessMessage">Order <strong id="checkoutReference">ATU-000000</strong> has been placed successfully.</p>
+              <dl class="checkout-success-details" id="checkoutSuccessDetails">
+                <div><dt>Delivery</dt><dd id="checkoutSuccessDeliveryDate">To be confirmed</dd></div>
+                <div><dt>Payment</dt><dd id="checkoutSuccessPaymentStatus">Confirmed</dd></div>
+              </dl>
+              <div class="checkout-success-actions">
+                <a class="button button-dark" id="checkoutViewOrderLink" href="account.html#orders">View my order <span aria-hidden="true">→</span></a>
+                <button class="checkout-back" id="successCloseButton" type="button">Return to Atulyash</button>
+              </div>
+              <p class="checkout-success-support">Need help with this order? <a id="whatsappOrderLink" href="https://wa.me/919818588996" target="_blank" rel="noopener noreferrer">Chat with Atulyash on WhatsApp <span aria-hidden="true">↗</span></a></p>
+            </section>
+          </div>
+
+          <aside class="checkout-summary" aria-labelledby="checkoutSummaryTitle">
+            <p class="checkout-kicker">Your bag</p>
+            <h3 id="checkoutSummaryTitle">Order summary</h3>
+            <div class="checkout-summary-items" id="checkoutSummaryItems"></div>
+            <div class="checkout-summary-total"><span id="checkoutSubtotalLabel">Subtotal</span><strong id="checkoutSubtotal">₹0</strong></div>
+            <div class="checkout-summary-credit" id="checkoutExperienceCreditRow" hidden><span id="checkoutDiscountLabel">Your first Atulyash experience</span><strong id="checkoutExperienceCredit">−₹100</strong></div>
+            <section class="commerce-offers" id="couponOffer" aria-labelledby="couponOfferTitle">
+              <button class="commerce-offers-toggle" id="couponToggleButton" type="button" aria-expanded="false" aria-controls="couponPanel">
+                <span class="commerce-offers-mark" aria-hidden="true">%</span>
+                <span><strong id="couponOfferTitle">Offers for this bag</strong><small id="couponOfferSummary">See eligible Atulyash coupons</small></span>
+                <span class="commerce-offers-chevron" aria-hidden="true">›</span>
+              </button>
+              <div class="commerce-offers-panel" id="couponPanel" hidden>
+                <label class="commerce-offers-search">
+                  <span class="sr-only">Search coupons</span>
+                  <input id="couponSearch" type="search" autocomplete="off" placeholder="Search coupon code">
+                </label>
+                <p class="commerce-offers-status" id="couponStatus" role="status" aria-live="polite"></p>
+                <div class="commerce-offers-list" id="couponList"></div>
+              </div>
+            </section>
+            <div class="checkout-summary-grand-total"><span id="checkoutTotalLabel">Total after credit</span><strong id="checkoutTotal">₹0</strong></div>
+            <small>No delivery charges. The final fresh-batch schedule is confirmed after address review.</small>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="commerce-toast" id="commerceToast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <noscript><p class="checkout-noscript">JavaScript is required for secure checkout. <a href="index.html#shop">Return to your bag</a>.</p></noscript>
+  <script src="api-client.js?v=20260801-7"></script>
+  <script src="ecommerce.js?v=20260802-12"></script>
+</body>
+</html>

@@ -1,0 +1,4299 @@
+(() => {
+  'use strict';
+
+  const SESSION_META_KEY = 'atulyash-account-meta-v1';
+  const STOREFRONT_INTENT_KEY = 'atulyash-storefront-intent-v1';
+  const CHECKOUT_CONTEXT_KEY = 'atulyash-checkout-context-v1';
+  const CART_STORAGE_KEY = 'atulyash-cart-v1';
+  const currency = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  });
+  const shortDate = new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+  const monthDate = new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short'
+  });
+  const dateTime = new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+
+  const $ = (id) => document.getElementById(id);
+
+  function rememberCheckoutOrigin(origin = 'account') {
+    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify({
+      version: 1,
+      origin: origin === 'home' ? 'home' : 'account',
+      createdAt: Date.now()
+    }));
+  }
+
+  const elements = {
+    skipLink: $('skipLink'),
+    authShell: $('authShell'),
+    accountShell: $('accountShell'),
+    mobileStep: $('mobileStep'),
+    otpStep: $('otpStep'),
+    authReturnNotice: $('authReturnNotice'),
+    mobileForm: $('mobileForm'),
+    mobileNumber: $('mobileNumber'),
+    mobileError: $('mobileError'),
+    otpForm: $('otpForm'),
+    otpCode: $('otpCode'),
+    otpError: $('otpError'),
+    otpMobileDisplay: $('otpMobileDisplay'),
+    changeMobileButton: $('changeMobileButton'),
+    resendOtpButton: $('resendOtpButton'),
+    resendCountdown: $('resendCountdown'),
+    headerName: $('headerName'),
+    headerAvatar: $('headerAvatar'),
+    sidebarName: $('sidebarName'),
+    sidebarMobile: $('sidebarMobile'),
+    portalSidebar: document.querySelector('.account-shell .portal-sidebar'),
+    portalNav: $('portalAccountNav'),
+    mobileAccountNavToggle: $('mobileAccountNavToggle'),
+    mobileAccountNavLabel: $('mobileAccountNavLabel'),
+    profileMenu: $('profileMenu'),
+    portalBagShortcut: $('portalBagShortcut'),
+    portalBagCount: $('portalBagCount'),
+    accountBagBackdrop: $('accountBagBackdrop'),
+    accountBagDrawer: $('accountBagDrawer'),
+    accountBagCloseButton: $('accountBagCloseButton'),
+    accountBagTitleCount: $('accountBagTitleCount'),
+    accountBagStatus: $('accountBagStatus'),
+    accountBagStatusText: $('accountBagStatusText'),
+    accountBagRetryButton: $('accountBagRetryButton'),
+    accountBagEmpty: $('accountBagEmpty'),
+    accountBagItems: $('accountBagItems'),
+    accountBagPromise: $('accountBagPromise'),
+    accountBagFooter: $('accountBagFooter'),
+    accountBagSubtotalLabel: $('accountBagSubtotalLabel'),
+    accountBagSubtotal: $('accountBagSubtotal'),
+    accountBagCreditRow: $('accountBagCreditRow'),
+    accountBagCredit: $('accountBagCredit'),
+    accountBagTotalLabel: $('accountBagTotalLabel'),
+    accountBagTotal: $('accountBagTotal'),
+    accountBagCheckoutButton: $('accountBagCheckoutButton'),
+    accountBagContinueButton: $('accountBagContinueButton'),
+    profileShortcut: $('profileShortcut'),
+    notificationShortcut: $('notificationShortcut'),
+    notificationBadge: $('notificationBadge'),
+    navNotificationBadge: $('navNotificationBadge'),
+    portalMain: $('portalMain'),
+    logoutButton: $('logoutButton'),
+    accountQuickOrderForm: $('accountQuickOrderForm'),
+    quickOrderModes: $('quickOrderModes'),
+    quickOrderOnceFields: $('quickOrderOnceFields'),
+    quickOrderWeeklyFields: $('quickOrderWeeklyFields'),
+    accountPackSelector: $('accountPackSelector'),
+    quickOrderCatalogStatus: $('quickOrderCatalogStatus'),
+    quickOrderCatalogMessage: $('quickOrderCatalogMessage'),
+    quickOrderCatalogRetry: $('quickOrderCatalogRetry'),
+    quickOrderPlan: $('quickOrderPlan'),
+    quickOrderMinus: $('quickOrderMinus'),
+    quickOrderPlus: $('quickOrderPlus'),
+    quickOrderQuantity: $('quickOrderQuantity'),
+    quickOrderSelection: $('quickOrderSelection'),
+    quickOrderPrice: $('quickOrderPrice'),
+    quickOrderTotal: $('quickOrderTotal'),
+    quickOrderCtaLabel: $('quickOrderCtaLabel'),
+    quickOrderAssuranceText: $('quickOrderAssuranceText'),
+    quickOrderWeightBadge: $('quickOrderWeightBadge'),
+    quickOrderVisual: $('quickOrderVisual'),
+    quickOrderChapatiFill: $('quickOrderChapatiFill'),
+    quickOrderPackArt: $('quickOrderPackArt'),
+    weeklyChoiceSummary: $('weeklyChoiceSummary'),
+    weeklyChoiceQuantity: $('weeklyChoiceQuantity'),
+    weeklyChoiceCoverage: $('weeklyChoiceCoverage'),
+    weeklyChoicePerDelivery: $('weeklyChoicePerDelivery'),
+    weeklyChoiceFirstMonth: $('weeklyChoiceFirstMonth'),
+    weeklyChoicePaymentCopy: $('weeklyChoicePaymentCopy'),
+    overviewMetrics: $('overviewMetrics'),
+    upcomingDelivery: $('upcomingDelivery'),
+    overviewOrders: $('overviewOrders'),
+    orderFilter: $('orderFilter'),
+    ordersList: $('ordersList'),
+    ordersLoadMore: $('ordersLoadMore'),
+    chooseWeeklyPlanButton: $('chooseWeeklyPlanButton'),
+    weeklyPlanCount: $('weeklyPlanCount'),
+    weeklyPlanCountLabel: $('weeklyPlanCountLabel'),
+    vacationBanner: $('vacationBanner'),
+    setVacationButton: $('setVacationButton'),
+    subscriptionsList: $('subscriptionsList'),
+    accountCalculatorDetails: $('accountCalculatorDetails'),
+    accountDailyRotis: $('accountDailyRotis'),
+    accountRotisMinus: $('accountRotisMinus'),
+    accountRotisPlus: $('accountRotisPlus'),
+    accountCalculatorKg: $('accountCalculatorKg'),
+    accountCalculatorPlan: $('accountCalculatorPlan'),
+    accountCalculatorFormula: $('accountCalculatorFormula'),
+    addAddressButton: $('addAddressButton'),
+    addressesList: $('addressesList'),
+    deliveryHomeCount: $('deliveryHomeCount'),
+    deliveryHomeCountLabel: $('deliveryHomeCountLabel'),
+    walletBalance: $('walletBalance'),
+    rechargeForm: $('rechargeForm'),
+    rechargeAmount: $('rechargeAmount'),
+    rechargeOptions: $('rechargeOptions'),
+    rechargePreview: $('rechargePreview'),
+    previewRechargeButton: $('previewRechargeButton'),
+    initiateRechargeButton: $('initiateRechargeButton'),
+    walletTransactions: $('walletTransactions'),
+    notificationCategory: $('notificationCategory'),
+    unreadOnly: $('unreadOnly'),
+    markAllReadButton: $('markAllReadButton'),
+    notificationsList: $('notificationsList'),
+    profileForm: $('profileForm'),
+    profileName: $('profileName'),
+    profileEmail: $('profileEmail'),
+    profileMobile: $('profileMobile'),
+    profileAvatar: $('profileAvatar'),
+    requestDeletionButton: $('requestDeletionButton'),
+    contactCards: $('contactCards'),
+    truthBookCard: $('truthBookCard'),
+    faqList: $('faqList'),
+    dialog: $('portalDialog'),
+    dialogEyebrow: $('dialogEyebrow'),
+    dialogTitle: $('dialogTitle'),
+    dialogBody: $('dialogBody'),
+    dialogCloseButton: $('dialogCloseButton'),
+    toast: $('portalToast'),
+    globalStatus: $('globalStatus')
+  };
+
+  const state = {
+    mobile: '',
+    userId: null,
+    customerId: null,
+    user: null,
+    customer: null,
+    activeView: 'shop',
+    quickOrderQuantity: 1,
+    quickOrderAnimationTimer: null,
+    loaded: new Set(),
+    loading: new Map(),
+    orders: [],
+    orderPage: 1,
+    ordersHaveMore: false,
+    addresses: [],
+    subscriptions: [],
+    vacations: [],
+    wallet: null,
+    walletPreview: null,
+    notifications: [],
+    unreadCount: 0,
+    products: [],
+    quickProductPacks: [],
+    quickProductCatalogStatus: 'loading',
+    weeklyPlans: [],
+    weeklyCatalogStatus: 'loading',
+    quickOrderSubmitting: false,
+    accountBagItems: [],
+    accountBagPayload: null,
+    accountBagLoading: false,
+    accountBagReturnFocus: null,
+    contact: null,
+    truthBook: null,
+    resendTimer: null,
+    toastTimer: null,
+    dialogReturnFocus: null,
+    razorpayLoader: null
+  };
+
+  function client() {
+    return window.AtulyashAPI || null;
+  }
+
+  function methodFrom(group, names) {
+    const api = client();
+    if (!api) return null;
+    const scope = group ? api[group] : api;
+    if (!scope) return null;
+    for (const name of names) {
+      if (typeof scope[name] === 'function') return scope[name].bind(scope);
+    }
+    return null;
+  }
+
+  function withoutKeys(source, keys) {
+    const result = {};
+    Object.keys(source || {}).forEach((key) => {
+      if (!keys.includes(key)) result[key] = source[key];
+    });
+    return result;
+  }
+
+  function groupedArguments(group, methodName, input) {
+    const value = input || {};
+    const identifier = firstValue(
+      value.id,
+      value.orderId,
+      value.addressId,
+      value.subscriptionId,
+      value.subPlanId,
+      value.subId,
+      value.vacationId,
+      value.notificationId,
+      value.userId,
+      value.customerId
+    );
+
+    if (group === 'auth') {
+      if (/requestOtp|requestOTP/.test(methodName)) {
+        return [value.mobile, { is_rider: false }];
+      }
+      if (/verifyOtp|verifyOTP/.test(methodName)) {
+        return [value.mobile, value.otp, { is_rider: false }];
+      }
+    }
+
+    if (group === 'addresses') {
+      if (/^update$|patchCustomerAddress/.test(methodName)) {
+        return [identifier, withoutKeys(value, ['id', 'addressId'])];
+      }
+      return [value];
+    }
+
+    if (group === 'orders') {
+      if (/^detail$|getOrderDetails/.test(methodName)) return [identifier];
+      if (/^reorder$/.test(methodName)) return [identifier];
+      if (/changeAddress/.test(methodName)) return [identifier, value.address_id || value.addressId];
+      return [value];
+    }
+
+    if (group === 'subscriptions') {
+      if (/skippableDeliveries|getSkippableDeliveries|skipSummary|getSkipSummary/.test(methodName)) {
+        return [identifier];
+      }
+      if (/^(skip|unskip)$|skipDelivery|unskipDelivery/.test(methodName)) {
+        return [identifier, value.delivery_date || value.deliveryDate];
+      }
+      if (/^cancel$/.test(methodName)) {
+        return [identifier, {
+          cancellation_reason_id: value.cancellation_reason_id,
+          cancellation_detail: value.cancellation_detail
+        }];
+      }
+      if (/^updateVacation$|patchCustomerVacation/.test(methodName)) {
+        return [identifier, {
+          start_date: value.start_date,
+          end_date: value.end_date
+        }];
+      }
+      if (/^endVacation$|endCustomerVacation/.test(methodName)) return [identifier];
+      if (/cancellationReasons|getCancellationReasons/.test(methodName)) return [];
+      if (/^createVacation$|setCustomerVacation/.test(methodName)) {
+        return [{
+          subscription: value.subscription,
+          start_date: value.start_date,
+          end_date: value.end_date
+        }];
+      }
+      return [value];
+    }
+
+    if (group === 'notifications') {
+      if (/unreadCount|fetchUnreadCount|markAllRead/.test(methodName)) return [];
+      if (/markRead/.test(methodName)) return [identifier];
+      return [value];
+    }
+
+    if (group === 'profile') {
+      if (/^getUser$|getUserData|^getCustomer$|getCustomerData/.test(methodName)) return [identifier];
+      if (/^updateUser$|saveUserData/.test(methodName)) {
+        return [identifier, withoutKeys(value, ['id', 'userId'])];
+      }
+      if (/requestDeletion|submitAccountDeletionRequest/.test(methodName)) return [value.reason];
+      return [value];
+    }
+
+    if (group === 'misc') {
+      if (/^wallet$|getCustomerWallet/.test(methodName)) return [value.customerId || value.id];
+      if (/rechargePreview|previewRecharge|rechargeInitiate|initiateRecharge/.test(methodName)) return [value.amount];
+      if (/submitReview|postReview/.test(methodName)) {
+        return [{
+          order: value.order,
+          is_active: value.is_active,
+          product: value.product,
+          user: value.user,
+          rating: value.rating,
+          review: value.review,
+          to_display: value.to_display
+        }];
+      }
+      if (/rechargeVerify|verifyRecharge/.test(methodName)) return [value];
+      if (/walletTransactions|getWalletTransactions|rechargeOptions|getRechargeOptions|faqs|getFAQs|truthBook|getTruthBook|contact|getContactUsData/.test(methodName)) {
+        return [value];
+      }
+    }
+
+    return [value];
+  }
+
+  async function apiCall(group, methodNames, input, fallback) {
+    const api = client();
+    if (!api) throw new Error('The secure Atulyash service is not available on this page.');
+
+    const names = Array.isArray(methodNames) ? methodNames : [methodNames];
+    const scope = group ? api[group] : api;
+    if (scope) {
+      for (const name of names) {
+        if (typeof scope[name] === 'function') {
+          return scope[name](...groupedArguments(group, name, input));
+        }
+      }
+    }
+
+    if (typeof api.request === 'function' && fallback?.path) {
+      const path = typeof fallback.path === 'function' ? fallback.path(input || {}) : fallback.path;
+      if (!path) throw new Error('This request needs account information that is not available yet.');
+      const formPayload = typeof fallback.form === 'function' ? fallback.form(input || {}) : fallback.form;
+      const bodyPayload = typeof fallback.body === 'function' ? fallback.body(input || {}) : fallback.body;
+      return api.request(path, {
+        method: fallback.method || 'GET',
+        query: typeof fallback.query === 'function' ? fallback.query(input || {}) : fallback.query,
+        body: bodyPayload === undefined ? formPayload : bodyPayload,
+        form: formPayload !== undefined,
+        auth: fallback.auth !== false
+      });
+    }
+
+    throw new Error('This account service is not available in the current API configuration.');
+  }
+
+  function responseData(response) {
+    if (response == null) return {};
+    if (response.data != null) return response.data;
+    return response;
+  }
+
+  function responseList(response) {
+    const data = responseData(response);
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.list)) return data.list;
+    if (Array.isArray(data.skippable)) return data.skippable;
+    if (Array.isArray(data.notifications)) return data.notifications;
+    if (Array.isArray(data.orders)) return data.orders;
+    if (Array.isArray(data.addresses)) return data.addresses;
+    if (Array.isArray(data.subscriptions)) return data.subscriptions;
+    if (Array.isArray(data.transactions)) return data.transactions;
+    if (Array.isArray(data.options)) return data.options;
+    if (data.data && data.data !== data) return responseList(data.data);
+    return [];
+  }
+
+  function localBagQuantity() {
+    try {
+      const items = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
+      if (!Array.isArray(items)) return 0;
+      return items.reduce((total, item) => {
+        const quantity = Number(item?.quantity);
+        return total + (Number.isFinite(quantity) && quantity > 0 ? Math.round(quantity) : 0);
+      }, 0);
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function bagQuantityFromPayload(payload) {
+    const sources = bagPayloadSources(payload);
+    const itemKeys = ['cart_items', 'items', 'line_items', 'results'];
+
+    for (const source of sources) {
+      for (const key of itemKeys) {
+        if (!Array.isArray(source[key])) continue;
+        return source[key].reduce((total, item) => {
+          const quantity = Number(item?.quantity);
+          return total + (Number.isFinite(quantity) && quantity > 0 ? Math.round(quantity) : 1);
+        }, 0);
+      }
+    }
+
+    const countKeys = ['total_quantity', 'item_count', 'items_count', 'cart_items_count', 'total_items'];
+    for (const source of sources) {
+      for (const key of countKeys) {
+        const count = Number(source[key]);
+        if (Number.isFinite(count) && count >= 0) return Math.round(count);
+      }
+    }
+    return null;
+  }
+
+  function bagPayloadSources(payload) {
+    const data = responseData(payload);
+    return [
+      payload,
+      data,
+      payload?.cart,
+      data?.cart,
+      payload?.summary,
+      data?.summary,
+      payload?.totals,
+      data?.totals
+    ].filter((source) => source && typeof source === 'object');
+  }
+
+  function serverBagItems(payload) {
+    const keys = ['cart_items', 'items', 'line_items', 'results'];
+    for (const source of bagPayloadSources(payload)) {
+      for (const key of keys) {
+        if (Array.isArray(source[key])) return source[key];
+      }
+    }
+    return [];
+  }
+
+  function readLocalBagItems() {
+    try {
+      const items = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]');
+      return Array.isArray(items) ? items : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function firstFinite(...values) {
+    for (const value of values) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function weightFromLabel(value) {
+    const match = String(value || '').match(/(\d+(?:\.\d+)?)\s*kg/i);
+    return match ? Number(match[1]) : null;
+  }
+
+  function bagWeightLabel(value) {
+    const weight = Number(value);
+    if (!Number.isFinite(weight) || weight <= 0) return '';
+    return Number.isInteger(weight) ? String(weight) : weight.toFixed(1);
+  }
+
+  function normalizeServerBagItem(item, index) {
+    if (!item || typeof item !== 'object') return null;
+    const subscriptionPack = item.subscription_pack && typeof item.subscription_pack === 'object'
+      ? item.subscription_pack
+      : null;
+    const productPack = item.product_pack && typeof item.product_pack === 'object'
+      ? item.product_pack
+      : null;
+    const subscriptionPackId = firstValue(
+      subscriptionPack?.id,
+      subscriptionPack?.pk,
+      subscriptionPack ? null : item.subscription_pack,
+      item.subscription_pack_id
+    );
+    const productPackId = firstValue(
+      productPack?.id,
+      productPack?.pk,
+      productPack ? null : item.product_pack,
+      item.product_pack_id
+    );
+    const catalogPlan = state.weeklyPlans.find((plan) => (
+      subscriptionPackId != null && String(plan.id) === String(subscriptionPackId)
+    )) || null;
+    const catalogPack = state.quickProductPacks.find((pack) => (
+      productPackId != null && String(pack.apiId) === String(productPackId)
+    )) || null;
+    const itemType = String(firstValue(item.cart_item_type, item.item_type, '')).toLowerCase();
+    const weekly = Boolean(subscriptionPack || item.subscription_pack) || itemType.includes('subscription');
+    const quantity = Math.max(1, Math.round(firstFinite(item.quantity) || 1));
+    const weight = weekly
+      ? firstFinite(
+        catalogPlan?.weeklyKg,
+        subscriptionPack?.weekly_quantity,
+        item.weekly_quantity,
+        item.weight,
+        weightFromLabel(subscriptionPack?.name)
+      )
+      : firstFinite(
+        catalogPack?.weight,
+        productPack?.weight,
+        item.weight,
+        weightFromLabel(productPack?.name)
+      );
+    const unitPrice = firstFinite(
+      weekly ? catalogPlan?.price : catalogPack?.price,
+      item.unit_price,
+      item.price,
+      weekly ? subscriptionPack?.weekly_price : productPack?.price
+    ) || 0;
+    const monthlyPrice = weekly
+      ? firstFinite(
+        catalogPlan?.monthlyPrice,
+        subscriptionPack?.price,
+        item.monthly_price,
+        item.subscription_price,
+        unitPrice * 4
+      ) || 0
+      : null;
+    const monthlyKg = weekly
+      ? firstFinite(catalogPlan?.monthlyKg, subscriptionPack?.monthly_quantity, item.monthly_quantity)
+      : null;
+    const lineTotal = (weekly ? monthlyPrice : unitPrice) * quantity;
+    const deliveryDay = firstValue(item.delivery_day, item.preferred_delivery_day, '');
+    const compactWeight = bagWeightLabel(weight);
+    const weeklyWeight = bagWeightLabel((weight || 0) * quantity);
+    const monthlyWeight = bagWeightLabel((monthlyKg || 0) * quantity);
+    const unavailable = weekly
+      ? state.weeklyCatalogStatus === 'ready' && subscriptionPackId != null && !catalogPlan
+      : state.quickProductCatalogStatus === 'ready' && productPackId != null && !catalogPack;
+    return {
+      key: `server-${firstValue(item.id, item.pk, index)}`,
+      source: 'server',
+      serverId: firstValue(item.id, item.pk),
+      title: firstValue(
+        productPack?.product?.name,
+        item.product?.name,
+        item.product_name,
+        'Atulyash Whole Wheat Atta'
+      ),
+      meta: weekly
+        ? [
+          weeklyWeight ? `${weeklyWeight} kg/week total` : 'Fresh weekly plan',
+          monthlyWeight ? `${monthlyWeight} kg/month total` : '',
+          deliveryDay || 'Schedule selected at checkout'
+        ].filter(Boolean).join(' · ')
+        : `${compactWeight ? `${compactWeight} kg · ` : ''}One-time order`,
+      quantity,
+      unitPrice,
+      monthlyPrice,
+      lineTotal,
+      weekly,
+      unavailable,
+      unavailableLabel: unavailable ? 'This selection is no longer in the active catalogue.' : ''
+    };
+  }
+
+  function normalizeLocalBagItem(item, index) {
+    if (!item || typeof item !== 'object') return null;
+    const weekly = item.purchaseType === 'weekly';
+    const quantity = Math.max(1, Math.round(firstFinite(item.quantity) || 1));
+    const requestedWeight = firstFinite(
+      weekly ? item.weeklyKg : item.weightKg,
+      item.weight
+    );
+    const catalogPlan = weekly
+      ? state.weeklyPlans.find((plan) => (
+        (item.apiPlanId != null && String(plan.id) === String(item.apiPlanId))
+        || Number(plan.monthlyKg) === Number(item.monthlyKg)
+        || Number(plan.weeklyKg) === Number(requestedWeight)
+      )) || null
+      : null;
+    const catalogPack = !weekly
+      ? state.quickProductPacks.find((pack) => (
+        (item.apiPackId != null && String(pack.apiId) === String(item.apiPackId))
+        || Number(pack.weight) === Number(requestedWeight)
+      )) || null
+      : null;
+    const weight = firstFinite(
+      weekly ? catalogPlan?.weeklyKg : catalogPack?.weight,
+      requestedWeight
+    );
+    const unitPrice = firstFinite(
+      weekly ? catalogPlan?.price : catalogPack?.price,
+      item.pricePerDelivery,
+      item.price
+    ) || 0;
+    const compactWeight = bagWeightLabel(weight);
+    const monthlyKg = weekly
+      ? firstFinite(catalogPlan?.monthlyKg, item.monthlyKg, (weight || 0) * 4)
+      : null;
+    const monthlyPrice = weekly
+      ? firstFinite(catalogPlan?.monthlyPrice, item.monthlyPrice, unitPrice * 4) || 0
+      : null;
+    const weeklyWeight = bagWeightLabel((weight || 0) * quantity);
+    const monthlyWeight = bagWeightLabel((monthlyKg || 0) * quantity);
+    const deliveryDay = firstValue(item.deliveryDay, '');
+    const unavailable = weekly
+      ? state.weeklyCatalogStatus === 'ready' && !catalogPlan
+      : state.quickProductCatalogStatus === 'ready' && !catalogPack;
+    return {
+      key: `local-${firstValue(item.id, index)}`,
+      source: 'local',
+      localIndex: index,
+      title: 'Atulyash Whole Wheat Atta',
+      meta: weekly
+        ? [
+          weeklyWeight ? `${weeklyWeight} kg/week total` : 'Fresh weekly plan',
+          monthlyWeight ? `${monthlyWeight} kg/month total` : '',
+          deliveryDay || 'Schedule selected at checkout'
+        ].filter(Boolean).join(' · ')
+        : `${compactWeight ? `${compactWeight} kg · ` : ''}One-time order`,
+      quantity,
+      unitPrice,
+      monthlyPrice,
+      lineTotal: (weekly ? monthlyPrice : unitPrice) * quantity,
+      weekly,
+      unavailable,
+      unavailableLabel: unavailable ? 'This saved selection is no longer in the active catalogue.' : ''
+    };
+  }
+
+  function normalizedAccountBagItems(payload = state.accountBagPayload) {
+    const liveItems = serverBagItems(payload)
+      .map(normalizeServerBagItem)
+      .filter(Boolean);
+    const savedItems = readLocalBagItems()
+      .map(normalizeLocalBagItem)
+      .filter(Boolean);
+    // Match the storefront contract: an unsynchronised local selection is the
+    // pending bag until checkout sync completes. Showing both copies here
+    // would inflate the customer-facing count and total.
+    return savedItems.length ? savedItems : liveItems;
+  }
+
+  function accountBagMoney(payload, keys) {
+    for (const source of bagPayloadSources(payload)) {
+      for (const key of keys) {
+        if (source?.[key] == null || source?.[key] === '') continue;
+        const value = Number(source[key]);
+        if (Number.isFinite(value)) return value;
+      }
+    }
+    return NaN;
+  }
+
+  function accountBagSummary(lines, lineSubtotal) {
+    const hasLocalSelections = readLocalBagItems().length > 0;
+    const hasWeekly = lines.some((line) => line.weekly);
+    const serverSubtotal = accountBagMoney(
+      state.accountBagPayload,
+      ['subtotal', 'sub_total', 'cart_subtotal', 'gross_amount', 'total_before_discount']
+    );
+    const serverDiscount = accountBagMoney(
+      state.accountBagPayload,
+      ['discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']
+    );
+    const serverTotal = accountBagMoney(
+      state.accountBagPayload,
+      ['net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']
+    );
+    const subtotal = !hasLocalSelections && !hasWeekly && Number.isFinite(serverSubtotal)
+      ? serverSubtotal
+      : lineSubtotal;
+    const discount = !hasLocalSelections && Number.isFinite(serverDiscount)
+      ? Math.max(0, serverDiscount)
+      : 0;
+    const total = !hasLocalSelections && !hasWeekly && Number.isFinite(serverTotal)
+      ? serverTotal
+      : Math.max(0, subtotal - discount);
+    return { subtotal, discount, total };
+  }
+
+  function showPortalBagCount(count) {
+    if (!elements.portalBagShortcut || !elements.portalBagCount) return;
+    const quantity = Math.max(0, Math.round(Number(count) || 0));
+    elements.portalBagCount.textContent = quantity > 99 ? '99+' : String(quantity);
+    elements.portalBagCount.hidden = false;
+    elements.portalBagShortcut.setAttribute(
+      'aria-label',
+      `Open My Bag, ${quantity} ${quantity === 1 ? 'item' : 'items'}`
+    );
+  }
+
+  async function refreshPortalBagCount() {
+    const localQuantity = localBagQuantity();
+    if (localQuantity > 0) showPortalBagCount(localQuantity);
+
+    const ensureActiveBag = methodFrom('cart', ['ensureActive']);
+    if (!ensureActiveBag) return;
+    try {
+      const payload = await ensureActiveBag(state.mobile);
+      state.accountBagPayload = payload;
+      const liveQuantity = bagQuantityFromPayload(payload);
+      if (localQuantity === 0 && liveQuantity != null) {
+        showPortalBagCount(liveQuantity);
+      }
+    } catch (error) {
+      // The bag remains directly accessible even when its live count cannot load.
+    }
+  }
+
+  function setAccountBagStatus(message = '', {
+    state: status = 'loading',
+    retry = false,
+    hidden = false
+  } = {}) {
+    if (!elements.accountBagStatus) return;
+    elements.accountBagStatus.hidden = hidden;
+    elements.accountBagStatus.dataset.state = status;
+    if (elements.accountBagStatusText) elements.accountBagStatusText.textContent = message;
+    if (elements.accountBagRetryButton) elements.accountBagRetryButton.hidden = !retry;
+  }
+
+  function makeAccountBagLine(line) {
+    const article = create(
+      'article',
+      `account-bag-line unified-bag-item${line.source === 'local' ? ' is-saved' : ''}${line.unavailable ? ' is-unavailable' : ''}`
+    );
+    article.dataset.bagSource = line.source;
+    if (line.serverId != null) article.dataset.serverId = String(line.serverId);
+    if (line.localIndex != null) article.dataset.localIndex = String(line.localIndex);
+
+    const visual = create('div', 'account-bag-line-visual unified-bag-item-visual');
+    const image = document.createElement('img');
+    image.src = 'images/sack5g.webp';
+    image.width = 490;
+    image.height = 512;
+    image.alt = '';
+    visual.append(image);
+
+    const copy = create('div', 'account-bag-line-copy unified-bag-item-info');
+    const price = create('strong', 'account-bag-line-price', currency.format(line.lineTotal));
+    const top = create('div', 'unified-bag-item-top');
+    top.append(create('h3', '', line.title), price);
+    const meta = create(
+      'p',
+      'unified-bag-item-meta',
+      line.unavailable
+        ? line.unavailableLabel
+        : line.weekly
+          ? `${line.meta} · ${currency.format(line.unitPrice)}/week · ${currency.format(line.monthlyPrice)} charged for the first month`
+          : `${line.meta} · ${currency.format(line.unitPrice)} each`
+    );
+    const controls = create('div', 'account-bag-line-controls unified-bag-item-controls');
+    if (line.unavailable) {
+      controls.append(create('span', 'cart-item-warning', 'Ordering unavailable'));
+      const remove = button('Remove', 'account-bag-remove', null);
+      remove.dataset.bagAction = 'remove';
+      remove.disabled = line.source === 'server' && line.serverId == null;
+      controls.append(remove);
+      copy.append(top, meta, controls);
+      article.append(visual, copy);
+      return article;
+    }
+    const quantity = create('div', 'account-bag-quantity unified-bag-quantity');
+    quantity.setAttribute('aria-label', `Quantity for ${line.title}`);
+    const minus = button('−', '', null);
+    minus.dataset.bagAction = 'decrease';
+    minus.setAttribute('aria-label', `Decrease quantity for ${line.title}`);
+    minus.disabled = line.source === 'server' && line.serverId == null;
+    const output = create('output', '', line.quantity);
+    output.setAttribute('aria-label', `Quantity ${line.quantity}`);
+    output.setAttribute('aria-live', 'polite');
+    const plus = button('+', '', null);
+    plus.dataset.bagAction = 'increase';
+    plus.setAttribute('aria-label', `Increase quantity for ${line.title}`);
+    plus.disabled = line.quantity >= 20 || (line.source === 'server' && line.serverId == null);
+    quantity.append(minus, output, plus);
+    const remove = button('Remove', 'account-bag-remove', null);
+    remove.dataset.bagAction = 'remove';
+    remove.disabled = line.source === 'server' && line.serverId == null;
+    controls.append(quantity, remove);
+
+    copy.append(top, meta, controls);
+    article.append(visual, copy);
+    return article;
+  }
+
+  function renderAccountBag() {
+    if (!elements.accountBagItems) return;
+    state.accountBagItems = normalizedAccountBagItems();
+    const quantity = state.accountBagItems.reduce((total, item) => total + item.quantity, 0);
+    const lineSubtotal = state.accountBagItems.reduce((total, item) => total + item.lineTotal, 0);
+    const summary = accountBagSummary(state.accountBagItems, lineSubtotal);
+    const hasWeekly = state.accountBagItems.some((item) => item.weekly);
+    showPortalBagCount(quantity);
+    if (elements.accountBagTitleCount) elements.accountBagTitleCount.textContent = `(${quantity})`;
+    if (elements.accountBagSubtotalLabel) {
+      elements.accountBagSubtotalLabel.textContent = hasWeekly
+        ? 'First-month plan subtotal'
+        : 'Subtotal';
+    }
+    if (elements.accountBagSubtotal) elements.accountBagSubtotal.textContent = currency.format(summary.subtotal);
+    if (elements.accountBagCreditRow) elements.accountBagCreditRow.hidden = summary.discount <= 0;
+    if (elements.accountBagCredit) elements.accountBagCredit.textContent = `−${currency.format(summary.discount)}`;
+    if (elements.accountBagTotalLabel) {
+      elements.accountBagTotalLabel.textContent = hasWeekly
+        ? 'Wallet debit today'
+        : 'Total after credit';
+    }
+    if (elements.accountBagTotal) elements.accountBagTotal.textContent = currency.format(summary.total);
+
+    const fragment = document.createDocumentFragment();
+    state.accountBagItems.forEach((line) => fragment.append(makeAccountBagLine(line)));
+    elements.accountBagItems.replaceChildren(fragment);
+    if (elements.accountBagEmpty) elements.accountBagEmpty.hidden = state.accountBagItems.length > 0;
+    if (elements.accountBagPromise) elements.accountBagPromise.hidden = state.accountBagItems.length === 0;
+    if (elements.accountBagFooter) elements.accountBagFooter.hidden = state.accountBagItems.length === 0;
+    if (elements.accountBagCheckoutButton) {
+      elements.accountBagCheckoutButton.disabled = (
+        state.accountBagItems.length === 0
+        || state.accountBagLoading
+        || state.accountBagItems.some((item) => item.unavailable)
+      );
+    }
+  }
+
+  async function loadAccountBag() {
+    if (state.accountBagLoading) return;
+    state.accountBagLoading = true;
+    setAccountBagStatus('Refreshing your secure bag…', { state: 'loading' });
+    renderAccountBag();
+
+    try {
+      const ensureActiveBag = methodFrom('cart', ['ensureActive']);
+      if (!ensureActiveBag) throw new Error('The secure bag service is unavailable right now.');
+      let payload = await ensureActiveBag(state.mobile);
+      const reportedQuantity = bagQuantityFromPayload(payload);
+      if (!serverBagItems(payload).length && reportedQuantity > 0) {
+        const activeSession = client()?.getSession?.() || {};
+        const cartId = firstValue(activeSession.cartId, activeSession.cart_id);
+        const getBag = methodFrom('cart', ['get']);
+        if (cartId != null && getBag) payload = await getBag(cartId);
+      }
+      state.accountBagPayload = payload;
+      renderAccountBag();
+      const savedCount = readLocalBagItems().length;
+      if (savedCount) {
+        setAccountBagStatus(
+          `${savedCount} ${savedCount === 1 ? 'selection is' : 'selections are'} saved from before sign-in and will be securely synchronised when you continue.`,
+          { state: 'info' }
+        );
+      } else {
+        setAccountBagStatus('', { hidden: true });
+      }
+    } catch (error) {
+      renderAccountBag();
+      setAccountBagStatus(
+        friendlyError(error, 'We could not refresh your live bag. Your saved selections are still safe.'),
+        { state: 'error', retry: true }
+      );
+    } finally {
+      state.accountBagLoading = false;
+      if (elements.accountBagCheckoutButton) {
+        elements.accountBagCheckoutButton.disabled = (
+          state.accountBagItems.length === 0
+          || state.accountBagItems.some((item) => item.unavailable)
+        );
+      }
+    }
+  }
+
+  function setAccountBagBackgroundInert(inert) {
+    document.querySelector('.account-shell .portal-header')?.toggleAttribute('inert', inert);
+    document.querySelector('.account-shell .portal-layout')?.toggleAttribute('inert', inert);
+    document.querySelector('.account-shell .portal-footer')?.toggleAttribute('inert', inert);
+  }
+
+  function openAccountBag({ refresh = true } = {}) {
+    if (!elements.accountBagDrawer || elements.accountShell.hidden) return;
+    if (elements.accountBagDrawer.classList.contains('is-open')) return;
+    state.accountBagReturnFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : elements.portalBagShortcut;
+    if (elements.accountBagBackdrop) elements.accountBagBackdrop.hidden = false;
+    elements.accountBagDrawer.inert = false;
+    elements.accountBagDrawer.setAttribute('aria-hidden', 'false');
+    elements.portalBagShortcut?.setAttribute('aria-expanded', 'true');
+    setAccountBagBackgroundInert(true);
+    document.body.classList.add('account-bag-open');
+    window.requestAnimationFrame(() => {
+      elements.accountBagBackdrop?.classList.add('is-visible');
+      elements.accountBagDrawer?.classList.add('is-open');
+    });
+    renderAccountBag();
+    if (refresh) void loadAccountBag();
+    window.setTimeout(() => elements.accountBagCloseButton?.focus(), 40);
+  }
+
+  function closeAccountBag({ restoreFocus = true } = {}) {
+    if (!elements.accountBagDrawer) return;
+    elements.accountBagDrawer.classList.remove('is-open');
+    elements.accountBagBackdrop?.classList.remove('is-visible');
+    elements.accountBagDrawer.setAttribute('aria-hidden', 'true');
+    elements.accountBagDrawer.inert = true;
+    elements.portalBagShortcut?.setAttribute('aria-expanded', 'false');
+    setAccountBagBackgroundInert(false);
+    document.body.classList.remove('account-bag-open');
+    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 320;
+    window.setTimeout(() => {
+      if (elements.accountBagBackdrop) elements.accountBagBackdrop.hidden = true;
+    }, delay);
+    if (restoreFocus) state.accountBagReturnFocus?.focus?.();
+    state.accountBagReturnFocus = null;
+  }
+
+  function saveLocalBagItems(items) {
+    if (items.length) localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    else localStorage.removeItem(CART_STORAGE_KEY);
+  }
+
+  async function updateAccountBagLine(article, action) {
+    if (!article || state.accountBagLoading) return;
+    const source = article.dataset.bagSource;
+    const line = source === 'local'
+      ? state.accountBagItems.find((item) => (
+        item.source === 'local' && String(item.localIndex) === String(article.dataset.localIndex)
+      ))
+      : state.accountBagItems.find((item) => (
+        item.source === 'server' && String(item.serverId) === String(article.dataset.serverId)
+      ));
+    if (!line) return;
+    const effectiveAction = action === 'decrease' && line.quantity <= 1 ? 'remove' : action;
+
+    article.querySelectorAll('button').forEach((control) => { control.disabled = true; });
+    if (source === 'local') {
+      try {
+        const items = readLocalBagItems();
+        const index = Number(line.localIndex);
+        if (!items[index]) throw new Error('This saved selection is no longer available.');
+        if (effectiveAction === 'remove') items.splice(index, 1);
+        else {
+          const change = effectiveAction === 'increase' ? 1 : -1;
+          items[index].quantity = Math.max(1, Math.min(20, line.quantity + change));
+        }
+        saveLocalBagItems(items);
+        renderAccountBag();
+        const savedCount = readLocalBagItems().length;
+        if (savedCount) {
+          setAccountBagStatus(
+            `${savedCount} ${savedCount === 1 ? 'selection is' : 'selections are'} saved from before sign-in and will be securely synchronised when you continue.`,
+            { state: 'info' }
+          );
+        } else {
+          setAccountBagStatus('', { hidden: true });
+        }
+        announce(effectiveAction === 'remove' ? 'Selection removed from your bag.' : 'Bag quantity updated.');
+      } catch (error) {
+        setAccountBagStatus('This saved selection could not be updated.', { state: 'error' });
+        renderAccountBag();
+      }
+      return;
+    }
+
+    state.accountBagLoading = true;
+    try {
+      if (effectiveAction === 'remove') {
+        const removeItem = methodFrom('cart', ['deleteItem']);
+        if (!removeItem) throw new Error('Bag removal is unavailable right now.');
+        await removeItem(line.serverId);
+      } else {
+        const updateItem = methodFrom('cart', ['updateItem']);
+        if (!updateItem) throw new Error('Bag updates are unavailable right now.');
+        const change = effectiveAction === 'increase' ? 1 : -1;
+        await updateItem(line.serverId, {
+          quantity: Math.max(1, Math.min(20, line.quantity + change))
+        });
+      }
+      state.accountBagLoading = false;
+      await loadAccountBag();
+      announce(effectiveAction === 'remove' ? 'Item removed from your bag.' : 'Bag quantity updated.');
+    } catch (error) {
+      state.accountBagLoading = false;
+      setAccountBagStatus(
+        friendlyError(error, 'Your bag could not be updated. Please try again.'),
+        { state: 'error', retry: true }
+      );
+      renderAccountBag();
+    }
+  }
+
+  function continueAccountBagCheckout() {
+    if (!state.accountBagItems.length) return;
+    try {
+      rememberCheckoutOrigin('account');
+      window.location.assign('checkout.html');
+    } catch (error) {
+      showToast('We could not prepare secure checkout. Please try again.', 'error');
+    }
+  }
+
+  function trapAccountBagFocus(event) {
+    if (
+      event.key !== 'Tab'
+      || !elements.accountBagDrawer?.classList.contains('is-open')
+    ) return;
+    const focusable = [...elements.accountBagDrawer.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )].filter((control) => !control.hidden && control.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function nextPageExists(response, listLength, pageSize = 15) {
+    const data = responseData(response);
+    return Boolean(data.next || data.next_page || data.has_next || listLength >= pageSize);
+  }
+
+  function numberFrom(...values) {
+    for (const value of values) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return 0;
+  }
+
+  function firstValue(...values) {
+    return values.find((value) => value !== undefined && value !== null && value !== '');
+  }
+
+  function idOf(value) {
+    if (value == null) return null;
+    if (typeof value === 'object') return firstValue(value.id, value.pk, value.uuid);
+    return value;
+  }
+
+  function formatMoney(value) {
+    return currency.format(numberFrom(value));
+  }
+
+  function dateValue(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function formatDate(value, includeTime = false) {
+    const parsed = dateValue(value);
+    if (!parsed) return 'Date to be confirmed';
+    return includeTime ? dateTime.format(parsed) : shortDate.format(parsed);
+  }
+
+  function create(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined && text !== null) element.textContent = String(text);
+    return element;
+  }
+
+  function button(text, className, handler) {
+    const control = create('button', className, text);
+    control.type = 'button';
+    if (handler) control.addEventListener('click', handler);
+    return control;
+  }
+
+  function safeUrl(value) {
+    if (!value) return null;
+    try {
+      const apiBase = typeof client()?.getConfig === 'function'
+        ? client().getConfig().baseUrl
+        : window.location.href;
+      const parsed = new URL(value, apiBase || window.location.href);
+      return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol) ? parsed.href : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function loadRazorpayCheckout() {
+    if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
+    if (state.razorpayLoader) return state.razorpayLoader;
+    state.razorpayLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => (
+        typeof window.Razorpay === 'function'
+          ? resolve(window.Razorpay)
+          : reject(new Error('Razorpay loaded without a checkout client.'))
+      );
+      script.onerror = () => reject(new Error('Razorpay Checkout could not be loaded.'));
+      document.head.append(script);
+    });
+    return state.razorpayLoader;
+  }
+
+  function announce(message) {
+    elements.globalStatus.textContent = '';
+    window.requestAnimationFrame(() => {
+      elements.globalStatus.textContent = message;
+    });
+  }
+
+  function showToast(message, type = 'success') {
+    window.clearTimeout(state.toastTimer);
+    elements.toast.textContent = message;
+    elements.toast.classList.toggle('is-error', type === 'error');
+    elements.toast.hidden = false;
+    state.toastTimer = window.setTimeout(() => {
+      elements.toast.hidden = true;
+    }, 4400);
+  }
+
+  function friendlyError(error, fallback = 'Something did not go through. Please try again.') {
+    if (!error) return fallback;
+    const payload = error.data || error.response?.data || error.body;
+    const message = firstValue(
+      payload?.detail,
+      payload?.message,
+      payload?.error,
+      error.userMessage,
+      error.message
+    );
+    if (typeof message === 'string' && message.trim()) return message;
+    if (payload && typeof payload === 'object') {
+      const firstKey = Object.keys(payload)[0];
+      const value = payload[firstKey];
+      if (Array.isArray(value) && value[0]) return String(value[0]);
+      if (typeof value === 'string') return value;
+    }
+    return fallback;
+  }
+
+  function isUnauthorized(error) {
+    const status = firstValue(error?.status, error?.statusCode, error?.response?.status);
+    return Number(status) === 401 || /unauthori|token.*expired|authentication credentials/i.test(friendlyError(error, ''));
+  }
+
+  function setButtonBusy(control, busy, busyText) {
+    if (!control) return;
+    if (busy) {
+      control.dataset.originalText = control.textContent;
+      control.disabled = true;
+      if (busyText) control.textContent = busyText;
+    } else {
+      control.disabled = false;
+      if (control.dataset.originalText) {
+        control.textContent = control.dataset.originalText;
+        delete control.dataset.originalText;
+      }
+    }
+  }
+
+  function makeState(type, title, copy, retry) {
+    const wrapper = create('div', `${type}-state`);
+    const inner = create('div', 'state-inner');
+    inner.append(
+      create('span', 'state-mark', type === 'error' ? '!' : type === 'loading' ? '·' : 'A'),
+      create('h2', '', title),
+      create('p', '', copy)
+    );
+    if (retry) inner.append(button('Try again', 'secondary-button', retry));
+    wrapper.append(inner);
+    return wrapper;
+  }
+
+  function renderLoading(container, text = 'Bringing your account up to date…') {
+    if (!container) return;
+    container.replaceChildren(makeState('loading', 'Just a moment.', text));
+  }
+
+  function renderEmpty(container, title, copy, action) {
+    if (!container) return;
+    const stateElement = makeState('empty', title, copy);
+    if (action) stateElement.querySelector('.state-inner')?.append(action);
+    container.replaceChildren(stateElement);
+  }
+
+  function renderError(container, error, retry) {
+    if (!container) return;
+    container.replaceChildren(makeState('error', 'We could not load this yet.', friendlyError(error), retry));
+  }
+
+  function persistMeta() {
+    const meta = {
+      mobile: state.mobile,
+      userId: state.userId,
+      customerId: state.customerId
+    };
+    sessionStorage.setItem(SESSION_META_KEY, JSON.stringify(meta));
+  }
+
+  function readMeta() {
+    try {
+      return JSON.parse(sessionStorage.getItem(SESSION_META_KEY) || '{}');
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function captureIdentity(payload, mobileFallback = '') {
+    const data = responseData(payload);
+    const user = firstValue(data.user, data.user_data, data.profile, data.auth_user);
+    const customer = firstValue(data.customer, data.customer_data, user?.customer);
+    state.mobile = String(firstValue(
+      data.mobile,
+      data.phone,
+      data.phone_number,
+      user?.mobile,
+      user?.phone,
+      customer?.mobile,
+      mobileFallback,
+      state.mobile
+    ) || '').replace(/\D/g, '').slice(-10);
+    state.userId = firstValue(
+      idOf(user),
+      data.user_id,
+      data.userId,
+      customer?.user_id,
+      idOf(customer?.user),
+      state.userId
+    );
+    state.customerId = firstValue(
+      idOf(customer),
+      data.customer_id,
+      data.customerId,
+      user?.customer_id,
+      idOf(user?.customer),
+      state.customerId
+    );
+    if (user && typeof user === 'object') state.user = user;
+    if (customer && typeof customer === 'object') state.customer = customer;
+    persistMeta();
+  }
+
+  async function resolveCustomerIdentity() {
+    if (state.customerId) return true;
+    const resolver = methodFrom('auth', ['resolveCustomerSession']);
+    if (resolver) {
+      const session = await resolver(state.mobile);
+      captureIdentity(session, state.mobile);
+    }
+    if (!state.customerId) {
+      throw new Error('Your mobile is verified, but we could not connect your customer account yet.');
+    }
+    return true;
+  }
+
+  async function restoreSession() {
+    const meta = readMeta();
+    state.mobile = String(meta.mobile || '');
+    state.userId = meta.userId || null;
+    state.customerId = meta.customerId || null;
+
+    const getSession = methodFrom('auth', ['getSession', 'session']) || methodFrom(null, ['getSession']);
+    if (getSession) {
+      try {
+        const session = await getSession();
+        if (session && (session.accessToken || session.isAuthenticated === true)) {
+          captureIdentity(session, state.mobile);
+          await resolveCustomerIdentity();
+          return true;
+        }
+      } catch (error) {
+        return false;
+      }
+    }
+
+    const isAuthenticated = methodFrom('auth', ['isAuthenticated']) || methodFrom(null, ['isAuthenticated']);
+    if (isAuthenticated) {
+      try {
+        if (!await isAuthenticated()) return false;
+        await resolveCustomerIdentity();
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    if (meta.mobile && (meta.userId || meta.customerId)) {
+      await resolveCustomerIdentity();
+      return true;
+    }
+    return false;
+  }
+
+  async function requestOtp(mobile) {
+    return apiCall('auth', ['requestOtp', 'requestOTP'], { mobile, is_rider: false }, {
+      path: '/users/otp/request/',
+      method: 'POST',
+      form: { mobile, is_rider: false },
+      auth: false
+    });
+  }
+
+  async function verifyOtp(mobile, otp) {
+    return apiCall('auth', ['verifyOtp', 'verifyOTP'], { mobile, otp }, {
+      path: '/users/otp/verify/',
+      method: 'POST',
+      form: { mobile, otp, is_rider: false },
+      auth: false
+    });
+  }
+
+  function showOtpStep() {
+    elements.mobileStep.hidden = true;
+    elements.otpStep.hidden = false;
+    elements.otpMobileDisplay.textContent = `+91 ${state.mobile.slice(0, 5)} ${state.mobile.slice(5)}`;
+    elements.otpCode.value = '';
+    elements.otpError.textContent = '';
+    startResendCountdown();
+    window.setTimeout(() => elements.otpCode.focus(), 40);
+  }
+
+  function showMobileStep() {
+    window.clearInterval(state.resendTimer);
+    elements.otpStep.hidden = true;
+    elements.mobileStep.hidden = false;
+    elements.mobileNumber.value = state.mobile;
+    elements.mobileError.textContent = '';
+    window.setTimeout(() => elements.mobileNumber.focus(), 40);
+  }
+
+  function startResendCountdown(seconds = 30) {
+    window.clearInterval(state.resendTimer);
+    let remaining = seconds;
+    elements.resendOtpButton.disabled = true;
+    elements.resendOtpButton.replaceChildren(
+      document.createTextNode('Resend code in '),
+      create('span', '', remaining),
+      document.createTextNode('s')
+    );
+    state.resendTimer = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        window.clearInterval(state.resendTimer);
+        elements.resendOtpButton.disabled = false;
+        elements.resendOtpButton.textContent = 'Resend secure code';
+        return;
+      }
+      const count = elements.resendOtpButton.querySelector('span');
+      if (count) count.textContent = String(remaining);
+    }, 1000);
+  }
+
+  function accountRoute() {
+    const [viewCandidate, detailId] = window.location.hash.replace(/^#/, '').split('/');
+    const allowedViews = new Set([
+      'shop',
+      'overview',
+      'orders',
+      'subscriptions',
+      'addresses',
+      'wallet',
+      'notifications',
+      'profile',
+      'support'
+    ]);
+    return {
+      view: allowedViews.has(viewCandidate) ? viewCandidate : 'shop',
+      detailId: viewCandidate === 'orders' && detailId ? decodeURIComponent(detailId) : null
+    };
+  }
+
+  function storefrontReturnMode() {
+    const mode = new URLSearchParams(window.location.search).get('return');
+    return mode === 'checkout' ? 'checkout' : mode === 'cart' ? 'cart' : '';
+  }
+
+  function updateAuthReturnNotice() {
+    if (!elements.authReturnNotice) return;
+    const mode = storefrontReturnMode();
+    elements.authReturnNotice.hidden = !mode;
+    const title = elements.authReturnNotice.querySelector('strong');
+    const copy = elements.authReturnNotice.querySelector('span');
+    if (title) {
+      title.textContent = mode === 'checkout'
+        ? 'Your secure checkout is ready to continue.'
+        : 'Your bag is ready to reopen.';
+    }
+    if (copy) {
+      copy.textContent = mode === 'checkout'
+        ? 'Sign in with your mobile number and we’ll take you straight back to delivery.'
+        : 'Sign in with your mobile number and we’ll take you straight back to your bag.';
+    }
+  }
+
+  function returnToStorefrontAfterAuthentication() {
+    const mode = storefrontReturnMode();
+    if (!mode) return false;
+    if (mode === 'checkout') {
+      rememberCheckoutOrigin('account');
+      window.location.assign('checkout.html');
+      return true;
+    }
+    sessionStorage.setItem(STOREFRONT_INTENT_KEY, JSON.stringify({
+      action: 'openCart',
+      createdAt: Date.now()
+    }));
+    window.location.assign('index.html#shop');
+    return true;
+  }
+
+  function enterAccount() {
+    if (returnToStorefrontAfterAuthentication()) return;
+    window.clearInterval(state.resendTimer);
+    elements.authShell.hidden = true;
+    elements.accountShell.hidden = false;
+    elements.skipLink.href = '#portalMain';
+    elements.skipLink.textContent = 'Skip to My Atulyash';
+    updateIdentityUI();
+    const route = accountRoute();
+    showView(route.view, { focus: false, updateHash: false });
+    if (route.detailId) {
+      window.setTimeout(() => openOrderDetail({ id: route.detailId, order_id: route.detailId }), 80);
+    }
+    void refreshPortalBagCount();
+    void loadUnread().catch(() => updateUnreadUI(0));
+    window.scrollTo(0, 0);
+  }
+
+  function enterAuth(message) {
+    const alreadyShowingAuth = !elements.authShell.hidden;
+    if (elements.accountBagDrawer?.classList.contains('is-open')) {
+      closeAccountBag({ restoreFocus: false });
+    }
+    sessionStorage.removeItem(SESSION_META_KEY);
+    state.loaded.clear();
+    state.mobile = '';
+    state.userId = null;
+    state.customerId = null;
+    state.user = null;
+    state.customer = null;
+    elements.accountShell.hidden = true;
+    elements.authShell.hidden = false;
+    elements.skipLink.href = '#authTitle';
+    elements.skipLink.textContent = 'Skip to sign in';
+    closeDialog();
+    updateAuthReturnNotice();
+    showMobileStep();
+    if (message && !alreadyShowingAuth) showToast(message, 'error');
+  }
+
+  function displayName() {
+    return String(firstValue(
+      state.user?.name,
+      state.user?.full_name,
+      state.customer?.name,
+      state.customer?.customer_name,
+      'Atulyash family'
+    ));
+  }
+
+  function updateIdentityUI() {
+    const name = displayName();
+    const initial = name.trim().charAt(0).toUpperCase() || 'A';
+    elements.headerName.textContent = name;
+    elements.sidebarName.textContent = name;
+    elements.headerAvatar.textContent = initial;
+    elements.profileAvatar.textContent = initial;
+    elements.sidebarMobile.textContent = state.mobile ? `+91 ${state.mobile}` : 'Verified Atulyash member';
+    elements.profileName.value = name === 'Atulyash family' ? '' : name;
+    elements.profileEmail.value = String(firstValue(state.user?.email, state.customer?.email, ''));
+    elements.profileMobile.value = state.mobile ? `+91 ${state.mobile}` : '';
+  }
+
+  function updateUnreadUI(count) {
+    state.unreadCount = Math.max(0, numberFrom(count));
+    [elements.notificationBadge, elements.navNotificationBadge].filter(Boolean).forEach((badge) => {
+      badge.textContent = state.unreadCount > 99 ? '99+' : String(state.unreadCount);
+      badge.hidden = state.unreadCount < 1;
+    });
+    elements.notificationShortcut.setAttribute(
+      'aria-label',
+      state.unreadCount ? `Open notifications, ${state.unreadCount} unread` : 'Open notifications'
+    );
+  }
+
+  async function loadProfile(force = false) {
+    if (!force && state.loaded.has('profile')) return;
+    const tasks = [];
+    if (state.userId) {
+      tasks.push(apiCall('profile', ['getUser', 'getUserData'], {
+        id: state.userId,
+        userId: state.userId
+      }, {
+        path: ({ id, userId }) => (id || userId) ? `/users/users/${id || userId}/` : null,
+        method: 'GET'
+      }).then((result) => {
+        const data = responseData(result);
+        state.user = data;
+        captureIdentity({ user: data }, state.mobile);
+      }));
+    }
+    if (state.customerId) {
+      tasks.push(apiCall('profile', ['getCustomer', 'getCustomerData'], {
+        id: state.customerId,
+        customerId: state.customerId
+      }, {
+        path: ({ id, customerId }) => (id || customerId) ? `/customers/customers/${id || customerId}/` : null,
+        method: 'GET'
+      }).then((result) => {
+        const data = responseData(result);
+        state.customer = data;
+        captureIdentity({ customer: data }, state.mobile);
+      }));
+    }
+    if (!tasks.length) {
+      updateIdentityUI();
+      return;
+    }
+    const results = await Promise.allSettled(tasks);
+    const unauthorized = results.find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
+    if (unauthorized) throw unauthorized.reason;
+    state.loaded.add('profile');
+    updateIdentityUI();
+  }
+
+  async function loadUnread(force = false) {
+    if (!force && state.loaded.has('unread')) return state.unreadCount;
+    const result = await apiCall('notifications', ['unreadCount', 'fetchUnreadCount'], undefined, {
+      path: '/notifications/unread-count/',
+      method: 'GET'
+    });
+    const data = responseData(result);
+    updateUnreadUI(firstValue(data.unread_count, data.count, data.total, data));
+    state.loaded.add('unread');
+    return state.unreadCount;
+  }
+
+  async function getOrders({ page = 1, oneTime = '', force = false } = {}) {
+    if (!force && page === 1 && state.loaded.has(`orders:${oneTime}`)) return state.orders;
+    const query = {
+      page_size: 15,
+      page,
+      is_active: true,
+      customer__id: state.customerId,
+      pending_order: false
+    };
+    if (oneTime !== '') query.one_time = oneTime;
+    const result = await apiCall('orders', ['list', 'getMyOrders'], query, {
+      path: '/orders/order/',
+      method: 'GET',
+      query
+    });
+    const orders = responseList(result);
+    state.orders = page === 1 ? orders : state.orders.concat(orders);
+    state.orderPage = page;
+    state.ordersHaveMore = nextPageExists(result, orders.length);
+    state.loaded.add(`orders:${oneTime}`);
+    return state.orders;
+  }
+
+  function orderId(order) {
+    return firstValue(order.id, order.order_id, order.pk, order.uuid);
+  }
+
+  function orderNumber(order) {
+    return String(firstValue(order.order_number, order.number, order.order_no, order.reference, order.display_id, `#${orderId(order) || '—'}`));
+  }
+
+  function orderStatus(order) {
+    const status = firstValue(order.order_status, order.status_display, order.status, order.delivery_status, 'Processing');
+    return typeof status === 'object' ? String(firstValue(status.name, status.label, status.status, 'Processing')) : String(status);
+  }
+
+  function orderItems(order) {
+    const candidates = firstValue(order.order_items, order.items, order.cart_items, order.products, order.line_items, []);
+    return Array.isArray(candidates) ? candidates : responseList(candidates);
+  }
+
+  function orderTitle(order) {
+    const items = orderItems(order);
+    const item = items[0] || {};
+    const product = [item.product_detail, item.product_pack, item.subscription_pack, item.pack, item.product]
+      .find((candidate) => candidate && typeof candidate === 'object') || {};
+    const productName = firstValue(
+      item.product_name,
+      item.name,
+      item.title,
+      product.product_name,
+      product.name,
+      product.title,
+      order.product_name,
+      order.title,
+      'Atulyash Whole Wheat Atta'
+    );
+    const weight = firstValue(
+      item.weight,
+      item.weight_kg,
+      item.pack_size,
+      item.weekly_quantity,
+      product.weight,
+      product.weight_kg,
+      product.pack_size,
+      product.weekly_quantity
+    );
+    const weightText = String(weight || '').trim();
+    return weightText
+      ? `${productName} · ${weightText}${/kg/i.test(weightText) ? '' : ' kg'}`
+      : String(productName);
+  }
+
+  function finiteMoney(...values) {
+    for (const value of values) {
+      if (value == null || value === '') continue;
+      const normalized = typeof value === 'string'
+        ? value.replace(/[^0-9.-]/g, '')
+        : value;
+      const parsed = Number(normalized);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function orderAmount(order) {
+    const amountKeys = [
+      'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
+      'total_price', 'payable_amount', 'amount_payable', 'subtotal', 'total', 'amount'
+    ];
+    const sources = [
+      order,
+      order.payment_summary,
+      order.summary,
+      order.totals,
+      order.cart,
+      order.subscription,
+      order.subscription_plan
+    ].filter((source) => source && typeof source === 'object');
+    for (const source of sources) {
+      const direct = finiteMoney(...amountKeys.map((key) => source[key]));
+      if (direct !== null) return direct;
+    }
+
+    const lineAmounts = orderItems(order).map((item) => {
+      const direct = finiteMoney(
+        item.line_total,
+        item.total_price,
+        item.total_amount,
+        item.subtotal,
+        item.amount
+      );
+      if (direct !== null) return direct;
+      const pack = [item.product_pack, item.subscription_pack, item.pack, item.product]
+        .find((candidate) => candidate && typeof candidate === 'object') || {};
+      const unitPrice = finiteMoney(item.unit_price, item.price, item.selling_price, pack.price, pack.selling_price);
+      if (unitPrice === null) return null;
+      return unitPrice * Math.max(1, finiteMoney(item.quantity) ?? 1);
+    }).filter((value) => value !== null);
+    return lineAmounts.length ? lineAmounts.reduce((sum, value) => sum + value, 0) : null;
+  }
+
+  function orderAmountText(order) {
+    const amount = orderAmount(order);
+    return amount === null ? 'See details' : formatMoney(amount);
+  }
+
+  function orderDate(order) {
+    return firstValue(order.created_at, order.order_date, order.created, order.delivery_date);
+  }
+
+  function isCompleted(order) {
+    return /deliver|complete|fulfilled/i.test(orderStatus(order));
+  }
+
+  function statusPill(status) {
+    const normalized = String(status).toLowerCase();
+    const pill = create('span', 'status-pill', status);
+    if (/deliver|complete|fulfilled/.test(normalized)) pill.classList.add('is-complete');
+    if (/cancel|failed|refund/.test(normalized)) pill.classList.add('is-cancelled');
+    return pill;
+  }
+
+  function makeOrderCard(order, { compact = false } = {}) {
+    const card = create('article', 'order-card');
+    const imageBox = create('div', 'order-product-image');
+    const image = create('img');
+    image.src = 'images/sack5g.webp';
+    image.alt = '';
+    image.width = 490;
+    image.height = 512;
+    imageBox.append(image);
+
+    const title = create('div', 'order-title');
+    title.append(create('h3', '', orderTitle(order)), create('p', '', `Order ${orderNumber(order)}`));
+
+    const meta = create('div', 'order-meta');
+    meta.append(create('strong', '', formatDate(orderDate(order))), create('span', '', 'Order placed'));
+
+    const status = create('div', 'order-status');
+    status.append(statusPill(orderStatus(order)));
+
+    const total = create('div', 'order-total');
+    if (orderAmount(order) === null) total.classList.add('is-unavailable');
+    total.append(
+      create('strong', '', orderAmountText(order)),
+      create('span', '', orderAmount(order) === null ? 'Total not supplied in list' : 'Order total')
+    );
+
+    const actions = create('div', 'card-actions');
+    actions.append(button('View details', 'card-action', () => openOrderDetail(order)));
+    if (!compact) {
+      actions.append(button('Order again', 'card-action', () => confirmReorder(order)));
+      if (isCompleted(order)) actions.append(button('Review', 'card-action is-rust', () => openReview(order)));
+    }
+    card.append(imageBox, title, meta, status, total, actions);
+    return card;
+  }
+
+  async function renderOrders({ page = 1, force = false } = {}) {
+    if (page === 1) renderLoading(elements.ordersList, 'Finding your fresh-batch history…');
+    try {
+      const orders = await getOrders({
+        page,
+        oneTime: elements.orderFilter.value,
+        force
+      });
+      if (!orders.length) {
+        renderEmpty(
+          elements.ordersList,
+          'Your first batch is waiting.',
+          'Once you place an order, every detail will appear here.',
+          Object.assign(create('a', 'primary-button', 'Choose your first batch →'), { href: 'index.html#shop' })
+        );
+      } else {
+        const fragment = document.createDocumentFragment();
+        orders.forEach((order) => fragment.append(makeOrderCard(order)));
+        elements.ordersList.replaceChildren(fragment);
+      }
+      elements.ordersLoadMore.hidden = !state.ordersHaveMore;
+    } catch (error) {
+      if (isUnauthorized(error)) return enterAuth('Your session has ended. Please sign in again.');
+      renderError(elements.ordersList, error, () => renderOrders({ force: true }));
+      elements.ordersLoadMore.hidden = true;
+    }
+  }
+
+  async function openOrderDetail(order) {
+    const id = orderId(order);
+    openDialog('Order details', orderNumber(order), makeState('loading', 'Loading order.', 'Bringing the complete order into view…'));
+    try {
+      const result = await apiCall('orders', ['detail', 'getOrderDetails'], { id, orderId: id }, {
+        path: `/orders/order/${id}/`,
+        method: 'GET'
+      });
+      const detail = responseData(result);
+      const body = create('div');
+      const summary = create('div', 'dialog-summary');
+      [
+        ['Status', orderStatus(detail)],
+        ['Placed on', formatDate(orderDate(detail))],
+        ['Payment', String(firstValue(detail.payment_method_display, detail.payment_method, detail.payment_status, 'Recorded'))],
+        ['Delivery', formatDate(firstValue(
+          detail.requested_delivery_date,
+          detail.order_delivery_date,
+          detail.delivery_date,
+          detail.expected_delivery_date
+        ))],
+        ['Order total', orderAmountText(detail)]
+      ].forEach(([label, value]) => {
+        const row = create('div', 'dialog-summary-row');
+        row.append(create('span', '', label), create('strong', '', value));
+        summary.append(row);
+      });
+      body.append(summary);
+
+      const address = firstValue(detail.delivery_address, detail.address, detail.customer_address);
+      if (address) {
+        body.append(create('p', 'section-label', 'Delivery address'));
+        body.append(create('p', 'dialog-copy', addressText(address)));
+      }
+
+      const items = orderItems(detail);
+      if (items.length) {
+        body.append(create('p', 'section-label', 'Items in this batch'));
+        const itemsSummary = create('div', 'dialog-summary');
+        items.forEach((item) => {
+          const row = create('div', 'dialog-summary-row');
+          const quantity = firstValue(item.quantity, item.qty, 1);
+          const itemTotal = firstValue(item.total, item.amount, item.price, 0);
+          const temporaryOrder = { items: [item] };
+          row.append(create('span', '', `${orderTitle(temporaryOrder)} × ${quantity}`), create('strong', '', formatMoney(itemTotal)));
+          itemsSummary.append(row);
+        });
+        body.append(itemsSummary);
+      }
+
+      const actions = create('div', 'dialog-actions');
+      actions.append(
+        button('Change delivery address', 'secondary-button', () => openChangeOrderAddress(detail)),
+        button('Order again', 'primary-button', () => confirmReorder(detail))
+      );
+      if (isCompleted(detail)) actions.append(button('Write a review', 'secondary-button', () => openReview(detail)));
+      body.append(actions);
+      elements.dialogBody.replaceChildren(body);
+    } catch (error) {
+      elements.dialogBody.replaceChildren(makeState('error', 'Order details are unavailable.', friendlyError(error), () => openOrderDetail(order)));
+    }
+  }
+
+  function confirmReorder(order) {
+    const body = create('div');
+    const note = create('div', 'confirmation-panel');
+    note.append(
+      create('strong', '', 'Add this order to your bag again?'),
+      create('p', '', `${orderTitle(order)} from order ${orderNumber(order)} will be copied to your current bag.`)
+    );
+    const actions = create('div', 'dialog-actions');
+    actions.append(
+      button('Not now', 'secondary-button', closeDialog),
+      button('Yes, add to bag', 'primary-button', async (event) => {
+        const control = event.currentTarget;
+        setButtonBusy(control, true, 'Adding…');
+        try {
+          const id = orderId(order);
+          await apiCall('orders', ['reorder'], { id, orderId: id }, {
+            path: `/orders/order/${id}/reorder/`,
+            method: 'POST',
+            form: {}
+          });
+          closeDialog();
+          await loadAccountBag();
+          openAccountBag({ refresh: false });
+        } catch (error) {
+          showToast(friendlyError(error), 'error');
+          setButtonBusy(control, false);
+        }
+      })
+    );
+    body.append(note, actions);
+    openDialog('Order again', orderNumber(order), body);
+  }
+
+  async function ensureAddresses(force = false) {
+    if (!force && state.loaded.has('addresses')) return state.addresses;
+    const query = { page_size: 100, customer__id: state.customerId, is_active: true };
+    const result = await apiCall('addresses', ['list', 'getCustomerAddress'], query, {
+      path: '/customers/customer-addresses/',
+      method: 'GET',
+      query
+    });
+    state.addresses = responseList(result);
+    state.loaded.add('addresses');
+    return state.addresses;
+  }
+
+  function addressId(address) {
+    if (!address) return null;
+    return firstValue(address.id, address.address_id, address.pk);
+  }
+
+  function addressText(address) {
+    if (typeof address === 'string') return address;
+    const lines = [
+      firstValue(address.house_name, address.house_number, address.flat_number, address.address_line_1),
+      firstValue(address.tower_wing, address.building, address.apartment, address.address_line_2),
+      address.landmark ? `Near ${address.landmark}` : null,
+      firstValue(address.area, address.city, address.locality),
+      address.state,
+      firstValue(address.pincode?.pincode, address.pincode?.code, address.pincode, address.postal_code)
+    ].filter(Boolean);
+    return lines.join(', ') || 'Address details available with Atulyash';
+  }
+
+  function addressPincode(address) {
+    return String(firstValue(
+      address?.pincode?.pincode,
+      address?.pincode?.code,
+      address?.pincode,
+      address?.postal_code,
+      ''
+    ));
+  }
+
+  function addressPhone(address) {
+    const value = String(firstValue(
+      address?.address_phone,
+      address?.phone,
+      address?.mobile,
+      state.mobile,
+      ''
+    )).replace(/\D/g, '').slice(-10);
+    return value.length === 10 ? `+91 ${value.slice(0, 5)} ${value.slice(5)}` : value;
+  }
+
+  function addressIsDefault(address) {
+    return Boolean(firstValue(
+      address?.is_default,
+      address?.is_default_address,
+      address?.default,
+      address?.is_primary,
+      false
+    ));
+  }
+
+  function updateDeliveryHomeCount(count = null) {
+    if (!elements.deliveryHomeCount || !elements.deliveryHomeCountLabel) return;
+    if (!Number.isFinite(Number(count))) {
+      elements.deliveryHomeCount.textContent = '—';
+      elements.deliveryHomeCountLabel.textContent = 'Checking saved homes';
+      return;
+    }
+    const total = Math.max(0, Number(count));
+    elements.deliveryHomeCount.textContent = String(total).padStart(2, '0');
+    elements.deliveryHomeCountLabel.textContent = total === 1 ? 'Saved delivery home' : 'Saved delivery homes';
+  }
+
+  async function openChangeOrderAddress(order) {
+    const body = create('div');
+    renderLoading(body, 'Loading your saved addresses…');
+    openDialog('Delivery details', 'Change address', body);
+    try {
+      const addresses = await ensureAddresses();
+      if (!addresses.length) {
+        renderEmpty(body, 'No saved address yet.', 'Add an address before changing this delivery.', button('Add an address', 'primary-button', () => openAddressForm()));
+        return;
+      }
+      const form = create('form', 'dialog-form');
+      const label = create('label', '', 'Choose a saved address');
+      const select = create('select');
+      select.name = 'address_id';
+      select.required = true;
+      addresses.forEach((address) => {
+        const option = create('option', '', `${firstValue(address.address_type, 'Address')} — ${addressText(address)}`);
+        option.value = String(addressId(address));
+        select.append(option);
+      });
+      label.append(select);
+      const note = create('p', 'dialog-copy', 'The address can be changed only while the order is still eligible for an update.');
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Cancel', 'secondary-button', closeDialog));
+      const submit = create('button', 'primary-button', 'Update address →');
+      submit.type = 'submit';
+      actions.append(submit);
+      form.append(label, note, actions);
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setButtonBusy(submit, true, 'Updating…');
+        try {
+          const id = orderId(order);
+          const address_id = select.value;
+          await apiCall('orders', ['changeAddress'], { id, orderId: id, address_id, addressId: address_id }, {
+            path: `/orders/order/${id}/change-address/`,
+            method: 'POST',
+            form: { address_id }
+          });
+          closeDialog();
+          state.loaded.delete(`orders:${elements.orderFilter.value}`);
+          showToast('The delivery address has been updated.');
+          renderOrders({ force: true });
+        } catch (error) {
+          showToast(friendlyError(error), 'error');
+          setButtonBusy(submit, false);
+        }
+      });
+      body.replaceChildren(form);
+    } catch (error) {
+      renderError(body, error, () => openChangeOrderAddress(order));
+    }
+  }
+
+  function openReview(order) {
+    const items = orderItems(order);
+    const firstItem = items[0] || {};
+    const form = create('form', 'dialog-form');
+    form.append(create('p', 'dialog-copy', `Tell us about ${orderTitle(order)}. Reviews are moderated before they appear publicly.`));
+
+    const ratingLabel = create('span', '', 'Your rating');
+    const rating = create('div', 'rating-control');
+    for (let value = 5; value >= 1; value -= 1) {
+      const input = create('input');
+      input.type = 'radio';
+      input.name = 'rating';
+      input.id = `rating-${value}`;
+      input.value = String(value);
+      input.required = true;
+      const star = create('label', '', '★');
+      star.htmlFor = input.id;
+      star.setAttribute('aria-label', `${value} star${value === 1 ? '' : 's'}`);
+      rating.append(input, star);
+    }
+    const reviewLabel = create('label', '', 'Your review');
+    const review = create('textarea');
+    review.name = 'review';
+    review.maxLength = 800;
+    review.required = true;
+    review.placeholder = 'How did this fresh batch feel in your home?';
+    reviewLabel.append(review);
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Cancel', 'secondary-button', closeDialog));
+    const submit = create('button', 'primary-button', 'Submit review →');
+    submit.type = 'submit';
+    actions.append(submit);
+    form.append(ratingLabel, rating, reviewLabel, actions);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const selectedRating = new FormData(form).get('rating');
+      if (!selectedRating) return showToast('Please choose a rating.', 'error');
+      setButtonBusy(submit, true, 'Submitting…');
+      let productId = firstValue(
+        idOf(firstItem.product),
+        idOf(firstItem.product_detail),
+        idOf(firstItem.product_pack?.product),
+        idOf(firstItem.subscription_pack?.product),
+        firstItem.product_id,
+        order.product_id
+      );
+      if (!productId) {
+        try {
+          if (!state.products.length) {
+            const productsResult = await apiCall('products', ['list'], { is_active: true }, {
+              path: '/products/products/',
+              method: 'GET',
+              query: { is_active: true },
+              auth: false
+            });
+            state.products = responseList(productsResult);
+          }
+          const packId = firstValue(
+            idOf(firstItem.product_pack),
+            firstItem.product_pack_id,
+            idOf(firstItem.subscription_pack),
+            firstItem.subscription_pack_id
+          );
+          const matchedProduct = state.products.find((candidate) => {
+            const packs = firstValue(candidate.all_packs, candidate.packs, candidate.product_packs, []);
+            return Array.isArray(packs) && packs.some((pack) => String(idOf(pack)) === String(packId));
+          }) || (state.products.length === 1 ? state.products[0] : null);
+          productId = idOf(matchedProduct);
+        } catch (error) {
+          setButtonBusy(submit, false);
+          showToast('The product details needed for this review are unavailable. Please try again.', 'error');
+          return;
+        }
+      }
+      if (!productId) {
+        setButtonBusy(submit, false);
+        showToast('The product details needed for this review are unavailable.', 'error');
+        return;
+      }
+      const payload = {
+        order: orderId(order),
+        order_id: orderId(order),
+        is_active: true,
+        product: productId,
+        product_id: productId,
+        user: state.userId,
+        user_id: state.userId,
+        rating: Number(selectedRating),
+        review: review.value.trim(),
+        to_display: false
+      };
+      try {
+        await apiCall('misc', ['submitReview', 'postReview'], payload, {
+          path: '/reviews/reviews/',
+          method: 'POST',
+          form: payload
+        });
+        closeDialog();
+        showToast('Thank you. Your review has been sent for moderation.');
+      } catch (error) {
+        showToast(friendlyError(error), 'error');
+        setButtonBusy(submit, false);
+      }
+    });
+    openDialog('Your experience', `Review ${orderNumber(order)}`, form);
+  }
+
+  async function loadSubscriptions(force = false) {
+    if (!force && state.loaded.has('subscriptions')) return state.subscriptions;
+    const query = {
+      is_active: true,
+      page_size: 100,
+      customerId: state.customerId
+    };
+    const [subscriptionsResult, vacationsResult] = await Promise.allSettled([
+      apiCall('subscriptions', ['listActive', 'getCustomerActiveSubscriptions'], query, {
+        path: '/subscription/subscription_plan/',
+        method: 'GET',
+        query: {
+          is_active: true,
+          page_size: 100,
+          customer_address__customer__id: state.customerId
+        }
+      }),
+      apiCall('subscriptions', ['listVacations', 'getCustomerVacation'], query, {
+        path: '/subscription/vacation/',
+        method: 'GET',
+        query: {
+          subscription__customer_address__customer: state.customerId,
+          is_active: true
+        }
+      })
+    ]);
+    if (subscriptionsResult.status === 'rejected') throw subscriptionsResult.reason;
+    state.subscriptions = responseList(subscriptionsResult.value);
+    state.vacations = vacationsResult.status === 'fulfilled' ? responseList(vacationsResult.value) : [];
+    state.loaded.add('subscriptions');
+    return state.subscriptions;
+  }
+
+  function subscriptionId(subscription) {
+    return firstValue(subscription.id, subscription.subscription_plan_id, subscription.plan_id, subscription.pk);
+  }
+
+  function subscriptionCatalogPlan(subscription) {
+    const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package);
+    const packId = typeof pack === 'object'
+      ? firstValue(pack?.id, pack?.pk)
+      : firstValue(pack, subscription.subscription_pack_id, subscription.pack_id);
+    return state.weeklyPlans.find((plan) => String(plan.id) === String(packId)) || null;
+  }
+
+  function subscriptionName(subscription) {
+    const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package, {});
+    const catalogPlan = subscriptionCatalogPlan(subscription);
+    return String(firstValue(pack?.name, pack?.title, catalogPlan?.name, subscription.name, subscription.plan_name, 'Fresh Weekly Atta'));
+  }
+
+  function subscriptionWeight(subscription) {
+    const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package, {});
+    const catalogPlan = subscriptionCatalogPlan(subscription);
+    const weight = firstValue(
+      subscription.weekly_kg,
+      subscription.quantity_kg,
+      pack?.weekly_quantity,
+      pack?.weekly_kg,
+      pack?.weight,
+      catalogPlan?.weeklyKg,
+      subscription.quantity
+    );
+    if (!weight) return 'Weekly fresh batch';
+    return `${weight}${String(weight).toLowerCase().includes('kg') ? '' : ' kg'} per delivery`;
+  }
+
+  function subscriptionNextDate(subscription) {
+    const upcoming = firstValue(subscription.next_delivery, subscription.upcoming_delivery, subscription.next_order);
+    return firstValue(
+      upcoming?.delivery_date,
+      upcoming?.date,
+      subscription.next_delivery_date,
+      subscription.delivery_date,
+      subscription.start_date
+    );
+  }
+
+  function subscriptionStatus(subscription) {
+    return String(firstValue(subscription.status_display, subscription.plan_status, subscription.status, subscription.is_active === false ? 'Cancelled' : 'Active'));
+  }
+
+  function makeSubscriptionCard(subscription) {
+    const card = create('article', 'subscription-card');
+    const head = create('div', 'subscription-card-head');
+    const copy = create('div');
+    copy.append(create('h3', '', subscriptionName(subscription)), create('p', '', subscriptionWeight(subscription)));
+    head.append(copy, statusPill(subscriptionStatus(subscription)));
+
+    const body = create('div', 'subscription-body');
+    const pack = firstValue(subscription.subscription_pack, subscription.pack, {});
+    const catalogPlan = subscriptionCatalogPlan(subscription);
+    [
+      ['Delivery day', firstValue(subscription.delivery_day, subscription.weekday, 'As scheduled')],
+      ['Plan length', firstValue(subscription.duration_display, subscription.duration, pack?.duration, 'Ongoing')],
+      ['Weekly value', formatMoney(firstValue(subscription.price_per_delivery, subscription.weekly_price, pack?.weekly_price, catalogPlan?.price, 0))],
+      ['First month charged', formatMoney(firstValue(subscription.monthly_price, pack?.price, catalogPlan?.monthlyPrice, 0))],
+      ['Plan reference', `#${subscriptionId(subscription) || '—'}`]
+    ].forEach(([label, value]) => {
+      const stat = create('div', 'subscription-stat');
+      stat.append(create('span', '', label), create('strong', '', value));
+      body.append(stat);
+    });
+
+    const next = create('div', 'subscription-next');
+    const nextDate = dateValue(subscriptionNextDate(subscription));
+    const tile = create('div', 'date-tile');
+    tile.append(
+      create('span', '', nextDate ? new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(nextDate) : 'Next'),
+      create('strong', '', nextDate ? new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(nextDate) : '—')
+    );
+    const nextCopy = create('p');
+    nextCopy.append(create('strong', '', 'Next fresh batch'), document.createElement('br'), document.createTextNode(formatDate(subscriptionNextDate(subscription))));
+    next.append(tile, nextCopy);
+
+    const actions = create('div', 'subscription-actions');
+    actions.append(
+      button('Manage deliveries', 'card-action', () => openManageDeliveries(subscription)),
+      button('Vacation', 'card-action', () => openVacationForm(subscription)),
+      button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
+    );
+    card.append(head, body, next, actions);
+    return card;
+  }
+
+  function renderVacationBanner() {
+    const active = state.vacations[0];
+    if (!active) {
+      elements.vacationBanner.replaceChildren();
+      const left = create('div');
+      left.append(create('span', 'vacation-mark', '☼'));
+      const copy = create('p');
+      copy.append(create('strong', '', 'Going away?'), document.createElement('br'), document.createTextNode('Pause scheduled deliveries for the dates you are away.'));
+      left.append(copy);
+      elements.vacationBanner.append(left, button('Set vacation', 'secondary-button', () => openVacationForm()));
+      return;
+    }
+    const left = create('div');
+    left.append(create('span', 'vacation-mark', '☼'));
+    const copy = create('p');
+    copy.append(
+      create('strong', '', 'Vacation mode is scheduled'),
+      document.createElement('br'),
+      document.createTextNode(`${formatDate(firstValue(active.start_date, active.pause_from))} to ${formatDate(firstValue(active.end_date, active.resume_at))}`)
+    );
+    left.append(copy);
+    const actions = create('div', 'card-actions');
+    actions.append(
+      button('Edit dates', 'card-action', () => openVacationForm(null, active)),
+      button('End early', 'card-action is-rust', () => confirmEndVacation(active))
+    );
+    elements.vacationBanner.replaceChildren(left, actions);
+  }
+
+  async function renderSubscriptions(force = false) {
+    renderLoading(elements.subscriptionsList, 'Checking your weekly freshness plans…');
+    try {
+      const subscriptions = await loadSubscriptions(force);
+      const planCount = subscriptions.length;
+      if (elements.weeklyPlanCount) elements.weeklyPlanCount.textContent = String(planCount);
+      if (elements.weeklyPlanCountLabel) elements.weeklyPlanCountLabel.textContent = planCount === 1 ? 'Active weekly plan' : planCount ? 'Active weekly plans' : 'No active plan';
+      if (elements.chooseWeeklyPlanButton) elements.chooseWeeklyPlanButton.hidden = planCount > 0;
+      if (elements.vacationBanner) elements.vacationBanner.hidden = planCount === 0;
+      renderVacationBanner();
+      if (!subscriptions.length) {
+        renderEmpty(
+          elements.subscriptionsList,
+          'No active weekly plan.',
+          'Choose a weekly quantity and receive atta prepared close to delivery.',
+          Object.assign(create('a', 'primary-button', 'Explore weekly plans →'), { href: 'index.html#shop' })
+        );
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      subscriptions.forEach((subscription) => fragment.append(makeSubscriptionCard(subscription)));
+      elements.subscriptionsList.replaceChildren(fragment);
+    } catch (error) {
+      if (isUnauthorized(error)) return enterAuth('Your session has ended. Please sign in again.');
+      renderError(elements.subscriptionsList, error, () => renderSubscriptions(true));
+    }
+  }
+
+  async function openManageDeliveries(subscription) {
+    const id = subscriptionId(subscription);
+    const loading = makeState('loading', 'Checking your schedule.', 'Finding the dates that can still be changed…');
+    openDialog('Weekly plan', 'Manage deliveries', loading);
+    try {
+      const [deliveriesResult, summaryResult] = await Promise.allSettled([
+        apiCall('subscriptions', ['skippableDeliveries', 'getSkippableDeliveries'], { id, subscriptionId: id, subPlanId: id }, {
+          path: `/subscription/subscription_plan/${id}/skippable-deliveries/`,
+          method: 'GET'
+        }),
+        apiCall('subscriptions', ['skipSummary', 'getSkipSummary'], { id, subscriptionId: id, subPlanId: id }, {
+          path: `/subscription/subscription_plan/${id}/skip-summary/`,
+          method: 'GET'
+        })
+      ]);
+      if (deliveriesResult.status === 'rejected') throw deliveriesResult.reason;
+      const summary = summaryResult.status === 'fulfilled' ? responseData(summaryResult.value) : {};
+      const deliveriesByDate = new Map();
+      [
+        ...responseList(deliveriesResult.value),
+        ...(Array.isArray(summary.skipped_deliveries)
+          ? summary.skipped_deliveries
+              .filter((delivery) => delivery.can_unskip !== false)
+              .map((delivery) => ({ ...delivery, is_skipped: true }))
+          : [])
+      ].forEach((delivery) => {
+        const date = String(firstValue(delivery.delivery_date, delivery.date, delivery.scheduled_date, ''));
+        if (!date) return;
+        const previous = deliveriesByDate.get(date) || {};
+        deliveriesByDate.set(date, {
+          ...previous,
+          ...delivery,
+          is_skipped: Boolean(
+            firstValue(
+              delivery.is_skipped,
+              delivery.skipped,
+              previous.is_skipped,
+              /skip/i.test(String(delivery.delivery_status || delivery.status || ''))
+            )
+          )
+        });
+      });
+      const deliveries = Array.from(deliveriesByDate.values()).sort((a, b) =>
+        String(firstValue(a.delivery_date, a.date, '')).localeCompare(
+          String(firstValue(b.delivery_date, b.date, ''))
+        )
+      );
+      const body = create('div');
+      if (Object.keys(summary).length) {
+        const summaryBox = create('div', 'dialog-summary');
+        [
+          ['Skips available', firstValue(summary.remaining, summary.skips_remaining, summary.available, '—')],
+          ['Skips used', firstValue(summary.used_this_month, summary.used, summary.skips_used, '—')]
+        ].forEach(([label, value]) => {
+          const row = create('div', 'dialog-summary-row');
+          row.append(create('span', '', label), create('strong', '', value));
+          summaryBox.append(row);
+        });
+        body.append(summaryBox);
+      }
+      if (!deliveries.length) {
+        body.append(makeState('empty', 'No changeable dates right now.', 'Future delivery dates will appear here once they are within the allowed window.'));
+      } else {
+        const list = create('div', 'delivery-list');
+        deliveries.forEach((delivery) => {
+          const date = firstValue(delivery.delivery_date, delivery.date, delivery.scheduled_date);
+          const skipped = Boolean(firstValue(
+            delivery.is_skipped,
+            delivery.skipped,
+            /skip/i.test(String(delivery.delivery_status || delivery.status || ''))
+          ));
+          const row = create('div', 'delivery-option');
+          const copy = create('div');
+          copy.append(create('p', '', formatDate(date)), create('span', '', skipped ? 'Currently skipped' : 'Scheduled delivery'));
+          const action = button(skipped ? 'Restore delivery' : 'Skip this date', `card-action${skipped ? '' : ' is-rust'}`, () => {
+            confirmDeliveryChange(subscription, date, skipped);
+          });
+          row.append(copy, action);
+          list.append(row);
+        });
+        body.append(list);
+      }
+      elements.dialogBody.replaceChildren(body);
+    } catch (error) {
+      elements.dialogBody.replaceChildren(makeState('error', 'The schedule is unavailable.', friendlyError(error), () => openManageDeliveries(subscription)));
+    }
+  }
+
+  function confirmDeliveryChange(subscription, deliveryDate, currentlySkipped) {
+    const id = subscriptionId(subscription);
+    const body = create('div');
+    const panel = create('div', 'confirmation-panel');
+    panel.append(
+      create('strong', '', currentlySkipped ? 'Restore this delivery?' : 'Skip this delivery?'),
+      create('p', '', `${formatDate(deliveryDate)} will be ${currentlySkipped ? 'added back to' : 'removed from'} your current schedule.`)
+    );
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Keep as it is', 'secondary-button', closeDialog));
+    actions.append(button(currentlySkipped ? 'Restore delivery' : 'Yes, skip it', currentlySkipped ? 'primary-button' : 'danger-button', async (event) => {
+      const control = event.currentTarget;
+      setButtonBusy(control, true, 'Updating…');
+      const payload = { id, subscriptionId: id, subPlanId: id, delivery_date: deliveryDate, deliveryDate };
+      try {
+        await apiCall('subscriptions', currentlySkipped ? ['unskip', 'unskipDelivery'] : ['skip', 'skipDelivery'], payload, {
+          path: `/subscription/subscription_plan/${id}/${currentlySkipped ? 'unskip' : 'skip'}/`,
+          method: 'POST',
+          form: { delivery_date: deliveryDate }
+        });
+        closeDialog();
+        state.loaded.delete('subscriptions');
+        showToast(currentlySkipped ? 'The delivery is back on your schedule.' : 'That delivery has been skipped.');
+        renderSubscriptions(true);
+      } catch (error) {
+        showToast(friendlyError(error), 'error');
+        setButtonBusy(control, false);
+      }
+    }));
+    body.append(panel, actions);
+    openDialog('Confirm schedule change', formatDate(deliveryDate), body);
+  }
+
+  function openVacationForm(subscription = null, vacation = null) {
+    if (!state.subscriptions.length && !subscription) {
+      openDialog('Vacation mode', 'No active plan', makeState('empty', 'A weekly plan is needed.', 'Vacation mode pauses deliveries from an active subscription.'));
+      return;
+    }
+    const form = create('form', 'dialog-form');
+    form.append(create('p', 'dialog-copy', 'All scheduled deliveries within these dates will be paused. Choose dates carefully.'));
+
+    let subscriptionSelect;
+    if (!vacation) {
+      const subscriptionLabel = create('label', '', 'Subscription');
+      subscriptionSelect = create('select');
+      subscriptionSelect.required = true;
+      state.subscriptions.forEach((item) => {
+        const option = create('option', '', `${subscriptionName(item)} · ${subscriptionWeight(item)}`);
+        option.value = String(subscriptionId(item));
+        if (subscription && subscriptionId(item) === subscriptionId(subscription)) option.selected = true;
+        subscriptionSelect.append(option);
+      });
+      subscriptionLabel.append(subscriptionSelect);
+      form.append(subscriptionLabel);
+    }
+
+    const dates = create('div', 'form-grid');
+    const startLabel = create('label', '', 'Start date');
+    const start = create('input');
+    start.type = 'date';
+    start.required = true;
+    start.min = new Date().toISOString().slice(0, 10);
+    const savedStart = firstValue(vacation?.start_date, vacation?.pause_from);
+    const savedEnd = firstValue(vacation?.end_date, vacation?.resume_at);
+    start.value = savedStart ? String(savedStart).slice(0, 10) : '';
+    startLabel.append(start);
+    const endLabel = create('label', '', 'End date');
+    const end = create('input');
+    end.type = 'date';
+    end.required = true;
+    end.min = start.min;
+    end.value = savedEnd ? String(savedEnd).slice(0, 10) : '';
+    endLabel.append(end);
+    start.addEventListener('change', () => {
+      end.min = start.value || start.min;
+      if (end.value && end.value < end.min) end.value = end.min;
+    });
+    dates.append(startLabel, endLabel);
+
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Cancel', 'secondary-button', closeDialog));
+    const submit = create('button', 'primary-button', vacation ? 'Update vacation →' : 'Pause these dates →');
+    submit.type = 'submit';
+    actions.append(submit);
+    form.append(dates, actions);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (end.value < start.value) return showToast('The end date must be after the start date.', 'error');
+      setButtonBusy(submit, true, 'Saving…');
+      const vacationId = firstValue(vacation?.id, vacation?.vacation_id);
+      const payload = {
+        id: vacationId,
+        vacationId,
+        subscription: vacation ? firstValue(vacation.subscription, subscriptionId(subscription)) : subscriptionSelect.value,
+        subscriptionId: vacation ? firstValue(vacation.subscription, subscriptionId(subscription)) : subscriptionSelect.value,
+        start_date: start.value,
+        end_date: end.value
+      };
+      try {
+        await apiCall('subscriptions', vacation ? ['updateVacation', 'patchCustomerVacation'] : ['createVacation', 'setCustomerVacation'], payload, {
+          path: vacation ? `/subscription/vacation/${vacationId}/` : '/subscription/vacation/',
+          method: vacation ? 'PATCH' : 'POST',
+          form: {
+            ...(vacation ? {} : { subscription: payload.subscription }),
+            start_date: payload.start_date,
+            end_date: payload.end_date
+          }
+        });
+        closeDialog();
+        state.loaded.delete('subscriptions');
+        showToast(vacation ? 'Your vacation dates have been updated.' : 'Vacation mode has been scheduled.');
+        renderSubscriptions(true);
+      } catch (error) {
+        showToast(friendlyError(error), 'error');
+        setButtonBusy(submit, false);
+      }
+    });
+    openDialog('Vacation mode', vacation ? 'Edit pause dates' : 'Pause deliveries', form);
+  }
+
+  function confirmEndVacation(vacation) {
+    const body = create('div');
+    const panel = create('div', 'confirmation-panel');
+    panel.append(
+      create('strong', '', 'End vacation mode early?'),
+      create('p', '', 'Your weekly deliveries will resume from the next available cycle.')
+    );
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Keep vacation', 'secondary-button', closeDialog));
+    actions.append(button('End vacation', 'danger-button', async (event) => {
+      const control = event.currentTarget;
+      setButtonBusy(control, true, 'Ending…');
+      const id = firstValue(vacation.id, vacation.vacation_id);
+      try {
+        await apiCall('subscriptions', ['endVacation', 'endCustomerVacation'], { id, vacationId: id }, {
+          path: `/subscription/vacation/${id}/end_vacation/`,
+          method: 'POST',
+          form: {}
+        });
+        closeDialog();
+        state.loaded.delete('subscriptions');
+        showToast('Vacation mode has ended.');
+        renderSubscriptions(true);
+      } catch (error) {
+        showToast(friendlyError(error), 'error');
+        setButtonBusy(control, false);
+      }
+    }));
+    body.append(panel, actions);
+    openDialog('Vacation mode', 'Resume deliveries', body);
+  }
+
+  async function openCancelSubscription(subscription) {
+    const loading = makeState('loading', 'Preparing cancellation options.', 'This will take only a moment…');
+    openDialog('Subscription control', 'Cancel weekly plan', loading);
+    try {
+      const result = await apiCall('subscriptions', ['cancellationReasons', 'getCancellationReasons'], undefined, {
+        path: '/subscription/cancellation_reasons/',
+        method: 'GET'
+      });
+      const reasons = responseList(result);
+      const form = create('form', 'dialog-form');
+      const panel = create('div', 'confirmation-panel');
+      panel.append(
+        create('strong', '', `Cancel ${subscriptionName(subscription)}?`),
+        create('p', '', 'This stops future scheduled deliveries. This action may not be reversible from your account.')
+      );
+      const reasonLabel = create('label', '', 'Reason for cancellation');
+      const reasonSelect = create('select');
+      reasonSelect.required = reasons.length > 0;
+      const placeholder = create('option', '', 'Choose a reason');
+      placeholder.value = '';
+      reasonSelect.append(placeholder);
+      reasons.forEach((reason) => {
+        const option = create('option', '', firstValue(reason.reason_text, reason.name, reason.reason, reason.title, 'Other'));
+        option.value = String(firstValue(reason.id, reason.pk, option.textContent));
+        reasonSelect.append(option);
+      });
+      if (!reasons.length) {
+        placeholder.textContent = 'No published reason — add a note';
+        reasonSelect.disabled = true;
+      }
+      reasonLabel.append(reasonSelect);
+      const detailLabel = create('label', '', 'Anything you would like us to know?');
+      const detail = create('textarea');
+      detail.maxLength = 500;
+      detail.placeholder = reasons.length ? 'Optional note' : 'Please tell us why you are cancelling';
+      detail.required = !reasons.length;
+      detailLabel.append(detail);
+      const confirmLabel = create('label', 'check-control');
+      const confirm = create('input');
+      confirm.type = 'checkbox';
+      confirm.required = true;
+      confirmLabel.append(confirm, document.createTextNode(' I understand future deliveries will stop.'));
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Keep my plan', 'secondary-button', closeDialog));
+      const submit = create('button', 'danger-button', 'Cancel subscription');
+      submit.type = 'submit';
+      actions.append(submit);
+      form.append(panel, reasonLabel, detailLabel, confirmLabel, actions);
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setButtonBusy(submit, true, 'Cancelling…');
+        const id = subscriptionId(subscription);
+        const payload = {
+          id,
+          subscriptionId: id,
+          subId: id,
+          cancellation_reason_id: reasonSelect.value || undefined,
+          reasonId: reasonSelect.value || undefined,
+          cancellation_detail: detail.value.trim(),
+          detail: detail.value.trim()
+        };
+        try {
+          await apiCall('subscriptions', ['cancel'], payload, {
+            path: `/subscription/subscription_plan/${id}/cancel/`,
+            method: 'POST',
+            form: {
+              ...(reasonSelect.value ? { cancellation_reason_id: reasonSelect.value } : {}),
+              cancellation_detail: detail.value.trim()
+            }
+          });
+          closeDialog();
+          state.loaded.delete('subscriptions');
+          showToast('Your subscription has been cancelled.');
+          renderSubscriptions(true);
+        } catch (error) {
+          showToast(friendlyError(error), 'error');
+          setButtonBusy(submit, false);
+        }
+      });
+      elements.dialogBody.replaceChildren(form);
+    } catch (error) {
+      elements.dialogBody.replaceChildren(makeState('error', 'Cancellation options are unavailable.', friendlyError(error), () => openCancelSubscription(subscription)));
+    }
+  }
+
+  async function renderAddresses(force = false) {
+    updateDeliveryHomeCount();
+    renderLoading(elements.addressesList, 'Gathering your saved delivery places…');
+    try {
+      const addresses = await ensureAddresses(force);
+      updateDeliveryHomeCount(addresses.length);
+      if (!addresses.length) {
+        renderEmpty(
+          elements.addressesList,
+          'No saved address yet.',
+          'Add the place where your fresh batch should arrive.',
+          button('Add an address', 'primary-button', () => openAddressForm())
+        );
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      addresses.forEach((address) => {
+        const type = String(firstValue(address.address_type, address.type, 'Saved address'));
+        const receiver = String(firstValue(
+          address.receiver_name,
+          address.tower_wing,
+          address.building,
+          address.house_name,
+          address.house_number,
+          'Delivery address'
+        ));
+        const isDefault = addressIsDefault(address);
+        const card = create('article', `address-card${isDefault ? ' is-default' : ''}`);
+
+        const marker = create('span', 'address-marker', type.slice(0, 1).toUpperCase());
+        marker.setAttribute('aria-hidden', 'true');
+
+        const badges = create('div', 'address-card-badges');
+        badges.append(create('span', 'address-type', type));
+        if (isDefault) badges.append(create('span', 'address-default-badge', 'Default for delivery'));
+
+        const heading = create('div', 'address-card-heading');
+        heading.append(badges, create('h3', '', receiver));
+
+        const copy = create('div', 'address-card-copy');
+        copy.append(create('p', 'address-copy', addressText(address)));
+        const details = create('dl', 'address-card-details');
+        const phone = addressPhone(address);
+        const pincode = addressPincode(address);
+        if (phone) details.append(create('dt', '', 'Delivery mobile'), create('dd', '', phone));
+        if (pincode) details.append(create('dt', '', 'PIN code'), create('dd', '', pincode));
+        copy.append(details);
+
+        const actions = create('div', 'address-card-actions');
+        actions.append(
+          create('small', '', 'Choose this home when reviewing your order.'),
+          button('Edit delivery details', 'card-action', () => openAddressForm(address))
+        );
+        card.append(marker, heading, copy, actions);
+        fragment.append(card);
+      });
+      elements.addressesList.replaceChildren(fragment);
+    } catch (error) {
+      updateDeliveryHomeCount();
+      if (isUnauthorized(error)) return enterAuth('Your session has ended. Please sign in again.');
+      renderError(elements.addressesList, error, () => renderAddresses(true));
+    }
+  }
+
+  function openAddressForm(address = null) {
+    const editing = Boolean(address);
+    const form = create('form', 'dialog-form');
+    const fields = create('div', 'form-grid');
+    const definitions = [
+      ['receiver_name', 'Receiver name', 'text', firstValue(address?.receiver_name, displayName() === 'Atulyash family' ? '' : displayName())],
+      ['address_phone', 'Delivery mobile', 'tel', firstValue(address?.address_phone, state.mobile)],
+      ['house_name', 'House / flat number', 'text', firstValue(address?.house_name, address?.house_number, address?.flat_number, '')],
+      ['tower_wing', 'Building / tower / wing', 'text', firstValue(address?.tower_wing, address?.building, address?.address_line_1, '')],
+      ['landmark', 'Landmark', 'text', firstValue(address?.landmark, '')],
+      ['city', 'City', 'text', firstValue(address?.city, address?.locality, '')],
+      ['state', 'State', 'text', firstValue(address?.state, '')],
+      ['pincode', 'Pincode', 'text', firstValue(address?.pincode?.pincode, address?.pincode?.code, address?.pincode, address?.postal_code, '')]
+    ];
+    definitions.forEach(([name, labelText, type, value]) => {
+      const label = create('label', '', labelText);
+      const input = create('input');
+      input.name = name;
+      input.type = type;
+      input.value = name === 'address_phone'
+        ? String(value || '').replace(/\D/g, '').slice(-10)
+        : String(value || '');
+      input.required = name !== 'landmark';
+      if (name === 'pincode') {
+        input.inputMode = 'numeric';
+        input.pattern = '[0-9]{6}';
+        input.maxLength = 6;
+      }
+      if (name === 'address_phone') {
+        input.inputMode = 'numeric';
+        input.pattern = '[0-9]{10}';
+        input.maxLength = 10;
+      }
+      if (name === 'receiver_name') input.maxLength = 50;
+      if (name === 'tower_wing') input.maxLength = 50;
+      if (['house_name', 'landmark'].includes(name)) input.maxLength = 255;
+      if (['city', 'state'].includes(name)) input.maxLength = 100;
+      label.append(input);
+      fields.append(label);
+    });
+    const pincodeInput = fields.querySelector('input[name="pincode"]');
+    const serviceabilityNotice = create('div', 'address-serviceability-notice');
+    serviceabilityNotice.hidden = true;
+    serviceabilityNotice.setAttribute('role', 'alert');
+    const serviceabilityTitle = create('strong');
+    const serviceabilityCopy = create('small');
+    const serviceabilityContent = create('div', 'address-serviceability-copy');
+    serviceabilityContent.append(serviceabilityTitle, serviceabilityCopy);
+    serviceabilityNotice.append(create('span', 'address-serviceability-mark', '!'), serviceabilityContent);
+    fields.append(serviceabilityNotice);
+
+    const clearServiceabilityError = () => {
+      if (!pincodeInput) return;
+      pincodeInput.removeAttribute('aria-invalid');
+      pincodeInput.setCustomValidity('');
+      serviceabilityNotice.hidden = true;
+    };
+    pincodeInput?.addEventListener('input', clearServiceabilityError);
+
+    const typeLabel = create('label', '', 'Address type');
+    const type = create('select');
+    type.name = 'address_type';
+    [
+      ['HOME', 'Home'],
+      ['WORK', 'Work'],
+      ['OTHER', 'Other']
+    ].forEach(([value, label]) => {
+      const option = create('option', '', label);
+      option.value = value;
+      option.selected = value === String(firstValue(address?.address_type, 'HOME')).toUpperCase();
+      type.append(option);
+    });
+    typeLabel.append(type);
+    form.append(fields, typeLabel);
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Cancel', 'secondary-button', closeDialog));
+    const submit = create('button', 'primary-button', editing ? 'Save changes →' : 'Save address →');
+    submit.type = 'submit';
+    actions.append(submit);
+    form.append(actions);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setButtonBusy(submit, true, 'Saving…');
+      try {
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+        const activeSession = methodFrom('auth', ['getSession'])?.() || methodFrom(null, ['getSession'])?.() || {};
+        payload.customer = firstValue(state.customerId, activeSession.customerId, activeSession.customer_id);
+        if (!payload.customer) {
+          throw new Error('Your customer profile is not available in this session. Please sign in again.');
+        }
+        payload.country = 'IN';
+        payload.full_address = [
+          payload.house_name,
+          payload.tower_wing,
+          payload.landmark,
+          payload.city,
+          payload.state,
+          payload.pincode
+        ].filter(Boolean).join(', ');
+        const id = addressId(address);
+        if (id) {
+          payload.id = id;
+          payload.addressId = id;
+        }
+        await apiCall('addresses', editing ? ['update', 'patchCustomerAddress'] : ['create', 'setCustomerAddress'], payload, {
+          path: editing ? `/customers/customer-addresses/${id}/` : '/customers/customer-addresses/',
+          method: editing ? 'PATCH' : 'POST',
+          form: payload
+        });
+        closeDialog();
+        state.loaded.delete('addresses');
+        showToast(editing ? 'Your address has been updated.' : 'Your address has been saved.');
+        if (state.activeView === 'addresses') renderAddresses(true);
+      } catch (error) {
+        const message = friendlyError(error);
+        const pincodeError = /pin\s*code|pincode|serviceable/i.test(message);
+        if (pincodeError && pincodeInput) {
+          const pin = String(new FormData(form).get('pincode') || '').replace(/\D/g, '').slice(0, 6);
+          serviceabilityTitle.textContent = 'This PIN code is not serviceable yet';
+          serviceabilityCopy.textContent = pin
+            ? `Atulyash does not currently deliver to ${pin}. Please use a delivery address in a serviceable area.`
+            : 'Atulyash does not currently deliver to this address. Please use a serviceable PIN code.';
+          serviceabilityNotice.hidden = false;
+          pincodeInput.setAttribute('aria-invalid', 'true');
+          pincodeInput.setCustomValidity(serviceabilityCopy.textContent);
+          pincodeInput.focus({ preventScroll: true });
+          pincodeInput.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        } else {
+          showToast(message, 'error');
+        }
+        setButtonBusy(submit, false);
+      }
+    });
+    openDialog('Delivery address', editing ? 'Edit saved address' : 'Add an address', form);
+  }
+
+  async function loadWallet(force = false) {
+    if (!force && state.loaded.has('wallet')) return state.wallet;
+    const [walletResult, transactionsResult, optionsResult] = await Promise.allSettled([
+      apiCall('misc', ['wallet', 'getCustomerWallet'], { id: state.customerId, customerId: state.customerId }, {
+        path: ({ id, customerId }) => (id || customerId) ? `/customers/customer-wallet/${id || customerId}/` : null,
+        method: 'GET'
+      }),
+      apiCall('misc', ['walletTransactions', 'getWalletTransactions'], { page: 1 }, {
+        path: '/orders/wallet/',
+        method: 'GET',
+        query: { page: 1 }
+      }),
+      apiCall('misc', ['rechargeOptions', 'getRechargeOptions'], {}, {
+        path: '/customers/customer-wallet/recharge/options/',
+        method: 'GET',
+        query: {}
+      })
+    ]);
+    if (walletResult.status === 'rejected') throw walletResult.reason;
+    state.wallet = responseData(walletResult.value);
+    state.walletTransactions = transactionsResult.status === 'fulfilled' ? responseList(transactionsResult.value) : [];
+    state.rechargeOptionsData = optionsResult.status === 'fulfilled' ? responseList(optionsResult.value) : [];
+    state.loaded.add('wallet');
+    return state.wallet;
+  }
+
+  function walletBalanceValue(wallet) {
+    return firstValue(
+      wallet?.current_balance,
+      wallet?.balance,
+      wallet?.available_balance,
+      wallet?.wallet_balance,
+      wallet?.amount,
+      0
+    );
+  }
+
+  function renderWalletTransactions() {
+    const transactions = state.walletTransactions || [];
+    if (!transactions.length) {
+      renderEmpty(elements.walletTransactions, 'No wallet activity yet.', 'Recharges, payments, refunds and credits will appear here.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    transactions.forEach((transaction) => {
+      const amount = numberFrom(firstValue(transaction.amount, transaction.transaction_amount, transaction.value));
+      const type = String(firstValue(transaction.transaction_type, transaction.type, transaction.entry_type, 'Transaction'));
+      const debit = /debit|payment|purchase|spent/i.test(type) || amount < 0;
+      const row = create('div', 'transaction-row');
+      row.append(create('span', 'transaction-icon', debit ? '−' : '+'));
+      const copy = create('div');
+      copy.append(
+        create('h3', '', firstValue(transaction.description, transaction.title, type)),
+        create('p', '', `${formatDate(firstValue(transaction.created_at, transaction.date, transaction.created), true)} · ${firstValue(transaction.reference, transaction.status, 'Recorded')}`)
+      );
+      const amountText = create('strong', `transaction-amount${debit ? ' is-debit' : ''}`, `${debit ? '−' : '+'}${formatMoney(Math.abs(amount))}`);
+      row.append(copy, amountText);
+      fragment.append(row);
+    });
+    elements.walletTransactions.replaceChildren(fragment);
+  }
+
+  async function renderWallet(force = false) {
+    elements.walletBalance.textContent = '₹—';
+    renderLoading(elements.walletTransactions, 'Preparing your wallet activity…');
+    try {
+      const wallet = await loadWallet(force);
+      elements.walletBalance.textContent = formatMoney(walletBalanceValue(wallet));
+      renderWalletTransactions();
+      const options = state.rechargeOptionsData || [];
+      if (options.length) {
+        elements.rechargeOptions.replaceChildren();
+        options.slice(0, 5).forEach((option) => {
+          const amount = firstValue(option.amount, option.recharge_amount, option.value);
+          if (!amount) return;
+          const label = firstValue(option.label, option.display_text, formatMoney(amount));
+          const chip = button(label, '', () => {
+            elements.rechargeAmount.value = String(amount);
+            resetRechargePreview();
+          });
+          chip.dataset.amount = String(amount);
+          elements.rechargeOptions.append(chip);
+        });
+      }
+    } catch (error) {
+      if (isUnauthorized(error)) return enterAuth('Your session has ended. Please sign in again.');
+      renderError(elements.walletTransactions, error, () => renderWallet(true));
+    }
+  }
+
+  function resetRechargePreview() {
+    state.walletPreview = null;
+    elements.rechargePreview.hidden = true;
+    elements.rechargePreview.replaceChildren();
+    elements.initiateRechargeButton.hidden = true;
+    elements.previewRechargeButton.hidden = false;
+  }
+
+  function renderRechargePreview(preview, amount) {
+    const data = responseData(preview);
+    const bonus = firstValue(data.bonus, data.bonus_amount, data.extra_credit, data.cashback, 0);
+    const tax = firstValue(data.tax, data.tax_amount, data.gst, 0);
+    const payable = firstValue(data.payable_amount, data.amount_to_pay, data.total, amount);
+    const credited = firstValue(data.credit_amount, data.wallet_credit, numberFrom(amount) + numberFrom(bonus));
+    const list = create('dl');
+    [
+      ['Recharge value', formatMoney(amount)],
+      ['Extra wallet credit', numberFrom(bonus) ? `+${formatMoney(bonus)}` : 'No extra credit'],
+      ['Tax / charges', formatMoney(tax)],
+      ['Amount payable', formatMoney(payable)],
+      ['Wallet receives', formatMoney(credited)]
+    ].forEach(([label, value]) => {
+      list.append(create('dt', '', label), create('dd', '', value));
+    });
+    elements.rechargePreview.replaceChildren(list);
+    elements.rechargePreview.hidden = false;
+    elements.previewRechargeButton.hidden = true;
+    elements.initiateRechargeButton.hidden = false;
+  }
+
+  async function previewRecharge(event) {
+    event.preventDefault();
+    const amount = numberFrom(elements.rechargeAmount.value);
+    if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
+    setButtonBusy(elements.previewRechargeButton, true, 'Preparing preview…');
+    try {
+      const result = await apiCall('misc', ['rechargePreview', 'previewRecharge'], { amount }, {
+        path: '/customers/customer-wallet/recharge/preview/',
+        method: 'POST',
+        form: { amount }
+      });
+      state.walletPreview = responseData(result);
+      renderRechargePreview(result, amount);
+    } catch (error) {
+      showToast(friendlyError(error), 'error');
+    } finally {
+      setButtonBusy(elements.previewRechargeButton, false);
+    }
+  }
+
+  function accountRazorpayResponseSources(payload) {
+    const envelopeKeys = [
+      'data', 'payment', 'razorpay', 'order', 'razorpay_order', 'razorpayOrder',
+      'payment_order', 'payment_details', 'payment_data', 'checkout'
+    ];
+    const sources = [];
+    const visited = new Set();
+    const visit = (value, depth) => {
+      if (!value || typeof value !== 'object' || visited.has(value) || depth > 4) return;
+      visited.add(value);
+      sources.push(value);
+      envelopeKeys.forEach((key) => visit(value[key], depth + 1));
+    };
+    visit(payload, 0);
+    return sources;
+  }
+
+  function firstAccountRazorpayValue(payload, keys) {
+    for (const source of accountRazorpayResponseSources(payload)) {
+      for (const key of keys) {
+        if (source[key] != null && source[key] !== '') return source[key];
+      }
+    }
+    return null;
+  }
+
+  function accountWalletRechargeConfiguration(payload, requestedAmount) {
+    const sources = accountRazorpayResponseSources(payload);
+    const namedOrder = firstAccountRazorpayValue(payload, [
+      'razorpay_order', 'razorpayOrder', 'payment_order', 'order'
+    ]);
+    const order = namedOrder && typeof namedOrder === 'object'
+      ? namedOrder
+      : sources.find((source) => typeof source.id === 'string' && source.id.startsWith('order_'));
+    const explicitOrderId = firstAccountRazorpayValue(payload, [
+      'razorpay_order_id', 'razorpayOrderId', 'payment_order_id'
+    ]);
+    const genericOrderId = firstAccountRazorpayValue(payload, ['order_id', 'orderId']);
+    const explicitPaise = numberFrom(firstAccountRazorpayValue(payload, [
+      'amount_in_paise', 'amount_paise', 'razorpay_amount', 'razorpayAmount'
+    ]));
+    const orderPaise = numberFrom(order?.amount);
+    const responseRupees = Number(firstAccountRazorpayValue(payload, [
+      'payable_amount', 'amount_to_pay', 'final_amount', 'total_amount'
+    ]));
+    const previewRupees = Number(firstValue(
+      state.walletPreview?.payable_amount,
+      state.walletPreview?.amount_to_pay,
+      state.walletPreview?.total
+    ));
+    const requestedRupees = Number(requestedAmount);
+    const payableRupees = Number.isFinite(responseRupees) && responseRupees > 0
+      ? responseRupees
+      : Number.isFinite(previewRupees) && previewRupees > 0
+        ? previewRupees
+        : requestedRupees;
+    return {
+      key: firstAccountRazorpayValue(payload, [
+        'razorpay_key_id', 'razorpayKeyId', 'razorpay_key', 'razorpayKey',
+        'key_id', 'public_key', 'publicKey', 'key'
+      ]),
+      orderId: explicitOrderId
+        || (typeof namedOrder === 'string' ? namedOrder : null)
+        || order?.id
+        || order?.order_id
+        || (String(genericOrderId || '').startsWith('order_') ? genericOrderId : null),
+      amount: orderPaise > 0 ? orderPaise : explicitPaise > 0 ? explicitPaise : Math.round(payableRupees * 100),
+      currency: order?.currency || firstAccountRazorpayValue(payload, ['currency']) || 'INR',
+      returnedFields: [...new Set(sources.flatMap((source) => Object.keys(source)))].sort()
+    };
+  }
+
+  async function initiateRecharge() {
+    const amount = numberFrom(elements.rechargeAmount.value);
+    if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
+    setButtonBusy(elements.initiateRechargeButton, true, 'Starting payment…');
+    try {
+      const result = await apiCall('misc', ['rechargeInitiate', 'initiateRecharge'], { amount }, {
+        path: '/customers/customer-wallet/recharge/initiate/',
+        method: 'POST',
+        form: { amount }
+      });
+      const config = accountWalletRechargeConfiguration(result, amount);
+
+      if (!config.key || !config.orderId || config.amount <= 0) {
+        const missing = [
+          !config.key ? 'Razorpay Key ID' : '',
+          !config.orderId ? 'Razorpay Order ID' : '',
+          config.amount <= 0 ? 'payment amount' : ''
+        ].filter(Boolean);
+        console.warn('Atulyash wallet recharge configuration is incomplete.', {
+          missing,
+          returnedFields: config.returnedFields
+        });
+        const body = create('div');
+        const panel = create('div', 'confirmation-panel');
+        panel.append(
+          create('strong', '', 'Secure payment setup is incomplete.'),
+          create('p', '', `The Atulyash payment service did not return ${missing.join(' and ')}. No payment has been taken.`)
+        );
+        body.append(panel, create('div', 'dialog-actions'));
+        openDialog('Wallet recharge', 'Payment configuration needed', body);
+        return;
+      }
+
+      const Razorpay = await loadRazorpayCheckout();
+      const checkout = new Razorpay({
+        key: config.key,
+        order_id: config.orderId,
+        amount: config.amount,
+        currency: config.currency,
+        name: 'Atulyash',
+        description: 'Atulyash Wallet Recharge',
+        image: 'images/brand-mark.webp',
+        prefill: {
+          name: displayName(),
+          email: firstValue(state.user?.email, state.customer?.email, ''),
+          contact: state.mobile
+        },
+        theme: { color: '#0d342a' },
+        handler: async (payment) => {
+          try {
+            await apiCall('misc', ['rechargeVerify', 'verifyRecharge'], payment, {
+              path: '/customers/customer-wallet/recharge/verify/',
+              method: 'POST',
+              form: payment
+            });
+            state.loaded.delete('wallet');
+            resetRechargePreview();
+            showToast('Recharge successful. Your wallet is being refreshed.');
+            renderWallet(true);
+          } catch (error) {
+            showToast(friendlyError(error, 'Payment completed, but verification is still pending. Please contact support.'), 'error');
+          }
+        }
+      });
+      checkout.open();
+    } catch (error) {
+      showToast(friendlyError(error), 'error');
+    } finally {
+      setButtonBusy(elements.initiateRechargeButton, false);
+    }
+  }
+
+  async function loadNotifications(force = false) {
+    const category = elements.notificationCategory.value;
+    const unread = elements.unreadOnly.checked;
+    const key = `notifications:${category}:${unread}`;
+    if (!force && state.loaded.has(key)) return state.notifications;
+    const query = { page: 1 };
+    if (category) query.category = category;
+    if (unread) query.is_read = false;
+    const result = await apiCall('notifications', ['list', 'fetchNotifications'], query, {
+      path: '/notifications/',
+      method: 'GET',
+      query
+    });
+    state.notifications = responseList(result);
+    state.loaded.add(key);
+    return state.notifications;
+  }
+
+  function notificationId(notification) {
+    return firstValue(notification.id, notification.notification_id, notification.pk);
+  }
+
+  async function markNotificationRead(notification, card) {
+    if (notification.is_read === true || notification.read === true) return;
+    const id = notificationId(notification);
+    try {
+      await apiCall('notifications', ['markRead'], { id, notificationId: id }, {
+        path: `/notifications/${id}/read/`,
+        method: 'PATCH',
+        form: {}
+      });
+      notification.is_read = true;
+      card.classList.remove('is-unread');
+      card.querySelector('.card-action')?.remove();
+      updateUnreadUI(Math.max(0, state.unreadCount - 1));
+      state.loaded.forEach((key) => {
+        if (key.startsWith('notifications:')) state.loaded.delete(key);
+      });
+      announce('Notification marked as read.');
+    } catch (error) {
+      showToast(friendlyError(error), 'error');
+    }
+  }
+
+  function renderNotificationCard(notification) {
+    const unread = !(notification.is_read === true || notification.read === true);
+    const card = create('article', `notification-card${unread ? ' is-unread' : ''}`);
+    const category = String(firstValue(notification.category, notification.type, 'update'));
+    const icon = create('span', 'notification-icon', /order|delivery/i.test(category) ? '↻' : /offer|promo/i.test(category) ? '◇' : '◌');
+    const copy = create('div');
+    copy.append(
+      create('h3', '', firstValue(notification.title, notification.subject, 'Atulyash update')),
+      create('p', '', firstValue(notification.message, notification.body, notification.description, 'There is a new update in your account.'))
+    );
+    if (unread) copy.append(button('Mark as read', 'card-action', () => markNotificationRead(notification, card)));
+    card.append(
+      icon,
+      copy,
+      create('time', 'notification-time', formatDate(firstValue(notification.created_at, notification.sent_at, notification.date), true))
+    );
+    return card;
+  }
+
+  async function renderNotifications(force = false) {
+    renderLoading(elements.notificationsList, 'Gathering your latest updates…');
+    try {
+      const notifications = await loadNotifications(force);
+      if (!notifications.length) {
+        renderEmpty(elements.notificationsList, 'You are all caught up.', 'Order and delivery updates will appear here.');
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      notifications.forEach((notification) => fragment.append(renderNotificationCard(notification)));
+      elements.notificationsList.replaceChildren(fragment);
+    } catch (error) {
+      if (isUnauthorized(error)) return enterAuth('Your session has ended. Please sign in again.');
+      renderError(elements.notificationsList, error, () => renderNotifications(true));
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    setButtonBusy(elements.markAllReadButton, true, 'Updating…');
+    try {
+      await apiCall('notifications', ['markAllRead'], undefined, {
+        path: '/notifications/mark-all-read/',
+        method: 'POST',
+        form: {}
+      });
+      updateUnreadUI(0);
+      state.loaded.forEach((key) => {
+        if (key.startsWith('notifications:')) state.loaded.delete(key);
+      });
+      showToast('Every notification is now marked as read.');
+      renderNotifications(true);
+    } catch (error) {
+      showToast(friendlyError(error), 'error');
+    } finally {
+      setButtonBusy(elements.markAllReadButton, false);
+    }
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    const submit = elements.profileForm.querySelector('[type="submit"]');
+    setButtonBusy(submit, true, 'Saving…');
+    const payload = {
+      id: state.userId,
+      userId: state.userId,
+      name: elements.profileName.value.trim(),
+      email: elements.profileEmail.value.trim()
+    };
+    try {
+      const result = await apiCall('profile', ['updateUser', 'saveUserData'], payload, {
+        path: ({ id, userId }) => (id || userId) ? `/users/users/${id || userId}/` : null,
+        method: 'PATCH',
+        form: { name: payload.name, email: payload.email }
+      });
+      const data = responseData(result);
+      state.user = { ...(state.user || {}), ...payload, ...(typeof data === 'object' ? data : {}) };
+      state.loaded.add('profile');
+      updateIdentityUI();
+      showToast('Your profile has been updated.');
+    } catch (error) {
+      showToast(friendlyError(error), 'error');
+    } finally {
+      setButtonBusy(submit, false);
+    }
+  }
+
+  function openDeletionRequest() {
+    const form = create('form', 'dialog-form');
+    const panel = create('div', 'confirmation-panel');
+    panel.append(
+      create('strong', '', 'This begins a permanent deletion request.'),
+      create('p', '', 'Our team will verify the request before your account data is removed. Active subscriptions may be stopped as part of this process.')
+    );
+    const reasonLabel = create('label', '', 'Why would you like to leave?');
+    const reason = create('textarea');
+    reason.required = true;
+    reason.maxLength = 500;
+    reason.placeholder = 'Please share a short reason';
+    reasonLabel.append(reason);
+    const confirmLabel = create('label', 'check-control');
+    const confirm = create('input');
+    confirm.type = 'checkbox';
+    confirm.required = true;
+    confirmLabel.append(confirm, document.createTextNode(' I understand this requests permanent deletion.'));
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Keep my account', 'secondary-button', closeDialog));
+    const submit = create('button', 'danger-button', 'Submit deletion request');
+    submit.type = 'submit';
+    actions.append(submit);
+    form.append(panel, reasonLabel, confirmLabel, actions);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setButtonBusy(submit, true, 'Submitting…');
+      const payload = { reason: reason.value.trim() };
+      try {
+        await apiCall('profile', ['requestDeletion', 'submitAccountDeletionRequest'], payload, {
+          path: '/users/account-deletion-requests/',
+          method: 'POST',
+          form: payload
+        });
+        closeDialog();
+        showToast('Your deletion request has been submitted. Our team will contact you.');
+      } catch (error) {
+        showToast(friendlyError(error), 'error');
+        setButtonBusy(submit, false);
+      }
+    });
+    openDialog('Privacy & control', 'Request account deletion', form);
+  }
+
+  async function loadSupport(force = false) {
+    if (!force && state.loaded.has('support')) return;
+    const [faqResult, truthResult, contactResult] = await Promise.allSettled([
+      apiCall('misc', ['faqs', 'getFAQs'], { page_size: 100, is_active: true }, {
+        path: '/customers/customer-faqs/',
+        method: 'GET',
+        query: { page_size: 100, is_active: true },
+        auth: false
+      }),
+      apiCall('misc', ['truthBook', 'getTruthBook'], { is_active: true }, {
+        path: '/products/product-truth-books/latest/',
+        method: 'GET',
+        query: { is_active: true },
+        auth: false
+      }),
+      apiCall('misc', ['contact', 'getContactUsData'], { is_active: true }, {
+        path: '/products/contact-us/',
+        method: 'GET',
+        query: { is_active: true },
+        auth: false
+      })
+    ]);
+    state.faqs = faqResult.status === 'fulfilled' ? responseList(faqResult.value) : [];
+    if (truthResult.status === 'fulfilled') {
+      const truthPayload = responseData(truthResult.value);
+      state.truthBook = responseList(truthPayload)[0] || truthPayload;
+    } else {
+      state.truthBook = null;
+    }
+    state.contact = contactResult.status === 'fulfilled' ? responseData(contactResult.value) : null;
+    state.supportErrors = [faqResult, truthResult, contactResult].filter((result) => result.status === 'rejected');
+    state.loaded.add('support');
+  }
+
+  function renderContact() {
+    const contactData = state.contact;
+    const contacts = responseList(contactData);
+    const contact = contacts[0] || contactData || {};
+    const phone = String(firstValue(contact.phone, contact.mobile, contact.helpline, contact.phone_number, '+91 98185 88996'));
+    const email = String(firstValue(contact.email, contact.support_email, 'info@atulyash.com'));
+    const fragment = document.createDocumentFragment();
+    const callCard = create('article', 'contact-card');
+    callCard.append(create('span', '', 'Call us'), create('strong', '', phone));
+    const callLink = create('a', '', 'Speak to our team →');
+    callLink.href = `tel:${phone.replace(/[^\d+]/g, '')}`;
+    callCard.append(callLink);
+    const emailCard = create('article', 'contact-card');
+    emailCard.append(create('span', '', 'Email us'), create('strong', '', 'Customer care'));
+    const emailLink = create('a', '', `${email} →`);
+    emailLink.href = `mailto:${email}`;
+    emailCard.append(emailLink);
+    fragment.append(callCard, emailCard);
+    elements.contactCards.replaceChildren(fragment);
+  }
+
+  function renderTruthBook() {
+    const truth = state.truthBook || {};
+    const fileUrl = safeUrl(firstValue(
+      truth.truth_book,
+      truth.file,
+      truth.document,
+      truth.pdf_url,
+      truth.url,
+      truth.download_url
+    ));
+    if (!fileUrl) return;
+    const copy = elements.truthBookCard.querySelector('div');
+    if (!copy || copy.querySelector('a')) return;
+    const link = create('a', 'light-button', 'Open the latest Truth Book →');
+    link.href = fileUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    copy.append(link);
+  }
+
+  function renderFaqs() {
+    if (!state.faqs?.length) {
+      if (state.supportErrors?.length) {
+        renderError(elements.faqList, state.supportErrors[0].reason, () => renderSupport(true));
+      } else {
+        renderEmpty(elements.faqList, 'No questions published yet.', 'Please call our team and we will help personally.');
+      }
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    state.faqs.forEach((faq) => {
+      const detail = create('details', 'faq-item');
+      detail.append(
+        create('summary', '', firstValue(faq.question, faq.title, faq.name, 'Atulyash question')),
+        create('div', '', firstValue(faq.answer, faq.description, faq.content, 'Our team will be happy to explain this personally.'))
+      );
+      fragment.append(detail);
+    });
+    elements.faqList.replaceChildren(fragment);
+  }
+
+  async function renderSupport(force = false) {
+    renderLoading(elements.faqList, 'Gathering answers from our team…');
+    try {
+      await loadSupport(force);
+      renderContact();
+      renderTruthBook();
+      renderFaqs();
+    } catch (error) {
+      renderError(elements.faqList, error, () => renderSupport(true));
+    }
+  }
+
+  async function renderOverview(force = false) {
+    const tasks = await Promise.allSettled([
+      loadProfile(force),
+      getOrders({ page: 1, force }),
+      loadSubscriptions(force),
+      loadWallet(force),
+      loadUnread(force)
+    ]);
+    const unauthorized = tasks.find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
+    if (unauthorized) return enterAuth('Your session has ended. Please sign in again.');
+
+    const metrics = [
+      ['Ready for your next batch', state.wallet ? formatMoney(walletBalanceValue(state.wallet)) : '—', 'Available in your Atulyash wallet'],
+      ['Your weekly rhythm', state.subscriptions.length, 'Freshness planned around your home'],
+      ['New for you', state.unreadCount, 'Delivery notes and gentle reminders']
+    ];
+    const fragment = document.createDocumentFragment();
+    metrics.forEach(([label, value, note]) => {
+      const card = create('article', 'metric-card');
+      card.append(create('span', '', label), create('strong', '', value), create('small', '', note));
+      fragment.append(card);
+    });
+    elements.overviewMetrics.replaceChildren(fragment);
+
+    const upcomingSubscription = state.subscriptions.find((subscription) => subscriptionNextDate(subscription)) || state.subscriptions[0];
+    if (!upcomingSubscription) {
+      renderEmpty(elements.upcomingDelivery, 'No delivery planned yet.', 'Choose a weekly rhythm whenever your home is ready.');
+    } else {
+      const upcoming = create('div', 'upcoming-delivery');
+      const date = dateValue(subscriptionNextDate(upcomingSubscription));
+      const tile = create('div', 'upcoming-date');
+      tile.append(
+        create('span', '', date ? new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(date) : 'Next'),
+        create('strong', '', date ? new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(date) : '—')
+      );
+      const copy = create('div');
+      copy.append(
+        create('h3', '', subscriptionName(upcomingSubscription)),
+        create('p', '', `${subscriptionWeight(upcomingSubscription)} · ${firstValue(upcomingSubscription.delivery_day, 'Scheduled delivery')}`)
+      );
+      upcoming.append(tile, copy, create('strong', '', formatDate(subscriptionNextDate(upcomingSubscription))));
+      elements.upcomingDelivery.replaceChildren(upcoming);
+    }
+
+    if (!state.orders.length) {
+      renderEmpty(elements.overviewOrders, 'Your first batch is waiting.', 'Once you bring Atulyash home, every fresh batch will live here.');
+    } else {
+      const orderFragment = document.createDocumentFragment();
+      state.orders.slice(0, 3).forEach((order) => orderFragment.append(makeOrderCard(order, { compact: true })));
+      elements.overviewOrders.replaceChildren(orderFragment);
+    }
+  }
+
+  function quickOrderMode() {
+    return document.querySelector('input[name="quickOrderMode"]:checked')?.value === 'weekly'
+      ? 'weekly'
+      : 'once';
+  }
+
+  function setQuickWeeklyCatalogPlaceholder(message) {
+    state.weeklyPlans = [];
+    const select = elements.quickOrderPlan;
+    if (select) {
+      const option = create('option', '', message);
+      option.value = '';
+      option.disabled = true;
+      option.selected = true;
+      select.replaceChildren(option);
+      select.disabled = true;
+    }
+    const weeklyRadio = document.querySelector('input[name="quickOrderMode"][value="weekly"]');
+    if (weeklyRadio) {
+      weeklyRadio.disabled = true;
+      weeklyRadio.closest('label')?.setAttribute('aria-disabled', 'true');
+      if (weeklyRadio.checked) {
+        weeklyRadio.checked = false;
+        const onceRadio = document.querySelector('input[name="quickOrderMode"][value="once"]');
+        if (onceRadio) onceRadio.checked = true;
+      }
+    }
+  }
+
+  function setQuickProductCatalogStatus(message, {
+    state: status = 'loading',
+    retry = false,
+    hidden = false
+  } = {}) {
+    if (!elements.quickOrderCatalogStatus) return;
+    elements.quickOrderCatalogStatus.hidden = hidden;
+    elements.quickOrderCatalogStatus.dataset.state = status;
+    if (elements.quickOrderCatalogMessage) elements.quickOrderCatalogMessage.textContent = message;
+    if (elements.quickOrderCatalogRetry) elements.quickOrderCatalogRetry.hidden = !retry;
+  }
+
+  function renderQuickProductPacks() {
+    if (!elements.accountPackSelector) return;
+    const previousWeight = Number(
+      document.querySelector('input[name="quickPackSize"]:checked')?.value
+    );
+    const fragment = document.createDocumentFragment();
+    const legend = create('legend', 'sr-only', 'Atta pack size');
+    fragment.append(legend);
+
+    state.quickProductPacks.forEach((pack, index) => {
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'quickPackSize';
+      input.value = String(pack.weight);
+      input.dataset.price = String(pack.price);
+      input.dataset.apiPackId = String(pack.apiId);
+      input.checked = (
+        Number.isFinite(previousWeight)
+          ? pack.weight === previousWeight
+          : index === 0
+      );
+
+      const content = document.createElement('span');
+      const weight = create('b', '', `${bagWeightLabel(pack.weight)} kg`);
+      const note = create(
+        'small',
+        '',
+        index === 0
+          ? 'Compact fresh batch'
+          : index === state.quickProductPacks.length - 1
+            ? 'Family fresh batch'
+            : 'Fresh-batch pack'
+      );
+      const price = create('em', '', currency.format(pack.price));
+      content.append(weight, note, price);
+      label.append(input, content);
+      fragment.append(label);
+    });
+
+    elements.accountPackSelector.replaceChildren(fragment);
+    elements.accountPackSelector.disabled = state.quickProductPacks.length === 0;
+  }
+
+  async function loadQuickOrderProducts() {
+    state.quickProductCatalogStatus = 'loading';
+    state.quickProductPacks = [];
+    if (elements.accountPackSelector) {
+      elements.accountPackSelector.disabled = true;
+      elements.accountPackSelector.replaceChildren();
+    }
+    setQuickProductCatalogStatus('Loading today’s live pack sizes…', { state: 'loading' });
+    renderQuickOrder();
+
+    try {
+      const result = await apiCall('products', ['list'], {
+        is_active: true,
+        page_size: 100
+      }, {
+        path: '/products/products/',
+        method: 'GET',
+        query: { is_active: true, page_size: 100 },
+        auth: false
+      });
+      const products = responseList(result).filter((product) => product?.is_active !== false);
+      const product = products.find((candidate) => {
+        const packs = firstValue(candidate?.all_packs, candidate?.packs, []);
+        return Array.isArray(packs) && packs.length > 0;
+      }) || null;
+      const packs = firstValue(product?.all_packs, product?.packs, []);
+      const livePacks = (Array.isArray(packs) ? packs : [])
+        .filter((pack) => (
+          pack?.is_active !== false
+          && (firstFinite(pack?.stock_quantity) ?? 1) > 0
+        ))
+        .map((pack) => {
+          const labelledWeight = weightFromLabel(pack?.name);
+          const weight = Number.isFinite(labelledWeight) && labelledWeight > 0
+            ? labelledWeight
+            : firstFinite(pack?.weight, pack?.amount);
+          const price = firstFinite(pack?.price);
+          const apiId = firstValue(pack?.id, pack?.pk);
+          if (
+            apiId == null
+            || !Number.isFinite(weight)
+            || weight <= 0
+            || !Number.isFinite(price)
+            || price < 0
+          ) {
+            return null;
+          }
+          return { apiId, weight, price };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.weight - b.weight);
+
+      if (!livePacks.length) {
+        throw new Error('No live atta packs are available right now.');
+      }
+
+      state.products = products;
+      state.quickProductPacks = livePacks;
+      state.quickProductCatalogStatus = 'ready';
+      renderQuickProductPacks();
+      setQuickProductCatalogStatus('', { state: 'success', hidden: true });
+    } catch (error) {
+      state.quickProductCatalogStatus = 'error';
+      state.quickProductPacks = [];
+      renderQuickProductPacks();
+      setQuickProductCatalogStatus(
+        friendlyError(error, 'Live pack availability could not be loaded.'),
+        { state: 'error', retry: true }
+      );
+    } finally {
+      renderQuickOrder();
+    }
+  }
+
+  async function loadQuickOrderWeeklyPlans() {
+    state.weeklyCatalogStatus = 'loading';
+    setQuickWeeklyCatalogPlaceholder('Loading live weekly plans…');
+    try {
+      const result = await apiCall('subscriptions', ['listPacks'], {
+        is_active: true,
+        page_size: 100
+      }, {
+        path: '/subscription/subscription_pack/',
+        method: 'GET',
+        query: { is_active: true, page_size: 100 },
+        auth: false
+      });
+      const plans = responseList(result)
+        .filter((plan) => plan?.is_active !== false)
+        .map((plan) => {
+          const monthlyKg = Number(plan?.monthly_quantity);
+          const weeklyKg = Number(plan?.weekly_quantity);
+          const price = Number(plan?.weekly_price);
+          const monthlyPrice = Number(plan?.price);
+          if (
+            plan?.id == null
+            || !Number.isFinite(monthlyKg)
+            || monthlyKg <= 0
+            || !Number.isFinite(weeklyKg)
+            || weeklyKg <= 0
+            || !Number.isFinite(price)
+            || price < 0
+            || !Number.isFinite(monthlyPrice)
+            || monthlyPrice < 0
+          ) {
+            return null;
+          }
+          return {
+            id: plan.id,
+            name: firstValue(plan.name, 'Fresh Weekly Atta'),
+            monthlyKg,
+            weeklyKg,
+            price,
+            monthlyPrice
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.monthlyKg - b.monthlyKg);
+
+      if (!plans.length) {
+        state.weeklyCatalogStatus = 'empty';
+        setQuickWeeklyCatalogPlaceholder('No live weekly plans are available.');
+        return;
+      }
+
+      state.weeklyPlans = plans;
+      state.weeklyCatalogStatus = 'ready';
+      const fragment = document.createDocumentFragment();
+      plans.forEach((plan) => {
+        const option = create('option');
+        option.value = String(plan.id);
+        option.dataset.monthly = String(plan.monthlyKg);
+        option.dataset.weekly = String(plan.weeklyKg);
+        option.dataset.price = String(plan.price);
+        option.dataset.monthlyPrice = String(plan.monthlyPrice);
+        const weeklyLabel = Number.isInteger(plan.weeklyKg) ? String(plan.weeklyKg) : plan.weeklyKg.toFixed(1);
+        option.textContent = `${weeklyLabel} kg every week`;
+        fragment.append(option);
+      });
+      elements.quickOrderPlan.replaceChildren(fragment);
+      elements.quickOrderPlan.disabled = false;
+      const weeklyRadio = document.querySelector('input[name="quickOrderMode"][value="weekly"]');
+      if (weeklyRadio) {
+        weeklyRadio.disabled = false;
+        weeklyRadio.closest('label')?.setAttribute('aria-disabled', 'false');
+      }
+      updateAccountAttaCalculator();
+    } catch (error) {
+      state.weeklyCatalogStatus = 'error';
+      setQuickWeeklyCatalogPlaceholder('Live weekly plans could not be loaded.');
+    } finally {
+      updateAccountAttaCalculator();
+      if (!elements.accountShell.hidden && state.activeView === 'shop') renderQuickOrder();
+      if (!elements.accountShell.hidden && state.activeView === 'subscriptions' && state.loaded.has('subscriptions')) {
+        renderSubscriptions();
+      }
+    }
+  }
+
+  function selectedQuickPack() {
+    const input = document.querySelector('input[name="quickPackSize"]:checked')
+      || document.querySelector('input[name="quickPackSize"]');
+    const weight = Number(input?.value);
+    const price = Number(input?.dataset.price);
+    const apiId = Number(input?.dataset.apiPackId);
+    if (
+      !input
+      || state.quickProductCatalogStatus !== 'ready'
+      || !Number.isFinite(weight)
+      || weight <= 0
+      || !Number.isFinite(price)
+      || price < 0
+      || !Number.isFinite(apiId)
+      || apiId <= 0
+    ) {
+      return null;
+    }
+    return {
+      weight,
+      price,
+      apiId
+    };
+  }
+
+  function selectedQuickPlan() {
+    const option = elements.quickOrderPlan?.selectedOptions?.[0];
+    const monthlyKg = Number(option?.dataset.monthly);
+    const weeklyKg = Number(option?.dataset.weekly);
+    const price = Number(option?.dataset.price);
+    const monthlyPrice = Number(option?.dataset.monthlyPrice);
+    if (
+      !option
+      || option.disabled
+      || !Number.isFinite(monthlyKg)
+      || monthlyKg <= 0
+      || !Number.isFinite(weeklyKg)
+      || weeklyKg <= 0
+      || !Number.isFinite(price)
+      || price < 0
+      || !Number.isFinite(monthlyPrice)
+      || monthlyPrice < 0
+    ) {
+      return null;
+    }
+    return {
+      id: option.value,
+      monthlyKg,
+      weeklyKg,
+      price,
+      monthlyPrice
+    };
+  }
+
+  function buildQuickOrderChapatis(weight) {
+    if (!elements.quickOrderChapatiFill) return;
+    const count = Math.max(1, Math.min(5, Math.ceil(Number(weight) / 2)));
+    const fragment = document.createDocumentFragment();
+    const spread = 29;
+    for (let index = 0; index < count; index += 1) {
+      const chapati = create('span', 'quick-order-chapati-token');
+      const position = index - (count - 1) / 2;
+      const startX = position * spread;
+      chapati.style.setProperty('--roti-start-x', `${startX}px`);
+      chapati.style.setProperty('--roti-mid-x', `${startX * .42}px`);
+      chapati.style.setProperty('--roti-rotation', `${position * 18 + (index % 2 ? 10 : -7)}deg`);
+      chapati.style.setProperty('--roti-mid-rotation', `${position * -5 + (index % 2 ? -3 : 2)}deg`);
+      chapati.style.setProperty('--roti-delay', `${30 + index * 72}ms`);
+      fragment.append(chapati);
+    }
+    elements.quickOrderChapatiFill.replaceChildren(fragment);
+  }
+
+  function animateQuickOrderPack(weight) {
+    if (!elements.quickOrderPackArt || !elements.quickOrderVisual || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    window.clearTimeout(state.quickOrderAnimationTimer);
+    elements.quickOrderPackArt.classList.remove('is-changing');
+    elements.quickOrderVisual.classList.remove('is-filling');
+    buildQuickOrderChapatis(weight);
+    void elements.quickOrderVisual.offsetWidth;
+    elements.quickOrderVisual.classList.add('is-filling');
+    state.quickOrderAnimationTimer = window.setTimeout(() => {
+      elements.quickOrderVisual?.classList.remove('is-filling');
+      elements.quickOrderChapatiFill?.replaceChildren();
+    }, 1050);
+  }
+
+  function renderQuickOrder({ animate = false } = {}) {
+    if (!elements.accountQuickOrderForm) return;
+    const mode = quickOrderMode();
+    const weekly = mode === 'weekly';
+    const pack = selectedQuickPack();
+    const plan = weekly ? selectedQuickPlan() : null;
+    const submit = elements.accountQuickOrderForm.querySelector('[type="submit"]');
+    const quantity = Math.max(1, Math.min(10, state.quickOrderQuantity));
+    state.quickOrderQuantity = quantity;
+    submit.setAttribute('aria-busy', String(state.quickOrderSubmitting));
+    elements.accountQuickOrderForm.dataset.orderMode = mode;
+
+    elements.quickOrderOnceFields.hidden = weekly;
+    elements.quickOrderOnceFields.inert = weekly;
+    elements.quickOrderWeeklyFields.hidden = !weekly;
+    elements.quickOrderWeeklyFields.inert = !weekly;
+    if (elements.quickOrderTotal) elements.quickOrderTotal.hidden = weekly;
+    if (elements.weeklyChoiceSummary) elements.weeklyChoiceSummary.hidden = !weekly || !plan;
+    if (elements.quickOrderAssuranceText) {
+      elements.quickOrderAssuranceText.textContent = weekly
+        ? 'Next: review your bag, then choose the delivery day and confirm wallet payment.'
+        : 'Added here, reviewed here. Choose delivery and payment only when you are ready.';
+    }
+    elements.quickOrderQuantity.textContent = String(quantity);
+
+    if (weekly && !plan) {
+      elements.quickOrderWeightBadge.textContent = 'Live';
+      elements.quickOrderSelection.textContent = state.weeklyCatalogStatus === 'loading'
+        ? 'Loading live weekly plans…'
+        : 'No live weekly plan is available';
+      elements.quickOrderPrice.textContent = '—';
+      elements.quickOrderCtaLabel.textContent = 'Weekly plan unavailable';
+      submit.disabled = true;
+      document.querySelectorAll('input[name="quickOrderMode"]').forEach((input) => {
+        input.closest('label')?.classList.toggle('is-selected', input.checked);
+      });
+      return;
+    }
+
+    if (!weekly && !pack) {
+      elements.quickOrderWeightBadge.textContent = 'Live';
+      elements.quickOrderSelection.textContent = state.quickProductCatalogStatus === 'loading'
+        ? 'Loading today’s live packs…'
+        : 'No live pack is available';
+      elements.quickOrderPrice.textContent = '—';
+      elements.quickOrderCtaLabel.textContent = state.quickProductCatalogStatus === 'loading'
+        ? 'Loading live availability…'
+        : 'Pack unavailable';
+      submit.disabled = true;
+      return;
+    }
+
+    submit.disabled = state.quickOrderSubmitting;
+    const displayWeight = weekly ? plan.weeklyKg : pack.weight;
+    const total = weekly ? plan.monthlyPrice : pack.price * quantity;
+    const compactWeight = Number.isInteger(displayWeight) ? String(displayWeight) : displayWeight.toFixed(1);
+    if (weekly) {
+      const monthlyWeight = Number.isInteger(plan.monthlyKg) ? String(plan.monthlyKg) : plan.monthlyKg.toFixed(1);
+      if (elements.weeklyChoiceQuantity) elements.weeklyChoiceQuantity.textContent = `${compactWeight} kg`;
+      if (elements.weeklyChoiceCoverage) elements.weeklyChoiceCoverage.textContent = `${monthlyWeight} kg across the first four deliveries`;
+      if (elements.weeklyChoicePerDelivery) elements.weeklyChoicePerDelivery.textContent = currency.format(plan.price);
+      if (elements.weeklyChoiceFirstMonth) elements.weeklyChoiceFirstMonth.textContent = currency.format(plan.monthlyPrice);
+      if (elements.weeklyChoicePaymentCopy) {
+        elements.weeklyChoicePaymentCopy.textContent = `${currency.format(plan.monthlyPrice)} is debited from your Atulyash Wallet at checkout and pays for the first four weekly deliveries.`;
+      }
+    }
+    elements.quickOrderWeightBadge.textContent = weekly ? `${compactWeight} kg/wk` : `${compactWeight} kg`;
+    elements.quickOrderSelection.textContent = weekly
+      ? `${compactWeight} kg/week · ${plan.monthlyKg} kg/month · ${currency.format(plan.price)}/week`
+      : `${quantity} × ${compactWeight} kg · one-time order`;
+    elements.quickOrderPrice.textContent = weekly ? `${currency.format(total)} first month` : currency.format(total);
+    elements.quickOrderCtaLabel.textContent = state.quickOrderSubmitting
+      ? 'Adding to your bag…'
+      : weekly
+        ? 'Continue with this weekly plan'
+        : 'Add to bag';
+
+    document.querySelectorAll('input[name="quickOrderMode"]').forEach((input) => {
+      input.closest('label')?.classList.toggle('is-selected', input.checked);
+    });
+    document.querySelectorAll('input[name="quickPackSize"]').forEach((input) => {
+      input.closest('label')?.classList.toggle('is-selected', input.checked);
+    });
+    if (animate) animateQuickOrderPack(displayWeight);
+  }
+
+  function setQuickOrderMode(mode) {
+    if (mode === 'weekly' && state.weeklyCatalogStatus !== 'ready') {
+      showToast(
+        state.weeklyCatalogStatus === 'loading'
+          ? 'Live weekly plans are still loading.'
+          : 'Live weekly plans are not available right now.',
+        'error'
+      );
+      return;
+    }
+    const target = document.querySelector(`input[name="quickOrderMode"][value="${mode === 'weekly' ? 'weekly' : 'once'}"]`);
+    if (target) target.checked = true;
+    renderQuickOrder({ animate: true });
+  }
+
+  function accountCalculatorBuffer() {
+    return Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value || 0);
+  }
+
+  function updateAccountAttaCalculator() {
+    if (!elements.accountDailyRotis) return null;
+    const dailyRotis = Math.max(8, Math.round(Number(elements.accountDailyRotis.value) || 8));
+    const buffer = accountCalculatorBuffer();
+    const weeklyKg = (dailyRotis * 30 * 7 * (1 + buffer / 100)) / 1000;
+    elements.accountDailyRotis.value = String(dailyRotis);
+    elements.accountRotisMinus.disabled = dailyRotis <= 8;
+    elements.accountCalculatorKg.replaceChildren(
+      document.createTextNode(weeklyKg.toFixed(2)),
+      Object.assign(create('small'), { textContent: 'kg/week' })
+    );
+    elements.accountCalculatorFormula.textContent = `${dailyRotis} rotis × 30 g × 7 days${buffer ? ` + ${buffer}% extra` : ''}`;
+
+    const recommendedPlan = state.weeklyPlans.find((plan) => plan.weeklyKg >= weeklyKg) || null;
+    if (state.weeklyCatalogStatus === 'loading') {
+      elements.accountCalculatorPlan.textContent = 'Finding the closest live weekly plan…';
+    } else if (!recommendedPlan) {
+      elements.accountCalculatorPlan.textContent = state.weeklyPlans.length
+        ? 'This estimate is above the available plans. Our team can help shape the right quantity.'
+        : 'Live weekly plans are not available right now.';
+    } else {
+      const planWeight = Number.isInteger(recommendedPlan.weeklyKg)
+        ? recommendedPlan.weeklyKg
+        : recommendedPlan.weeklyKg.toFixed(1);
+      elements.accountCalculatorPlan.textContent = `Closest live plan: ${planWeight} kg every week.`;
+      const option = Array.from(elements.quickOrderPlan?.options || [])
+        .find((candidate) => String(candidate.value) === String(recommendedPlan.id));
+      if (option) {
+        elements.quickOrderPlan.value = option.value;
+        if (quickOrderMode() === 'weekly') renderQuickOrder({ animate: true });
+      }
+    }
+    return { dailyRotis, buffer, weeklyKg, plan: recommendedPlan };
+  }
+
+  async function continueQuickOrder(event) {
+    event.preventDefault();
+    if (state.quickOrderSubmitting) return;
+    const weekly = quickOrderMode() === 'weekly';
+    const pack = selectedQuickPack();
+    const plan = weekly ? selectedQuickPlan() : null;
+    if (weekly && !plan) {
+      showToast('A live weekly plan is required before continuing.', 'error');
+      return;
+    }
+    if (!weekly && !pack) {
+      showToast('A live pack is required before it can be added to your bag.', 'error');
+      return;
+    }
+
+    state.quickOrderSubmitting = true;
+    renderQuickOrder();
+    setAccountBagStatus('Adding your fresh-batch selection…', { state: 'loading' });
+    try {
+      const ensureActiveBag = methodFrom('cart', ['ensureActive']);
+      if (!ensureActiveBag) throw new Error('The secure bag service is unavailable right now.');
+      let cartPayload = await ensureActiveBag(state.mobile);
+      const activeSession = client()?.getSession?.() || {};
+      const cartData = responseData(cartPayload);
+      const cartId = firstValue(
+        activeSession.cartId,
+        activeSession.cart_id,
+        cartData?.cart_id,
+        cartData?.cartId,
+        cartData?.id
+      );
+      if (cartId == null) {
+        throw new Error('Your secure bag could not be identified. Please try again.');
+      }
+
+      const lineItem = weekly ? {
+        cart: cartId,
+        subscription_pack: plan.id,
+        cart_item_type: 'Subscription'
+      } : {
+        cart: cartId,
+        product_pack: pack.apiId,
+        cart_item_type: 'One Time',
+        quantity: state.quickOrderQuantity
+      };
+      const addItem = weekly
+        ? methodFrom('cart', ['addSubscription', 'addItem'])
+        : methodFrom('cart', ['addOneTime', 'addItem']);
+      if (!addItem) throw new Error('Adding items to your secure bag is unavailable right now.');
+
+      await addItem(lineItem);
+      cartPayload = await ensureActiveBag(state.mobile);
+      state.accountBagPayload = cartPayload;
+      renderAccountBag();
+      setAccountBagStatus(
+        weekly
+          ? 'Your weekly plan is now in your bag.'
+          : `${state.quickOrderQuantity} × ${bagWeightLabel(pack.weight)} kg pack added to your bag.`,
+        { state: 'success' }
+      );
+      openAccountBag({ refresh: false });
+      announce('Selection added to your bag.');
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        enterAuth('Your session has ended. Please sign in again.');
+        return;
+      }
+      const message = friendlyError(error, 'This selection could not be added to your bag. Please try again.');
+      setAccountBagStatus(message, { state: 'error' });
+      openAccountBag({ refresh: false });
+      showToast(message, 'error');
+    } finally {
+      state.quickOrderSubmitting = false;
+      renderQuickOrder();
+    }
+  }
+
+  const viewLoaders = {
+    shop: renderQuickOrder,
+    overview: renderOverview,
+    orders: () => renderOrders({ page: 1 }),
+    subscriptions: renderSubscriptions,
+    addresses: renderAddresses,
+    wallet: renderWallet,
+    notifications: renderNotifications,
+    profile: async () => {
+      try {
+        await loadProfile();
+      } catch (error) {
+        if (isUnauthorized(error)) enterAuth('Your session has ended. Please sign in again.');
+        else showToast(friendlyError(error), 'error');
+      }
+    },
+    support: renderSupport
+  };
+
+  function syncMobileAccountNav() {
+    const viewLabels = {
+      shop: 'Order atta',
+      orders: 'Orders',
+      subscriptions: 'Weekly plan',
+      addresses: 'Delivery homes',
+      support: 'Help & support',
+      profile: 'My details',
+      wallet: 'My wallet',
+      notifications: 'Notifications'
+    };
+    const activeItem = elements.portalNav?.querySelector('.nav-item.is-active');
+    const activeLabel = activeItem?.querySelector('.nav-copy strong')?.textContent?.trim();
+    if (elements.mobileAccountNavLabel) {
+      elements.mobileAccountNavLabel.textContent = viewLabels[state.activeView] || activeLabel || 'Order atta';
+    }
+  }
+
+  function setMobileAccountNav(open, { restoreFocus = false } = {}) {
+    const canOpen = window.matchMedia('(max-width: 900px)').matches;
+    const expanded = Boolean(open && canOpen);
+    // Two menus over the same small screen is visually confusing. Keep the
+    // account navigation and profile menu mutually exclusive on mobile.
+    if (expanded && elements.profileMenu?.open) elements.profileMenu.open = false;
+    elements.portalSidebar?.classList.toggle('is-mobile-open', expanded);
+    if (elements.mobileAccountNavToggle) {
+      elements.mobileAccountNavToggle.setAttribute('aria-expanded', String(expanded));
+      elements.mobileAccountNavToggle.setAttribute('aria-label', expanded ? 'Close account menu' : 'Open account menu');
+    }
+    document.body.classList.toggle('mobile-account-menu-open', expanded);
+    if (!expanded && restoreFocus) elements.mobileAccountNavToggle?.focus();
+  }
+
+  function showView(viewName, { focus = true, updateHash = true } = {}) {
+    const panel = document.querySelector(`[data-view-panel="${viewName}"]`);
+    if (!panel) return;
+    state.activeView = viewName;
+    document.querySelectorAll('[data-view-panel]').forEach((view) => {
+      const active = view === panel;
+      view.hidden = !active;
+      view.classList.toggle('is-active', active);
+    });
+    document.querySelectorAll('[data-view]').forEach((nav) => {
+      const active = nav.dataset.view === viewName;
+      nav.classList.toggle('is-active', active);
+      if (active) nav.setAttribute('aria-current', 'page');
+      else nav.removeAttribute('aria-current');
+    });
+    syncMobileAccountNav();
+    if (updateHash && window.location.hash !== `#${viewName}`) {
+      window.history.replaceState(null, '', `#${viewName}`);
+    }
+    if (focus) {
+      elements.portalMain.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+    viewLoaders[viewName]?.();
+  }
+
+  function openDialog(eyebrow, title, body) {
+    state.dialogReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    elements.dialogEyebrow.textContent = eyebrow;
+    elements.dialogTitle.textContent = title;
+    elements.dialogBody.replaceChildren(body);
+    if (!elements.dialog.open) elements.dialog.showModal();
+    document.body.classList.add('dialog-open');
+    window.setTimeout(() => elements.dialogCloseButton.focus(), 30);
+  }
+
+  function closeDialog() {
+    if (elements.dialog.open) elements.dialog.close();
+  }
+
+  async function logout() {
+    setButtonBusy(elements.logoutButton, true, 'Signing out…');
+    try {
+      const logoutMethod = methodFrom('auth', ['logout']);
+      if (logoutMethod) await logoutMethod();
+    } catch (error) {
+      // Local session data is cleared even if the optional server logout fails.
+    }
+    sessionStorage.removeItem(SESSION_META_KEY);
+    enterAuth();
+    showToast('You have been signed out.');
+    setButtonBusy(elements.logoutButton, false);
+  }
+
+  elements.mobileForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    elements.mobileError.textContent = '';
+    const mobile = elements.mobileNumber.value.replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      elements.mobileError.textContent = 'Enter a valid 10-digit Indian mobile number.';
+      elements.mobileNumber.focus();
+      return;
+    }
+    const submit = elements.mobileForm.querySelector('[type="submit"]');
+    setButtonBusy(submit, true, 'Sending secure code…');
+    try {
+      await requestOtp(mobile);
+      state.mobile = mobile;
+      persistMeta();
+      showOtpStep();
+      announce('One-time code sent.');
+    } catch (error) {
+      elements.mobileError.textContent = friendlyError(error, 'We could not send a code. Please check the number and try again.');
+    } finally {
+      setButtonBusy(submit, false);
+    }
+  });
+
+  elements.otpForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    elements.otpError.textContent = '';
+    const otp = elements.otpCode.value.replace(/\D/g, '');
+    if (!/^\d{4}$/.test(otp)) {
+      elements.otpError.textContent = 'Enter the complete 4-digit code.';
+      elements.otpCode.focus();
+      return;
+    }
+    const submit = elements.otpForm.querySelector('[type="submit"]');
+    setButtonBusy(submit, true, 'Verifying securely…');
+    let mobileVerified = false;
+    try {
+      const result = await verifyOtp(state.mobile, otp);
+      mobileVerified = true;
+      captureIdentity(result, state.mobile);
+      const activeSession = methodFrom('auth', ['getSession'])?.() || methodFrom(null, ['getSession'])?.();
+      if (activeSession) captureIdentity(activeSession, state.mobile);
+      await resolveCustomerIdentity();
+      persistMeta();
+      enterAccount();
+      showToast('Welcome to My Atulyash.');
+    } catch (error) {
+      elements.otpError.textContent = mobileVerified
+        ? 'Your mobile is verified, but we could not connect your customer account yet. Please refresh and try again.'
+        : friendlyError(error, 'That code could not be verified. Please try again.');
+      if (!mobileVerified) elements.otpCode.select();
+    } finally {
+      setButtonBusy(submit, false);
+    }
+  });
+
+  elements.mobileNumber.addEventListener('input', () => {
+    const digits = elements.mobileNumber.value.replace(/\D/g, '').slice(0, 10);
+    elements.mobileNumber.value = digits;
+    elements.mobileError.textContent = '';
+  });
+  elements.otpCode.addEventListener('input', () => {
+    elements.otpCode.value = elements.otpCode.value.replace(/\D/g, '').slice(0, 4);
+    elements.otpError.textContent = '';
+  });
+  elements.changeMobileButton.addEventListener('click', showMobileStep);
+  elements.resendOtpButton.addEventListener('click', async () => {
+    setButtonBusy(elements.resendOtpButton, true, 'Sending…');
+    try {
+      await requestOtp(state.mobile);
+      startResendCountdown();
+      announce('A new one-time code has been sent.');
+    } catch (error) {
+      elements.otpError.textContent = friendlyError(error);
+      elements.resendOtpButton.disabled = false;
+    }
+  });
+
+  document.querySelectorAll('[data-view]').forEach((item) => {
+    item.addEventListener('click', () => {
+      showView(item.dataset.view);
+      setMobileAccountNav(false);
+      item.closest('details')?.removeAttribute('open');
+    });
+  });
+  document.querySelectorAll('[data-go-view]').forEach((item) => {
+    item.addEventListener('click', () => {
+      showView(item.dataset.goView);
+      if (item.dataset.shopMode) setQuickOrderMode(item.dataset.shopMode);
+      if (item.dataset.openCalculator === 'true' && elements.accountCalculatorDetails) {
+        elements.accountCalculatorDetails.open = true;
+        updateAccountAttaCalculator();
+        window.setTimeout(() => {
+          elements.accountCalculatorDetails.scrollIntoView({
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            block: 'center'
+          });
+          elements.accountDailyRotis?.focus({ preventScroll: true });
+        }, 80);
+      }
+    });
+  });
+  elements.quickOrderModes?.addEventListener('change', () => renderQuickOrder({ animate: true }));
+  elements.accountPackSelector?.addEventListener('change', () => renderQuickOrder({ animate: true }));
+  elements.quickOrderPlan?.addEventListener('change', () => renderQuickOrder({ animate: true }));
+  elements.accountDailyRotis?.addEventListener('input', updateAccountAttaCalculator);
+  elements.accountDailyRotis?.addEventListener('change', updateAccountAttaCalculator);
+  elements.accountRotisMinus?.addEventListener('click', () => {
+    elements.accountDailyRotis.value = String(Math.max(8, Number(elements.accountDailyRotis.value || 8) - 1));
+    updateAccountAttaCalculator();
+  });
+  elements.accountRotisPlus?.addEventListener('click', () => {
+    elements.accountDailyRotis.value = String(Math.max(8, Number(elements.accountDailyRotis.value || 8) + 1));
+    updateAccountAttaCalculator();
+  });
+  document.querySelectorAll('input[name="accountAttaBuffer"]').forEach((input) => {
+    input.addEventListener('change', updateAccountAttaCalculator);
+  });
+  elements.quickOrderMinus?.addEventListener('click', () => {
+    state.quickOrderQuantity = Math.max(1, state.quickOrderQuantity - 1);
+    renderQuickOrder();
+  });
+  elements.quickOrderPlus?.addEventListener('click', () => {
+    state.quickOrderQuantity = Math.min(10, state.quickOrderQuantity + 1);
+    renderQuickOrder();
+  });
+  elements.accountQuickOrderForm?.addEventListener('submit', continueQuickOrder);
+  elements.quickOrderCatalogRetry?.addEventListener('click', loadQuickOrderProducts);
+  elements.portalBagShortcut?.addEventListener('click', () => openAccountBag());
+  elements.accountBagCloseButton?.addEventListener('click', () => closeAccountBag());
+  elements.accountBagBackdrop?.addEventListener('click', () => closeAccountBag());
+  elements.accountBagRetryButton?.addEventListener('click', loadAccountBag);
+  elements.accountBagCheckoutButton?.addEventListener('click', continueAccountBagCheckout);
+  elements.accountBagContinueButton?.addEventListener('click', () => closeAccountBag());
+  elements.accountBagItems?.addEventListener('click', (event) => {
+    const actionButton = event.target.closest('[data-bag-action]');
+    if (!actionButton) return;
+    void updateAccountBagLine(actionButton.closest('.account-bag-line'), actionButton.dataset.bagAction);
+  });
+  elements.accountBagEmpty?.querySelector('[data-account-bag-shop]')?.addEventListener('click', () => {
+    closeAccountBag({ restoreFocus: false });
+    showView('shop');
+    window.setTimeout(() => elements.portalMain?.focus(), 40);
+  });
+  elements.notificationShortcut.addEventListener('click', () => showView('notifications'));
+  elements.mobileAccountNavToggle?.addEventListener('click', () => {
+    const expanded = elements.mobileAccountNavToggle.getAttribute('aria-expanded') === 'true';
+    setMobileAccountNav(!expanded);
+  });
+  elements.profileMenu?.addEventListener('toggle', () => {
+    if (elements.profileMenu.open) setMobileAccountNav(false);
+  });
+  document.addEventListener('click', (event) => {
+    if (!elements.portalSidebar?.classList.contains('is-mobile-open')) return;
+    if (!elements.portalSidebar.contains(event.target)) setMobileAccountNav(false);
+  });
+  window.addEventListener('resize', () => {
+    if (!window.matchMedia('(max-width: 900px)').matches) setMobileAccountNav(false);
+  });
+  elements.logoutButton.addEventListener('click', logout);
+  elements.ordersLoadMore.addEventListener('click', () => renderOrders({ page: state.orderPage + 1, force: true }));
+  elements.orderFilter.addEventListener('change', () => {
+    state.orders = [];
+    state.orderPage = 1;
+    renderOrders({ page: 1, force: true });
+  });
+  elements.setVacationButton.addEventListener('click', () => openVacationForm());
+  elements.addAddressButton.addEventListener('click', () => openAddressForm());
+  elements.rechargeOptions.addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-amount]');
+    if (!chip) return;
+    elements.rechargeAmount.value = chip.dataset.amount;
+    resetRechargePreview();
+  });
+  elements.rechargeAmount.addEventListener('input', resetRechargePreview);
+  elements.rechargeForm.addEventListener('submit', previewRecharge);
+  elements.initiateRechargeButton.addEventListener('click', initiateRecharge);
+  elements.notificationCategory.addEventListener('change', () => renderNotifications(true));
+  elements.unreadOnly.addEventListener('change', () => renderNotifications(true));
+  elements.markAllReadButton.addEventListener('click', markAllNotificationsRead);
+  elements.profileForm.addEventListener('submit', saveProfile);
+  elements.requestDeletionButton.addEventListener('click', openDeletionRequest);
+  elements.dialogCloseButton.addEventListener('click', closeDialog);
+  elements.dialog.addEventListener('click', (event) => {
+    if (event.target === elements.dialog) closeDialog();
+  });
+  elements.dialog.addEventListener('close', () => {
+    document.body.classList.remove('dialog-open');
+    state.dialogReturnFocus?.focus?.();
+    state.dialogReturnFocus = null;
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && elements.portalSidebar?.classList.contains('is-mobile-open')) {
+      setMobileAccountNav(false, { restoreFocus: true });
+      return;
+    }
+    if (event.key === 'Escape' && elements.accountBagDrawer?.classList.contains('is-open')) {
+      closeAccountBag();
+      return;
+    }
+    if (event.key === 'Escape' && elements.dialog.open) closeDialog();
+    trapAccountBagFocus(event);
+  });
+
+  client()?.on?.('autherror', () => {
+    closeAccountBag({ restoreFocus: false });
+    enterAuth('Your session has ended. Please sign in again.');
+  });
+
+  async function initialise() {
+    if (!client()) {
+      elements.mobileError.textContent = 'The secure account service could not load. Please refresh the page.';
+      return;
+    }
+    updateAuthReturnNotice();
+    void loadQuickOrderProducts();
+    void loadQuickOrderWeeklyPlans();
+    const authenticated = await restoreSession();
+    if (authenticated) enterAccount();
+    else {
+      elements.authShell.hidden = false;
+      elements.accountShell.hidden = true;
+    }
+  }
+
+  initialise();
+})();

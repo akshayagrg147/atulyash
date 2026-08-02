@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Shop Atulyash whole wheat atta in live fresh-batch pack sizes — carefully selected MP Sharbati wheat, slow natural-stone milling and weekly plans.">
+  <meta name="theme-color" content="#153c32">
+  <title>Atulyash | Fresh Natural-Stone Milled Atta</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Atulyash | Atta Deserves Respect">
+  <meta property="og:description" content="Shop carefully selected MP Sharbati wheat atta, slow-milled on natural stone in fresh small batches.">
+  <meta property="og:image" content="/images/og-atulyash-commerce.png">
+  <meta property="og:image:width" content="1733">
+  <meta property="og:image:height" content="907">
+  <meta property="og:image:alt" content="Atulyash atta pack with the message Atta deserves respect">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Atulyash | Atta Deserves Respect">
+  <meta name="twitter:description" content="Natural-stone milled atta prepared in fresh small batches.">
+  <meta name="twitter:image" content="/images/og-atulyash-commerce.png">
+  <link rel="icon" href="images/brand-mark.webp" type="image/webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="images/atta-packet-2026.webp" fetchpriority="high">
+  <link rel="preload" as="image" href="images/natural-stone-hero.webp" fetchpriority="high">
+  <link rel="stylesheet" href="styles.css?v=20260730-4">
+  <link rel="stylesheet" href="ecommerce.css?v=20260802-15">
+  <link rel="stylesheet" href="commerce-shared.css?v=20260802-3">
+</head>
+<body data-commerce-page="storefront">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="checkout-handoff" id="checkoutHandoff" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <div class="checkout-handoff-card">
+      <img src="images/brand-mark.webp" width="630" height="550" alt="">
+      <p>Your Atulyash order</p>
+      <h2 id="checkoutHandoffTitle">Preparing your delivery.</h2>
+      <span id="checkoutHandoffStatus">Bringing your selected pack into secure checkout…</span>
+      <div class="checkout-handoff-progress" aria-hidden="true"><i></i></div>
+      <div class="checkout-handoff-actions" id="checkoutHandoffActions" hidden>
+        <a href="account.html#shop">Change selection</a>
+        <button id="checkoutHandoffReview" type="button">Review shop availability</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        let accountHandoff = params.get('checkout') === 'account';
+        if (!accountHandoff) {
+          const rawIntent = sessionStorage.getItem('atulyash-storefront-intent-v1');
+          const intent = rawIntent ? JSON.parse(rawIntent) : null;
+          const createdAt = Number(intent?.createdAt);
+          accountHandoff = (
+            intent?.origin === 'account'
+            && ['openCheckout', 'checkout'].includes(intent?.action)
+            && Number.isFinite(createdAt)
+            && Math.abs(Date.now() - createdAt) <= 15 * 60 * 1000
+          );
+        }
+        if (!accountHandoff) return;
+        const handoff = document.getElementById('checkoutHandoff');
+        if (handoff) handoff.hidden = false;
+        document.body.classList.add('checkout-handoff-open');
+      } catch (error) {
+        // The normal storefront remains available when URL state is unavailable.
+      }
+    })();
+  </script>
+
+  <div class="atulyash-cursor" id="atulyashCursor" aria-hidden="true">
+    <span class="atulyash-cursor-ring"></span>
+    <span class="atulyash-cursor-grain"></span>
+    <span class="atulyash-cursor-label"></span>
+  </div>
+
+  <aside class="announcement" aria-label="Food awareness">
+    <div class="container announcement-inner">
+      <span class="announcement-mark" aria-hidden="true"></span>
+      <p>Everyday food deserves clear questions.</p>
+      <a href="#questions">Ask what matters</a>
+    </div>
+  </aside>
+
+  <header class="site-header" id="siteHeader">
+    <div class="container header-inner">
+      <a class="brand" href="#home" aria-label="Atulyash home">
+        <img class="brand-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+        <img class="brand-wordmark" src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash — Incomparable Purity. No Compromise.">
+      </a>
+
+      <nav class="primary-nav" id="primaryNav" aria-label="Primary navigation">
+        <a href="#shop">Shop atta</a>
+        <a href="#way">The Atulyash Way</a>
+        <a href="#weekly">Weekly freshness</a>
+        <a href="#process-film">Our process</a>
+      </nav>
+
+      <a class="header-account" id="headerAccountLink" href="account.html" aria-label="Open your Atulyash account">
+        <span class="header-account-icon" aria-hidden="true"></span>
+        <span id="headerAccountLabel">My Atulyash</span>
+      </a>
+
+      <button class="header-cta header-cart" id="headerCartButton" type="button" aria-label="Open shopping bag, 0 items" aria-controls="cartDrawer">
+        <span class="header-cart-icon" aria-hidden="true"></span>
+        <span>My bag</span>
+        <span class="cart-count" id="headerCartCount" aria-hidden="true">0</span>
+      </button>
+
+      <button class="menu-toggle" id="menuToggle" type="button" aria-expanded="false" aria-controls="primaryNav">
+        <span class="sr-only">Open navigation</span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="store-service-status" id="storeServiceStatus" role="status" aria-live="polite" aria-atomic="true" data-state="idle" hidden>
+    <span class="store-service-status-dot" aria-hidden="true"></span>
+    <span id="storeServiceStatusLabel">Connecting to Atulyash services…</span>
+    <button id="storeServiceRetryButton" type="button" hidden>Try again</button>
+  </div>
+
+  <main id="main-content">
+    <section class="hero" id="home" aria-labelledby="hero-title">
+      <div class="container hero-layout">
+        <div class="hero-copy">
+          <h1 id="hero-title">Atta deserves respect.</h1>
+          <p class="hero-lead">It is eaten every day, yet rarely questioned with the seriousness it deserves.</p>
+          <p class="hero-support">Atulyash brings that seriousness back.</p>
+          <ul class="hero-proof-list" aria-label="Five Atulyash decisions" data-motion-sequence>
+            <li>MP Sharbati wheat</li>
+            <li>Slow natural-stone milling</li>
+            <li>Fresh small batches</li>
+            <li>Natural chokar retained</li>
+            <li>Weekly delivery</li>
+          </ul>
+          <div class="hero-actions hero-actions-client">
+            <a class="button button-primary" href="#packSelector">Your First Atulyash Experience <span aria-hidden="true">↓</span></a>
+            <a class="text-action" href="#weekly">Estimate My Weekly Requirement <span aria-hidden="true">→</span></a>
+            <a class="text-action hero-subscribe" id="heroWeeklyButton" href="#shop">Subscribe for Weekly Delivery <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+
+        <div class="hero-visual" data-hero-depth>
+          <div class="hero-backdrop" aria-hidden="true"></div>
+          <div class="hero-arch-outline" aria-hidden="true"></div>
+          <div class="hero-grains" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="hero-product" data-cursor-label="Pure atta">
+            <div class="hero-product-depth">
+              <div class="hero-product-halo" aria-hidden="true"></div>
+              <img src="images/atta-packet-2026.webp" width="1553" height="2302" alt="Atulyash atta two kilogram pack" fetchpriority="high">
+              <div class="hero-origin-seal" aria-hidden="true">
+                <span>Natural stone</span>
+                <strong>Slow milled</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shop-section section" id="shop" aria-labelledby="shop-title">
+      <div class="container shop-heading reveal">
+        <div>
+          <div class="section-index">01 — The fresh batch</div>
+          <p class="eyebrow"><span></span>One honest atta. Four useful quantities.</p>
+          <h2 id="shop-title">Choose your fresh batch.</h2>
+        </div>
+        <p>Every pack contains the same Atulyash atta: 100% MP Sharbati wheat, carefully cleaned, slow-milled on natural stone and packed with its natural chokar intact.</p>
+      </div>
+
+      <div class="container product-showcase reveal" id="productShowcase">
+        <div class="product-gallery" data-cursor-label="Fresh batch">
+          <div class="product-gallery-copy">
+            <span class="product-kicker">Atulyash Sharbati atta</span>
+            <strong>Slow. Honest. Fresh.</strong>
+          </div>
+          <div class="product-image-stage">
+            <div class="product-image-halo" aria-hidden="true"></div>
+            <div class="pack-fill-animation" id="packFillAnimation" aria-hidden="true"></div>
+            <img id="shopProductImage" src="images/sack5g.webp" width="490" height="512" alt="Atulyash 2 kg natural-stone milled whole wheat atta pack artwork">
+            <span class="product-pack-badge" id="productPackBadge" aria-hidden="true">2 kg</span>
+          </div>
+          <div class="product-gallery-foot">
+            <span>2 kg pack shown</span>
+            <span>Natural stone</span>
+            <span>Fresh batch</span>
+          </div>
+        </div>
+
+        <div class="product-buy-panel" aria-label="Configure Atulyash atta">
+          <div class="catalog-api-status" id="catalogApiStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+            <span class="api-status-spinner" aria-hidden="true"></span>
+            <span id="catalogApiStatusLabel">Loading today’s packs and prices…</span>
+            <button id="catalogRetryButton" type="button" hidden>Try again</button>
+          </div>
+          <div class="product-title-row">
+            <div>
+              <p class="product-overline">100% MP Sharbati wheat</p>
+              <h3>Atulyash Whole Wheat Atta</h3>
+            </div>
+            <span class="product-stock"><i aria-hidden="true"></i> Fresh-batch ordering</span>
+          </div>
+
+          <p class="product-description">Made from one carefully selected wheat and milled slowly for homes that want to know what goes into their everyday roti.</p>
+
+          <div class="product-price-line" aria-live="polite">
+            <strong id="productPrice">₹180</strong>
+            <span id="productUnitPrice">₹90 per kg</span>
+            <small>No delivery charges · Schedule confirmed before payment</small>
+          </div>
+
+          <fieldset class="purchase-selector" id="purchaseSelector">
+            <legend>How would you like it?</legend>
+            <label class="purchase-option is-selected">
+              <input type="radio" name="purchaseType" value="once" checked>
+              <span><strong>Your First Atulyash Experience</strong><small>Eligible first orders of 2 kg or more may receive ₹100 experience credit · confirmed at checkout</small></span>
+              <i aria-hidden="true"></i>
+            </label>
+            <label class="purchase-option">
+              <input type="radio" name="purchaseType" value="weekly" disabled>
+              <span><strong>Fresh Weekly Atta</strong><small>Prepared fresh · No long storage</small></span>
+              <em>No delivery charges · No automatic billing</em>
+              <i aria-hidden="true"></i>
+            </label>
+          </fieldset>
+
+          <fieldset class="pack-selector" id="packSelector">
+            <legend>Select pack size</legend>
+            <div class="pack-options">
+              <label class="pack-option is-selected">
+                <input type="radio" name="packSize" value="2" checked>
+                <span><strong>2 kg</strong><small>Compact pack</small></span>
+                <b>₹180</b>
+              </label>
+              <label class="pack-option">
+                <input type="radio" name="packSize" value="4">
+                <span><strong>4 kg</strong><small>Medium pack</small></span>
+                <b>₹360</b>
+              </label>
+              <label class="pack-option">
+                <input type="radio" name="packSize" value="6">
+                <span><strong>6 kg</strong><small>Large pack</small></span>
+                <b>₹540</b>
+              </label>
+              <label class="pack-option">
+                <input type="radio" name="packSize" value="8">
+                <span><strong>8 kg</strong><small>Extra-large pack</small></span>
+                <b>₹720</b>
+              </label>
+            </div>
+            <div class="pack-selection-scene" id="packSelectionScene" aria-hidden="true">
+              <div class="pack-selection-scene-copy">
+                <strong id="packSelectionSceneWeight">2 kg fresh batch</strong>
+                <span>More atta. More family rotis.</span>
+              </div>
+              <div class="pack-selection-mini-stage">
+                <div class="pack-selection-mini-fill" id="packSelectionMiniFill"></div>
+                <img src="images/sack5g.webp" width="490" height="512" alt="">
+              </div>
+            </div>
+          </fieldset>
+
+          <section class="weekly-plan-panel" id="weeklyPlanPanel" aria-labelledby="weeklyPlanHeading" hidden>
+            <div class="weekly-plan-heading">
+              <div>
+                <span>Fresh-batch routine</span>
+                <h4 id="weeklyPlanHeading">Choose your weekly plan</h4>
+              </div>
+              <b>No automatic billing</b>
+            </div>
+            <div class="weekly-plan-controls">
+              <label class="weekly-plan-field weekly-plan-field-wide">
+                <span>Monthly household use</span>
+                <select id="weeklyPlanSelect" name="weeklyPlan" disabled>
+                  <option value="" selected disabled>Loading live weekly plans…</option>
+                </select>
+              </label>
+            </div>
+            <aside class="weekly-calculator-suggestion" aria-labelledby="weeklyCalculatorSuggestionTitle">
+              <div class="weekly-calculator-suggestion-copy" role="status" aria-live="polite" aria-atomic="true">
+                <span id="weeklyCalculatorSuggestionLabel">Not sure how much atta?</span>
+                <strong id="weeklyCalculatorSuggestionTitle">Let your daily rotis suggest the right plan.</strong>
+                <small id="weeklyCalculatorSuggestionText">Tell us your household’s daily roti count and add a little extra for parathas or pooris.</small>
+              </div>
+              <div class="weekly-calculator-suggestion-actions">
+                <a id="weeklyCalculatorLink" href="#weekly">Use the roti calculator <span aria-hidden="true">→</span></a>
+                <button id="weeklyCalculatorApplyButton" type="button" hidden disabled>Use suggested plan <span aria-hidden="true">→</span></button>
+              </div>
+            </aside>
+            <div class="weekly-dates-bar">
+              <div>
+                <strong id="weeklyPlanSummary">Loading live weekly plans…</strong>
+                <small>Choose your delivery preference during checkout, after we confirm availability for your address.</small>
+              </div>
+            </div>
+          </section>
+
+          <div class="product-purchase-row">
+            <div class="quantity-control" aria-label="Quantity">
+              <button type="button" id="productQuantityMinus" aria-label="Decrease quantity">−</button>
+              <output id="productQuantity" aria-live="polite">1</output>
+              <button type="button" id="productQuantityPlus" aria-label="Increase quantity">+</button>
+            </div>
+            <button class="button button-primary product-add-button" id="addToCartButton" type="button">
+              <span class="product-add-label" id="addToCartLabel">Add to bag</span>
+              <span id="addToCartPrice">₹180</span>
+            </button>
+          </div>
+
+          <button class="buy-now-button" id="buyNowButton" type="button">Buy it now <span aria-hidden="true">→</span></button>
+
+          <div class="product-reassurance" aria-label="Product reassurance">
+            <span><i aria-hidden="true">01</i> Chokar retained</span>
+            <span><i aria-hidden="true">02</i> No wheat blending</span>
+            <span><i aria-hidden="true">03</i> Small batches</span>
+          </div>
+
+          <div class="product-details">
+            <details>
+              <summary>What is inside?<span aria-hidden="true">+</span></summary>
+              <p>100% whole MP Sharbati wheat atta. Nothing added. Natural bran/chokar retained.</p>
+            </details>
+            <details>
+              <summary>Milling &amp; packing<span aria-hidden="true">+</span></summary>
+              <p>Slow-milled on natural stone chakkis in controlled small batches, then packed with disciplined handling.</p>
+            </details>
+            <details>
+              <summary>Delivery promise<span aria-hidden="true">+</span></summary>
+              <p>We confirm availability and your delivery schedule before payment so the atta can be prepared closer to dispatch.</p>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="way-section signature-orbit-section section" id="way" aria-labelledby="way-title">
+      <div class="container signature-orbit-wrap">
+        <div class="signature-orbit-heading">
+          <div class="section-index">02 — The Atulyash Way</div>
+          <h2 id="way-title">Six decisions. One honest packet.</h2>
+          <p>Meet Veer — your guide to better atta.</p>
+        </div>
+
+        <div class="orbit-showcase orbit-showcase-signature reveal" id="orbitShowcase">
+          <button class="orbit-toggle" id="orbitToggle" type="button" aria-pressed="false">
+            <span class="orbit-toggle-icon" aria-hidden="true">Ⅱ</span>
+            <span class="orbit-toggle-label">Pause orbit</span>
+          </button>
+
+          <div class="orbit-stage signature-orbit-stage" role="img" aria-describedby="orbitDescription" data-cursor-label="Explore">
+            <p class="sr-only" id="orbitDescription">Veer stands at the centre of the Atulyash Way, surrounded by six commitments: MP Sharbati wheat, multi-stage cleaning, natural stone chakkis, slow milling, small batches and weekly delivery.</p>
+
+            <div class="orbit-ring orbit-ring-outer" aria-hidden="true">
+              <div class="orbit-node orbit-node-wheat" style="--angle: 0deg;"><span>MP Sharbati Wheat</span></div>
+              <div class="orbit-node orbit-node-accent" style="--angle: 120deg;"><span>Natural Stone Chakkis</span></div>
+              <div class="orbit-node" style="--angle: 240deg;"><span>Weekly Delivery</span></div>
+            </div>
+
+            <div class="orbit-ring orbit-ring-inner" aria-hidden="true">
+              <div class="orbit-node" style="--angle: 60deg;"><span>Multi-Stage Cleaning</span></div>
+              <div class="orbit-node orbit-node-wheat" style="--angle: 180deg;"><span>Slow Milling</span></div>
+              <div class="orbit-node orbit-node-accent" style="--angle: 300deg;"><span>Small Batches</span></div>
+            </div>
+
+            <div class="orbit-core orbit-core-veer" aria-hidden="true">
+              <div class="orbit-core-glow"></div>
+              <img src="images/veer-mascot-2026.webp" width="2130" height="2740" alt="">
+            </div>
+
+            <ul class="orbit-mobile-list" aria-hidden="true">
+              <li>MP Sharbati Wheat</li>
+              <li>Multi-Stage Cleaning</li>
+              <li>Natural Stone Chakkis</li>
+              <li>Slow Milling</li>
+              <li>Small Batches</li>
+              <li>Weekly Delivery</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="weekly-section section" id="weekly" aria-labelledby="weekly-title">
+      <div class="container weekly-layout">
+        <div class="weekly-copy reveal">
+          <div class="section-index">03 — A fresher routine</div>
+          <p class="eyebrow"><span></span>The Atulyash Way</p>
+          <h2 id="weekly-title">You buy milk fresh. Why store atta for a month or more?</h2>
+          <p>Atta is eaten every day, yet it is usually bought like monthly stock. Atulyash changes that habit, from long storage to freshly milled weekly delivery.</p>
+          <ol class="weekly-steps weekly-steps-four" data-motion-sequence>
+            <li><span>1</span>Count your household’s daily rotis</li>
+            <li><span>2</span>Add a practical buffer for other atta dishes</li>
+            <li><span>3</span>See the live weekly plan that covers your need</li>
+            <li><span>4</span>Set your delivery preference securely at checkout</li>
+          </ol>
+        </div>
+
+        <div class="calculator reveal" aria-labelledby="calculator-title">
+          <p class="calculator-tag">Estimate my weekly requirement</p>
+          <h3 id="calculator-title">How many rotis does your home make each day?</h3>
+          <p class="calculator-intro">Enter the total rotis made for your household on a usual day. We will turn that into a practical weekly quantity.</p>
+
+          <div class="calculator-roti-control">
+            <div class="calculator-roti-copy">
+              <label for="dailyRotis">Daily household count</label>
+              <strong>How many rotis on a usual day?</strong>
+              <small id="dailyRotisHelp">Count everyone at home · minimum 8 rotis</small>
+            </div>
+            <div class="calculator-roti-stepper" role="group" aria-label="Daily roti count" data-cursor-hide>
+              <button id="dailyRotisMinus" type="button" aria-label="Decrease daily roti count">−</button>
+              <div class="calculator-roti-value">
+                <input id="dailyRotis" name="dailyRotis" type="number" min="8" step="1" value="8" inputmode="numeric" aria-describedby="dailyRotisHelp">
+                <span>rotis / day</span>
+              </div>
+              <button id="dailyRotisPlus" type="button" aria-label="Increase daily roti count">＋</button>
+            </div>
+          </div>
+
+          <fieldset class="calculator-buffer">
+            <legend>Add a little extra for parathas and pooris</legend>
+            <p>How often does your family use atta for more than everyday rotis?</p>
+            <div class="calculator-buffer-options">
+              <label>
+                <input type="radio" name="attaBuffer" value="0">
+                <span><strong>0%</strong><small>Rotis only</small></span>
+              </label>
+              <label>
+                <input type="radio" name="attaBuffer" value="10" checked>
+                <span><strong>+10%</strong><small>Sometimes</small></span>
+              </label>
+              <label>
+                <input type="radio" name="attaBuffer" value="20">
+                <span><strong>+20%</strong><small>Often</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="weekly-result" aria-live="polite">
+            <div class="calculator-result-top">
+              <div class="calculator-result-primary">
+                <span>Your estimated weekly need</span>
+                <div class="calculator-result-value">
+                  <strong id="weeklyOutput">1.85</strong>
+                  <em>kg / week</em>
+                </div>
+              </div>
+              <output class="calculator-monthly-output" id="monthlyOutput" for="dailyRotis">7.39 kg across 4 weeks</output>
+            </div>
+            <div class="calculator-result-method">
+              <small class="calculator-formula" id="calculatorFormulaSummary">8 rotis × 30 g × 7 days + 10% buffer</small>
+              <small>Based on about 30 g atta per medium roti. Actual use may vary.</small>
+            </div>
+            <small class="weekly-pack-match" id="closestPackOutput">Loading live weekly plans…</small>
+          </div>
+          <button class="button button-dark button-block calculator-plan-cta" id="calculatorCta" type="button" aria-disabled="true" disabled data-cursor-hide>Choose my weekly plan <span aria-hidden="true">→</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="awareness-section section" id="awareness" aria-labelledby="awareness-title">
+      <div class="container awareness-layout">
+        <div class="awareness-index section-index">04 — Food awareness</div>
+        <div class="awareness-statement reveal">
+          <p class="eyebrow"><span></span>Awareness is no longer optional</p>
+          <h2 id="awareness-title">Food adulteration and quality compromises are real.</h2>
+        </div>
+        <div class="awareness-body reveal">
+          <p>And you cannot completely protect your family from everything. You will eat outside. You will depend on systems you do not control. Even in your own kitchen, you may not always know what goes into the ingredients used every day.</p>
+          <p class="awareness-close">That is why awareness is no longer optional. The food consumed every day deserves to be questioned with care.</p>
+        </div>
+      </div>
+
+      <div class="container news-context" aria-labelledby="news-context-title">
+        <div class="news-context-head">
+          <p class="eyebrow"><span></span>Independent reporting</p>
+          <h3 id="news-context-title">Why food awareness stays in the news</h3>
+        </div>
+        <div class="news-grid">
+          <article class="news-card reveal">
+            <div><span>NDTV Food</span><time datetime="2026-03-15">15 Mar 2026</time></div>
+            <h4>150 tonnes of expired food and adulterated paneer seized across two states</h4>
+            <p>A recent report on official food-safety action in Rajasthan and Jharkhand.</p>
+            <a href="https://www.ndtv.com/food/150-tonnes-of-expired-food-adulterated-paneer-seized-in-major-food-raids-across-two-states-11217962" target="_blank" rel="noopener noreferrer">Read original <span aria-hidden="true">↗</span></a>
+          </article>
+          <article class="news-card reveal">
+            <div><span>The Times of India</span><time datetime="2026-03-24">24 Mar 2026</time></div>
+            <h4>Fake paneer and adulterated ghee racket busted in Jaipur</h4>
+            <p>A city report on a police operation involving dairy products and spices.</p>
+            <a href="https://timesofindia.indiatimes.com/city/jaipur/fake-paneer-adulterated-ghee-racket-busted-in-jaipur/articleshow/129761828.cms" target="_blank" rel="noopener noreferrer">Read original <span aria-hidden="true">↗</span></a>
+          </article>
+          <article class="news-card news-card-flour reveal">
+            <div><span>The Hindu</span><time datetime="2025-09-23">23 Sep 2025</time></div>
+            <h4>Hundreds hospitalised after consuming adulterated flour</h4>
+            <p>This report concerned kuttu (buckwheat) flour during Navratri, not wheat atta.</p>
+            <a href="https://www.thehindu.com/news/cities/Delhi/hundreds-hospitalised-after-consuming-adulterated-flour/article70086142.ece" target="_blank" rel="noopener noreferrer">Read original <span aria-hidden="true">↗</span></a>
+          </article>
+        </div>
+        <p class="news-disclaimer"><strong>Disclaimer:</strong> Publicly available news reports/references are shown for educational purposes only. No endorsement, approval or commercial association with Atulyash Foods is implied.</p>
+      </div>
+    </section>
+
+    <section class="questions-section section" id="questions" aria-labelledby="questions-title">
+      <div class="container">
+        <div class="questions-intro">
+          <div class="veer-card veer-investigation-card reveal" id="veerInvestigation" data-cursor-label="Ask Veer">
+            <div class="veer-sun" aria-hidden="true"></div>
+            <img src="images/veer-ask-what-matters.webp" width="825" height="998" alt="Veer, the Atulyash guide, examining wheat grains held in his hand" loading="lazy">
+            <div class="veer-clue-stage" aria-hidden="true">
+              <div class="veer-clue veer-clue-one"><span>01 · The grain</span><strong>Which wheat?</strong></div>
+              <div class="veer-clue veer-clue-two"><span>02 · The mill</span><strong>What grinds it?</strong></div>
+              <div class="veer-clue veer-clue-three"><span>03 · Freshness</span><strong>When was it milled?</strong></div>
+              <div class="veer-clue veer-finding"><span>Veer's finding</span><strong>Clear questions. Clear answers.</strong></div>
+            </div>
+            <div class="veer-label"><span>Veer investigates</span><strong>Daily food deserves clear answers.</strong></div>
+          </div>
+          <div class="questions-heading reveal">
+            <div class="section-index">05 — Ask what matters</div>
+            <p class="eyebrow"><span></span>Veer investigates</p>
+            <h2 id="questions-title">Before you buy atta, ask what matters.</h2>
+            <p>Start with the grain. Then the milling. Then the freshness. Every step decides the atta your family eats every day.</p>
+          </div>
+        </div>
+
+        <div class="question-grid" aria-label="Six questions to ask before buying atta">
+          <article class="question-card reveal"><span>01</span><h3>The wheat</h3><p>Is the wheat clearly identified, or casually mixed for cost?</p></article>
+          <article class="question-card reveal"><span>02</span><h3>The cleaning</h3><p>Is the grain cleaned with discipline before milling?</p></article>
+          <article class="question-card reveal"><span>03</span><h3>The mill</h3><p>Is it ground on natural stone, emery stone, or steel rollers?</p></article>
+          <article class="question-card reveal"><span>04</span><h3>The speed</h3><p>Is it milled slowly, or rushed for higher output?</p></article>
+          <article class="question-card reveal"><span>05</span><h3>The chokar</h3><p>Is the natural chokar retained, or separated from the atta?</p></article>
+          <article class="question-card reveal"><span>06</span><h3>The freshness</h3><p>Is it milled closer to consumption, or stored for weeks?</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="compromises-section section" id="compromises" aria-labelledby="compromises-title">
+      <div class="container compromises-header">
+        <div class="section-index">06 — Look closer</div>
+        <p class="eyebrow"><span></span>The everyday compromises</p>
+        <h2 id="compromises-title">Everyday atta may carry compromises you never see.</h2>
+      </div>
+
+      <div class="container compromise-grid">
+        <article class="compromise-card compromise-card-featured reveal">
+          <header><span>01</span><p>The First Compromise: Wheat Selection</p></header>
+          <h3>The first decision is also the first compromise</h3>
+          <p>Good wheat is expensive. When procurement is driven mainly by cost, what enters the mill may already be compromised.</p>
+          <div class="way-answer"><span>The Atulyash Way</span><p>Atulyash begins with carefully selected high grade MP Sharbati wheat, no casual mixing, no cheaper blends.</p></div>
+        </article>
+
+        <article class="compromise-card reveal">
+          <header><span>02</span><p>The Second Compromise: Milling Stone</p></header>
+          <h3>Stone-ground does not always mean natural stone</h3>
+          <p>Most mills, including most neighbourhood chakkis, use man-made synthetic emery stones, manufactured by bonding abrasive mineral particles into hard grinding discs. Large-scale systems may use steel rollers.</p>
+          <div class="way-answer"><span>The Atulyash Way</span><p>We use natural stone chakkis, no emery-stone grinding, no industrial steel rollers.</p></div>
+        </article>
+
+        <article class="compromise-card reveal">
+          <header><span>03</span><p>The Third Compromise: Milling Speed</p></header>
+          <h3>Speed increases output. But it also increases heat.</h3>
+          <p>High-speed systems commonly process hundreds of kilos per hour. Speed creates friction. Friction creates heat. And heat can affect the grain’s natural oils, aroma and character.</p>
+          <div class="way-answer"><span>The Atulyash Way</span><p>Atulyash mills slowly, around 20–30 kg per hour, to keep the process gentle and controlled.</p></div>
+        </article>
+
+        <article class="compromise-card compromise-card-dark reveal">
+          <header><span>04</span><p>The Fourth Compromise: Chokar</p></header>
+          <h3>When chokar is removed, atta loses its soul.</h3>
+          <p>In many milling systems, the wheat grain is separated in stages. Bran/chokar may be removed to make atta appear smoother, improve shelf stability, or be sold separately for other food and commercial uses.</p>
+          <div class="way-answer"><span>The Atulyash Way</span><p>We do not separate. Chokar remains. Nothing removed. Nothing added. Just atta in its purest form.</p></div>
+        </article>
+
+        <article class="compromise-card reveal">
+          <header><span>05</span><p>The Fifth Compromise: Discipline After Milling</p></header>
+          <h3>After milling, atta is often treated casually.</h3>
+          <p>In many milling environments, atta remains exposed during collection, handling and packing. Hands, surfaces and air become part of the environment around it.</p>
+          <div class="way-answer"><span>The Atulyash Way</span><p>Respect for atta does not end with milling. Atulyash follows structured post-milling handling with minimal human contact, automated packing and closed systems in clean, monitored environments.</p></div>
+        </article>
+
+        <article class="compromise-card compromise-card-featured reveal">
+          <header><span>06</span><p>The Sixth Compromise: Shelf Life</p></header>
+          <h3>Freshness slowly becomes secondary.</h3>
+          <p>Once wheat is milled, its natural oils begin interacting with air. Over time, slow oxidation gradually changes the atta’s aroma and character. Yet most atta is made to travel, sit and stay stable for weeks or months.</p>
+          <div class="way-answer"><span>The Atulyash Way</span><p>Atulyash mills in smaller quantities and delivers weekly, closer to consumption. No bulk storage, no long-stored atta.</p></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="film-section section" id="process-film" aria-labelledby="film-title">
+      <div class="container film-layout">
+        <div class="film-copy reveal">
+          <div class="section-index">07 — See the discipline</div>
+          <p class="eyebrow eyebrow-light"><span></span>Inside the process</p>
+          <h2 id="film-title">From selected grain to fresh atta.</h2>
+          <p>Respect for atta should be visible in every step — selection, cleaning, natural-stone milling, handling and weekly delivery.</p>
+          <details class="transcript">
+            <summary>Read video description</summary>
+            <p>A short visual journey through wheat selection, natural-stone milling and the preparation of Atulyash atta.</p>
+          </details>
+        </div>
+        <div class="film-frame reveal">
+          <video controls playsinline preload="metadata" poster="images/natural-stone-hero.webp" aria-label="The Atulyash natural-stone milling process">
+            <source src="videos/hero.mp4" type="video/mp4">
+            Your browser does not support embedded video.
+          </video>
+          <span class="film-stamp" aria-hidden="true">Slow<br>by choice</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq-section section" aria-labelledby="faq-title">
+      <div class="container faq-layout">
+        <div class="faq-heading">
+          <div class="section-index">Questions, answered</div>
+          <p class="eyebrow"><span></span>Good to know</p>
+          <h2 id="faq-title">Questions before you begin.</h2>
+          <p>Our team will help you understand Atulyash, weekly delivery, subscription and your first experience.</p>
+          <a href="tel:+919818588996" class="text-action text-action-dark">Call us on 98185 88996 <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="faq-list" data-motion-sequence>
+          <details>
+            <summary>What makes Atulyash different from regular packaged atta?<span aria-hidden="true">+</span></summary>
+            <p>Atulyash is built around carefully selected MP Sharbati wheat, natural stone slow milling, chokar retention and weekly delivery. The idea is not to store atta for long, but to receive it closer to consumption.</p>
+          </details>
+          <details>
+            <summary>Why do you deliver weekly instead of monthly?<span aria-hidden="true">+</span></summary>
+            <p>Atta is eaten every day, yet it is usually bought like monthly stock. Atulyash delivers weekly so families receive smaller, fresher quantities instead of storing atta for weeks.</p>
+          </details>
+          <details>
+            <summary>Is every chakki made from natural stone?<span aria-hidden="true">+</span></summary>
+            <p>No. Most chakkis use man-made synthetic emery stones, and large-scale systems may use steel rollers. Atulyash uses natural stone chakkis, no emery-stone grinding and no industrial steel rollers.</p>
+          </details>
+          <details>
+            <summary>What is chokar, and why does it matter?<span aria-hidden="true">+</span></summary>
+            <p>Chokar is the natural bran of wheat. It is the soul of atta. Atulyash does not separate the grain; the natural chokar remains, making the atta fuller and closer to the whole wheat grain.</p>
+          </details>
+          <details>
+            <summary>Do I have to subscribe immediately?<span aria-hidden="true">+</span></summary>
+            <p>No. You can start with your first Atulyash experience before moving to weekly subscription. Subscription is recommended for freshness and regularity, but the first step can be simple.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="start-section section" id="start" aria-labelledby="start-title">
+      <div class="container start-card" data-motion-scene>
+        <div class="start-copy">
+          <p class="eyebrow"><span></span>Start your journey towards the purity</p>
+          <h2 id="start-title">Bring home atta in its purest form.</h2>
+          <p>Experience Atulyash with freshly milled atta, delivered in weekly quantities, closer to the way atta was meant to be consumed.</p>
+          <div class="start-actions">
+            <a class="button button-primary" href="#packSelector">Your First Atulyash Experience <span aria-hidden="true">↑</span></a>
+            <a class="text-action text-action-dark" href="#weekly">Estimate My Weekly Requirement <span aria-hidden="true">→</span></a>
+            <button class="text-action text-action-dark start-cart-action" id="startWeeklyButton" type="button">Subscribe for Weekly Delivery <span aria-hidden="true">→</span></button>
+          </div>
+          <small>Eligible first orders of 2 kg or more may receive ₹100 experience credit · confirmed at checkout.</small>
+        </div>
+        <div class="start-visual" aria-hidden="true" data-cursor-label="Fresh weekly">
+          <div class="start-ring"></div>
+          <img src="images/atta-packet-2026.webp" width="1553" height="2302" alt="">
+          <p><strong>Prepared fresh.</strong><span>No long storage.</span></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="commerce-backdrop unified-bag-backdrop" id="commerceBackdrop" hidden></div>
+
+  <aside class="cart-drawer unified-bag" id="cartDrawer" role="dialog" aria-modal="true" aria-labelledby="cartTitle" aria-hidden="true" inert>
+    <header class="cart-header unified-bag-header">
+      <div>
+        <p>Your Atulyash order</p>
+        <h2 id="cartTitle">My bag <span id="cartTitleCount">(0)</span></h2>
+      </div>
+      <button class="commerce-close" id="cartCloseButton" type="button" aria-label="Close shopping bag"><span aria-hidden="true">×</span></button>
+    </header>
+
+    <div class="cart-content unified-bag-content" id="cartContent">
+      <section class="cart-auth-gate" id="cartAuthGate" aria-labelledby="cartAuthTitle" hidden>
+        <span class="cart-auth-gate-mark" aria-hidden="true"></span>
+        <p class="eyebrow"><span></span>Secure bag</p>
+        <h3 id="cartAuthTitle">Sign in to open your bag.</h3>
+        <p>Your session has ended. Verify your mobile number to securely reconnect your saved bag.</p>
+        <a class="button button-dark" id="cartAuthLoginLink" href="account.html?return=cart#login">Sign in to view my bag <span aria-hidden="true">→</span></a>
+        <small>Your bag is linked to your Atulyash mobile account.</small>
+      </section>
+      <div class="cart-api-status unified-bag-status" id="cartApiStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+        <span class="api-status-spinner" aria-hidden="true"></span>
+        <span id="cartApiStatusLabel">Updating your bag…</span>
+        <button id="cartApiRetryButton" type="button" hidden>Try again</button>
+      </div>
+      <div class="cart-empty unified-bag-empty" id="cartEmpty">
+        <div class="cart-empty-visual unified-bag-empty-visual" aria-hidden="true">
+          <img src="images/sack5g.webp" width="490" height="512" alt="">
+        </div>
+        <p class="eyebrow"><span></span>Your bag is waiting</p>
+        <h3>Begin with one fresh batch.</h3>
+        <p>Choose the pack size that suits the rhythm of your home.</p>
+        <button class="button button-dark" id="emptyCartShopButton" type="button">Choose a pack</button>
+      </div>
+      <div class="cart-items unified-bag-items" id="cartItems" aria-live="polite"></div>
+      <aside class="cart-promise unified-bag-promise" id="cartPromise" hidden aria-label="Fresh-batch promise">
+        <p>Included with every pack</p>
+        <ul>
+          <li><span>01</span>Natural-stone milled</li>
+          <li><span>02</span>Natural chokar retained</li>
+          <li><span>03</span>Schedule confirmed first</li>
+        </ul>
+      </aside>
+    </div>
+
+    <footer class="cart-footer unified-bag-footer" id="cartFooter" hidden>
+      <div class="cart-subtotal unified-bag-subtotal"><span id="cartSubtotalLabel">Subtotal</span><strong id="cartSubtotal">₹0</strong></div>
+      <div class="cart-credit unified-bag-credit" id="cartExperienceCreditRow" hidden><span id="cartDiscountLabel">Your first Atulyash experience</span><strong id="cartExperienceCredit">−₹100</strong></div>
+      <section class="commerce-offers" id="couponOffer" aria-labelledby="couponOfferTitle">
+        <button class="commerce-offers-toggle" id="couponToggleButton" type="button" aria-expanded="false" aria-controls="couponPanel">
+          <span class="commerce-offers-mark" aria-hidden="true">%</span>
+          <span><strong id="couponOfferTitle">Offers for this bag</strong><small id="couponOfferSummary">See eligible Atulyash coupons</small></span>
+          <span class="commerce-offers-chevron" aria-hidden="true">›</span>
+        </button>
+        <div class="commerce-offers-panel" id="couponPanel" hidden>
+          <label class="commerce-offers-search">
+            <span class="sr-only">Search coupons</span>
+            <input id="couponSearch" type="search" autocomplete="off" placeholder="Search coupon code">
+          </label>
+          <p class="commerce-offers-status" id="couponStatus" role="status" aria-live="polite"></p>
+          <div class="commerce-offers-list" id="couponList"></div>
+        </div>
+      </section>
+      <div class="cart-total unified-bag-total"><span id="cartTotalLabel">Total after credit</span><strong id="cartTotal">₹0</strong></div>
+      <p>No delivery charges. Availability and the fresh-batch schedule are confirmed from your address.</p>
+      <button class="button button-primary button-block" id="checkoutButton" type="button">Proceed to delivery <span aria-hidden="true">→</span></button>
+      <button class="cart-continue unified-bag-continue" id="continueShoppingButton" type="button">Continue shopping</button>
+    </footer>
+  </aside>
+
+
+  <div class="commerce-toast" id="commerceToast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="mobile-buy-bar" id="mobileBuyBar" aria-hidden="true" inert>
+    <div><small id="mobilePackLabel">2 kg pack</small><strong id="mobilePackPrice">₹180</strong></div>
+    <button id="mobileAddButton" type="button">Add to bag</button>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-top">
+      <div class="footer-brand">
+        <a class="footer-logo-lockup" href="#home" aria-label="Atulyash home">
+          <img class="brand-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+          <img class="brand-wordmark" src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash — Incomparable Purity. No Compromise.">
+        </a>
+        <p>Bringing respect, discipline and weekly freshness back to one of India’s most everyday foods.</p>
+      </div>
+      <div class="footer-col">
+        <h2>Explore</h2>
+        <a href="#way">The Atulyash Way</a>
+        <a href="#weekly">Weekly freshness</a>
+        <a href="#awareness">Food awareness</a>
+        <a href="#questions">Ask what matters</a>
+        <a href="#compromises">Everyday compromises</a>
+      </div>
+      <div class="footer-col">
+        <h2>Contact</h2>
+        <a href="tel:+919818588996">+91 98185 88996</a>
+        <a href="mailto:info@atulyash.com">info@atulyash.com</a>
+        <p>Panipat, Haryana, India</p>
+      </div>
+      <div class="footer-belief">
+        <span>Our belief</span>
+        <p>“This is not about adding more. It is about refusing what does not belong.”</p>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>© <span id="year"></span> Atulyash Foods. All rights reserved.</p>
+      <p>Made with patience, from grain to screen.</p>
+    </div>
+  </footer>
+
+  <script src="script.js?v=20260730-5"></script>
+  <script src="api-client.js?v=20260801-7"></script>
+  <script src="ecommerce.js?v=20260802-13"></script>
+</body>
+</html>

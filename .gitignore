@@ -1,0 +1,12 @@
+# Local review exports and temporary extraction output
+tmp/
+
+# OS and editor files
+.DS_Store
+.vscode/
+.claude/
+
+# Dependency and build output
+node_modules/
+dist/
+build/

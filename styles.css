@@ -4116,6 +4116,81 @@ h3 {
   line-height: 1.28;
 }
 
+.dainik-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 384px);
+  align-items: center;
+  gap: clamp(38px, 8vw, 128px);
+  max-width: 1120px;
+  padding-top: clamp(64px, 9vw, 112px);
+  margin-top: clamp(64px, 9vw, 112px);
+  border-top: 1px solid var(--white-line);
+}
+
+.dainik-story-copy {
+  max-width: 560px;
+}
+
+.dainik-story-copy .eyebrow {
+  color: var(--wheat-300);
+}
+
+.dainik-story-copy h3 {
+  max-width: 540px;
+  margin: 0 0 22px;
+  font-size: clamp(2.4rem, 4.5vw, 4.4rem);
+  line-height: 0.96;
+}
+
+.dainik-story-copy > p:not(.eyebrow) {
+  color: rgba(255, 253, 248, 0.74);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.dainik-story-copy .dainik-story-disclaimer {
+  max-width: 500px;
+  margin-top: 28px;
+  color: rgba(255, 253, 248, 0.56);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.dainik-story-disclaimer strong {
+  color: var(--wheat-300);
+}
+
+.dainik-story-video {
+  width: min(100%, 384px);
+  margin: 0;
+}
+
+.dainik-story-video-frame {
+  overflow: hidden;
+  background: #050d0a;
+  border: 1px solid rgba(222, 197, 143, 0.38);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.32);
+}
+
+.dainik-story-video video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 384 / 848;
+  background: #050d0a;
+}
+
+.dainik-story-video figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  color: rgba(255, 253, 248, 0.52);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .news-context {
   margin-top: clamp(72px, 9vw, 120px);
   padding-top: 46px;
@@ -4490,6 +4565,11 @@ h3 {
   .compromise-card {
     min-height: 540px;
   }
+
+  .dainik-story {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+    gap: 42px;
+  }
 }
 
 @media (max-width: 680px) {
@@ -4599,6 +4679,18 @@ h3 {
 
   .awareness-body {
     padding-top: 28px;
+  }
+
+  .dainik-story {
+    grid-template-columns: 1fr;
+    gap: 34px;
+    margin-top: 54px;
+    padding-top: 54px;
+  }
+
+  .dainik-story-video {
+    width: min(100%, 340px);
+    margin-inline: auto;
   }
 
   .news-card {

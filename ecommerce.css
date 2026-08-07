@@ -3553,6 +3553,7 @@ button {
 .cart-credit,
 .cart-total,
 .checkout-summary-credit,
+.checkout-summary-delivery,
 .checkout-summary-grand-total {
   display: flex;
   align-items: baseline;
@@ -3567,13 +3568,15 @@ button {
 }
 
 .cart-credit span,
-.checkout-summary-credit span {
+.checkout-summary-credit span,
+.checkout-summary-delivery span {
   font-size: 0.65rem;
   font-weight: 700;
 }
 
 .cart-credit strong,
-.checkout-summary-credit strong {
+.checkout-summary-credit strong,
+.checkout-summary-delivery strong {
   font-family: var(--serif);
   font-size: 1.05rem;
 }
@@ -3604,6 +3607,16 @@ button {
   padding: 10px 0;
   color: var(--wheat-300);
   border-top: 1px solid rgba(255, 253, 248, 0.16);
+}
+
+.checkout-summary-delivery {
+  padding: 10px 0;
+  color: rgba(255, 253, 248, 0.8);
+  border-top: 1px solid rgba(255, 253, 248, 0.16);
+}
+
+.checkout-summary-delivery strong {
+  color: var(--cream-50);
 }
 
 .checkout-summary-grand-total {

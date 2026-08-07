@@ -23,8 +23,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="images/atta-packet-2026.webp" fetchpriority="high">
   <link rel="preload" as="image" href="images/natural-stone-hero.webp" fetchpriority="high">
-  <link rel="stylesheet" href="styles.css?v=20260730-4">
-  <link rel="stylesheet" href="ecommerce.css?v=20260802-15">
+  <link rel="stylesheet" href="styles.css?v=20260807-1">
+  <link rel="stylesheet" href="ecommerce.css?v=20260807-2">
   <link rel="stylesheet" href="commerce-shared.css?v=20260802-3">
 </head>
 <body data-commerce-page="storefront">
@@ -126,21 +126,8 @@
     <section class="hero" id="home" aria-labelledby="hero-title">
       <div class="container hero-layout">
         <div class="hero-copy">
-          <h1 id="hero-title">Atta deserves respect.</h1>
+          <h1 id="hero-title">Atta deserves respect</h1>
           <p class="hero-lead">It is eaten every day, yet rarely questioned with the seriousness it deserves.</p>
-          <p class="hero-support">Atulyash brings that seriousness back.</p>
-          <ul class="hero-proof-list" aria-label="Five Atulyash decisions" data-motion-sequence>
-            <li>MP Sharbati wheat</li>
-            <li>Slow natural-stone milling</li>
-            <li>Fresh small batches</li>
-            <li>Natural chokar retained</li>
-            <li>Weekly delivery</li>
-          </ul>
-          <div class="hero-actions hero-actions-client">
-            <a class="button button-primary" href="#packSelector">Your First Atulyash Experience <span aria-hidden="true">↓</span></a>
-            <a class="text-action" href="#weekly">Estimate My Weekly Requirement <span aria-hidden="true">→</span></a>
-            <a class="text-action hero-subscribe" id="heroWeeklyButton" href="#shop">Subscribe for Weekly Delivery <span aria-hidden="true">→</span></a>
-          </div>
         </div>
 
         <div class="hero-visual" data-hero-depth>
@@ -163,12 +150,24 @@
       </div>
     </section>
 
+    <section class="hero-journey" aria-label="Start your Atulyash journey">
+      <div class="container hero-journey-inner">
+        <div>
+          <p>Atulyash brings that seriousness back.</p>
+          <small>Slow-milled, carefully cleaned and prepared close to delivery.</small>
+        </div>
+        <div class="hero-actions hero-actions-client">
+          <a class="button button-primary" href="#packSelector">Your First Atulyash Experience <span aria-hidden="true">↓</span></a>
+          <a class="text-action" href="#weekly">Estimate My Weekly Requirement <span aria-hidden="true">→</span></a>
+          <a class="text-action hero-subscribe" id="heroWeeklyButton" href="#shop">Subscribe for Weekly Delivery <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </section>
+
     <section class="shop-section section" id="shop" aria-labelledby="shop-title">
       <div class="container shop-heading reveal">
         <div>
-          <div class="section-index">01 — The fresh batch</div>
-          <p class="eyebrow"><span></span>One honest atta. Four useful quantities.</p>
-          <h2 id="shop-title">Choose your fresh batch.</h2>
+          <h2 id="shop-title">Choose the quantity that suits your home.</h2>
         </div>
         <p>Every pack contains the same Atulyash atta: 100% MP Sharbati wheat, carefully cleaned, slow-milled on natural stone and packed with its natural chokar intact.</p>
       </div>
@@ -176,7 +175,7 @@
       <div class="container product-showcase reveal" id="productShowcase">
         <div class="product-gallery" data-cursor-label="Fresh batch">
           <div class="product-gallery-copy">
-            <span class="product-kicker">Atulyash Sharbati atta</span>
+            <span class="product-kicker">Atta, in its purest form</span>
             <strong>Slow. Honest. Fresh.</strong>
           </div>
           <div class="product-image-stage">
@@ -203,16 +202,9 @@
               <p class="product-overline">100% MP Sharbati wheat</p>
               <h3>Atulyash Whole Wheat Atta</h3>
             </div>
-            <span class="product-stock"><i aria-hidden="true"></i> Fresh-batch ordering</span>
           </div>
 
           <p class="product-description">Made from one carefully selected wheat and milled slowly for homes that want to know what goes into their everyday roti.</p>
-
-          <div class="product-price-line" aria-live="polite">
-            <strong id="productPrice">₹180</strong>
-            <span id="productUnitPrice">₹90 per kg</span>
-            <small>No delivery charges · Schedule confirmed before payment</small>
-          </div>
 
           <fieldset class="purchase-selector" id="purchaseSelector">
             <legend>How would you like it?</legend>
@@ -300,6 +292,12 @@
             </div>
           </section>
 
+          <div class="product-price-line" aria-live="polite">
+            <strong id="productPrice">₹180</strong>
+            <span id="productUnitPrice">₹90 per kg</span>
+            <small>Delivery charges, if applicable, are shown clearly in your bag before checkout.</small>
+          </div>
+
           <div class="product-purchase-row">
             <div class="quantity-control" aria-label="Quantity">
               <button type="button" id="productQuantityMinus" aria-label="Decrease quantity">−</button>
@@ -331,7 +329,7 @@
             </details>
             <details>
               <summary>Delivery promise<span aria-hidden="true">+</span></summary>
-              <p>We confirm availability and your delivery schedule before payment so the atta can be prepared closer to dispatch.</p>
+              <p>Your delivery date is confirmed before payment. The atta is freshly milled the previous day and delivered to you the next day.</p>
             </details>
           </div>
         </div>
@@ -342,8 +340,8 @@
       <div class="container signature-orbit-wrap">
         <div class="signature-orbit-heading">
           <div class="section-index">02 — The Atulyash Way</div>
-          <h2 id="way-title">Six decisions. One honest packet.</h2>
-          <p>Meet Veer — your guide to better atta.</p>
+          <h2 id="way-title"><span>Six decisions.</span><span>One honest packet.</span></h2>
+          <p>Meet Veer — Your Guide to Better Atta</p>
         </div>
 
         <div class="orbit-showcase orbit-showcase-signature reveal" id="orbitShowcase">
@@ -401,15 +399,15 @@
         </div>
 
         <div class="calculator reveal" aria-labelledby="calculator-title">
-          <p class="calculator-tag">Estimate my weekly requirement</p>
-          <h3 id="calculator-title">How many rotis does your home make each day?</h3>
-          <p class="calculator-intro">Enter the total rotis made for your household on a usual day. We will turn that into a practical weekly quantity.</p>
+          <p class="calculator-tag">Let us help you estimate your weekly &amp; monthly atta requirement</p>
+          <h3 id="calculator-title">How many rotis does your family usually consume in a day?</h3>
+          <p class="calculator-intro">Enter the total number of rotis your family usually consumes each day, and we’ll recommend the right weekly and monthly quantity of Atulyash Atta.</p>
 
           <div class="calculator-roti-control">
             <div class="calculator-roti-copy">
               <label for="dailyRotis">Daily household count</label>
               <strong>How many rotis on a usual day?</strong>
-              <small id="dailyRotisHelp">Count everyone at home · minimum 8 rotis</small>
+              <small id="dailyRotisHelp">Minimum 8 rotis</small>
             </div>
             <div class="calculator-roti-stepper" role="group" aria-label="Daily roti count" data-cursor-hide>
               <button id="dailyRotisMinus" type="button" aria-label="Decrease daily roti count">−</button>
@@ -431,11 +429,23 @@
               </label>
               <label>
                 <input type="radio" name="attaBuffer" value="10" checked>
-                <span><strong>+10%</strong><small>Sometimes</small></span>
+                <span><strong>+10%</strong><small>Minimum extra</small></span>
+              </label>
+              <label>
+                <input type="radio" name="attaBuffer" value="15">
+                <span><strong>+15%</strong><small>A little more</small></span>
               </label>
               <label>
                 <input type="radio" name="attaBuffer" value="20">
                 <span><strong>+20%</strong><small>Often</small></span>
+              </label>
+              <label>
+                <input type="radio" name="attaBuffer" value="25">
+                <span><strong>+25%</strong><small>Regular extras</small></span>
+              </label>
+              <label>
+                <input type="radio" name="attaBuffer" value="30">
+                <span><strong>+30%</strong><small>Frequent extras</small></span>
               </label>
             </div>
           </fieldset>
@@ -475,33 +485,6 @@
         </div>
       </div>
 
-      <div class="container news-context" aria-labelledby="news-context-title">
-        <div class="news-context-head">
-          <p class="eyebrow"><span></span>Independent reporting</p>
-          <h3 id="news-context-title">Why food awareness stays in the news</h3>
-        </div>
-        <div class="news-grid">
-          <article class="news-card reveal">
-            <div><span>NDTV Food</span><time datetime="2026-03-15">15 Mar 2026</time></div>
-            <h4>150 tonnes of expired food and adulterated paneer seized across two states</h4>
-            <p>A recent report on official food-safety action in Rajasthan and Jharkhand.</p>
-            <a href="https://www.ndtv.com/food/150-tonnes-of-expired-food-adulterated-paneer-seized-in-major-food-raids-across-two-states-11217962" target="_blank" rel="noopener noreferrer">Read original <span aria-hidden="true">↗</span></a>
-          </article>
-          <article class="news-card reveal">
-            <div><span>The Times of India</span><time datetime="2026-03-24">24 Mar 2026</time></div>
-            <h4>Fake paneer and adulterated ghee racket busted in Jaipur</h4>
-            <p>A city report on a police operation involving dairy products and spices.</p>
-            <a href="https://timesofindia.indiatimes.com/city/jaipur/fake-paneer-adulterated-ghee-racket-busted-in-jaipur/articleshow/129761828.cms" target="_blank" rel="noopener noreferrer">Read original <span aria-hidden="true">↗</span></a>
-          </article>
-          <article class="news-card news-card-flour reveal">
-            <div><span>The Hindu</span><time datetime="2025-09-23">23 Sep 2025</time></div>
-            <h4>Hundreds hospitalised after consuming adulterated flour</h4>
-            <p>This report concerned kuttu (buckwheat) flour during Navratri, not wheat atta.</p>
-            <a href="https://www.thehindu.com/news/cities/Delhi/hundreds-hospitalised-after-consuming-adulterated-flour/article70086142.ece" target="_blank" rel="noopener noreferrer">Read original <span aria-hidden="true">↗</span></a>
-          </article>
-        </div>
-        <p class="news-disclaimer"><strong>Disclaimer:</strong> Publicly available news reports/references are shown for educational purposes only. No endorsement, approval or commercial association with Atulyash Foods is implied.</p>
-      </div>
     </section>
 
     <section class="questions-section section" id="questions" aria-labelledby="questions-title">
@@ -730,8 +713,9 @@
           <div class="commerce-offers-list" id="couponList"></div>
         </div>
       </section>
+      <div class="cart-delivery-charge unified-bag-credit" id="cartDeliveryChargeRow"><span id="cartDeliveryChargeLabel">Delivery charge</span><strong id="cartDeliveryCharge">₹0</strong></div>
       <div class="cart-total unified-bag-total"><span id="cartTotalLabel">Total after credit</span><strong id="cartTotal">₹0</strong></div>
-      <p>No delivery charges. Availability and the fresh-batch schedule are confirmed from your address.</p>
+      <p id="cartDeliveryChargeNote">Delivery charges are based on your one-time pack weight. Scheduled subscription deliveries are always free.</p>
       <button class="button button-primary button-block" id="checkoutButton" type="button">Proceed to delivery <span aria-hidden="true">→</span></button>
       <button class="cart-continue unified-bag-continue" id="continueShoppingButton" type="button">Continue shopping</button>
     </footer>
@@ -781,6 +765,7 @@
 
   <script src="script.js?v=20260730-5"></script>
   <script src="api-client.js?v=20260801-7"></script>
-  <script src="ecommerce.js?v=20260802-13"></script>
+  <script src="serviceability-areas.js?v=20260807-1"></script>
+  <script src="ecommerce.js?v=20260807-2"></script>
 </body>
 </html>

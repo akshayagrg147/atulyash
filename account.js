@@ -5,6 +5,7 @@
   const STOREFRONT_INTENT_KEY = 'atulyash-storefront-intent-v1';
   const CHECKOUT_CONTEXT_KEY = 'atulyash-checkout-context-v1';
   const CART_STORAGE_KEY = 'atulyash-cart-v1';
+  const SERVICEABILITY_AREAS = window.AtulyashServiceabilityAreas || Object.freeze({});
   const currency = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -482,6 +483,38 @@
     return Number.isInteger(weight) ? String(weight) : weight.toFixed(1);
   }
 
+  function weeklyDeliveryCycle(plan) {
+    const monthlyKg = Math.round(Number(plan?.monthlyKg));
+    const suppliedCycle = Array.isArray(plan?.weeklyQuantityCycle)
+      ? plan.weeklyQuantityCycle.map(Number)
+      : [];
+    if (
+      suppliedCycle.length === 4
+      && suppliedCycle.every((quantity) => Number.isInteger(quantity) && quantity > 0)
+      && suppliedCycle.reduce((total, quantity) => total + quantity, 0) === monthlyKg
+    ) return suppliedCycle;
+    if (!Number.isInteger(monthlyKg) || monthlyKg < 4) return [];
+    const base = Math.floor(monthlyKg / 4);
+    const remainder = monthlyKg % 4;
+    const extraWeeks = remainder === 3 ? [0, 1, 2] : remainder === 2 ? [0, 2] : remainder === 1 ? [0] : [];
+    return Array.from({ length: 4 }, (_, index) => base + (extraWeeks.includes(index) ? 1 : 0));
+  }
+
+  function weeklyDeliveryCycleText(plan, { includeWeeks = false } = {}) {
+    const cycle = weeklyDeliveryCycle(plan);
+    if (!cycle.length) return 'Weekly fresh batches';
+    if (cycle.every((quantity) => quantity === cycle[0])) return `${cycle[0]} kg every week`;
+    return includeWeeks
+      ? cycle.map((quantity, index) => `Week ${index + 1}: ${quantity} kg`).join(' · ')
+      : `${cycle.map((quantity) => `${quantity} kg`).join(', ')} across four deliveries`;
+  }
+
+  function weeklyPlanSelectionLabel(plan) {
+    const cycle = weeklyDeliveryCycle(plan);
+    if (!cycle.length || cycle.every((quantity) => quantity === cycle[0])) return cycle.length ? `${cycle[0]} kg every week` : 'Weekly fresh batches';
+    return `${cycle[0]} kg / ${cycle[1]} kg alternating`;
+  }
+
   function normalizeServerBagItem(item, index) {
     if (!item || typeof item !== 'object') return null;
     const subscriptionPack = item.subscription_pack && typeof item.subscription_pack === 'object'
@@ -546,8 +579,8 @@
     const lineTotal = (weekly ? monthlyPrice : unitPrice) * quantity;
     const deliveryDay = firstValue(item.delivery_day, item.preferred_delivery_day, '');
     const compactWeight = bagWeightLabel(weight);
-    const weeklyWeight = bagWeightLabel((weight || 0) * quantity);
     const monthlyWeight = bagWeightLabel((monthlyKg || 0) * quantity);
+    const weeklyPlan = { monthlyKg, weeklyKg: weight, weeklyQuantityCycle: item.weekly_quantity_cycle };
     const unavailable = weekly
       ? state.weeklyCatalogStatus === 'ready' && subscriptionPackId != null && !catalogPlan
       : state.quickProductCatalogStatus === 'ready' && productPackId != null && !catalogPack;
@@ -563,7 +596,7 @@
       ),
       meta: weekly
         ? [
-          weeklyWeight ? `${weeklyWeight} kg/week total` : 'Fresh weekly plan',
+          weeklyPlanSelectionLabel(weeklyPlan),
           monthlyWeight ? `${monthlyWeight} kg/month total` : '',
           deliveryDay || 'Schedule selected at checkout'
         ].filter(Boolean).join(' · ')
@@ -571,6 +604,7 @@
       quantity,
       unitPrice,
       monthlyPrice,
+      weeklyPlan,
       lineTotal,
       weekly,
       unavailable,
@@ -615,8 +649,8 @@
     const monthlyPrice = weekly
       ? firstFinite(catalogPlan?.monthlyPrice, item.monthlyPrice, unitPrice * 4) || 0
       : null;
-    const weeklyWeight = bagWeightLabel((weight || 0) * quantity);
     const monthlyWeight = bagWeightLabel((monthlyKg || 0) * quantity);
+    const weeklyPlan = { monthlyKg, weeklyKg: weight, weeklyQuantityCycle: item.weeklyQuantityCycle };
     const deliveryDay = firstValue(item.deliveryDay, '');
     const unavailable = weekly
       ? state.weeklyCatalogStatus === 'ready' && !catalogPlan
@@ -628,7 +662,7 @@
       title: 'Atulyash Whole Wheat Atta',
       meta: weekly
         ? [
-          weeklyWeight ? `${weeklyWeight} kg/week total` : 'Fresh weekly plan',
+          weeklyPlanSelectionLabel(weeklyPlan),
           monthlyWeight ? `${monthlyWeight} kg/month total` : '',
           deliveryDay || 'Schedule selected at checkout'
         ].filter(Boolean).join(' · ')
@@ -636,6 +670,7 @@
       quantity,
       unitPrice,
       monthlyPrice,
+      weeklyPlan,
       lineTotal: (weekly ? monthlyPrice : unitPrice) * quantity,
       weekly,
       unavailable,
@@ -762,7 +797,7 @@
       line.unavailable
         ? line.unavailableLabel
         : line.weekly
-          ? `${line.meta} · ${currency.format(line.unitPrice)}/week · ${currency.format(line.monthlyPrice)} charged for the first month`
+          ? `${line.meta} · ${currency.format(line.unitPrice)} per delivery · ${currency.format(line.monthlyPrice)} minimum wallet balance for 4 deliveries`
           : `${line.meta} · ${currency.format(line.unitPrice)} each`
     );
     const controls = create('div', 'account-bag-line-controls unified-bag-item-controls');
@@ -811,7 +846,7 @@
     if (elements.accountBagTitleCount) elements.accountBagTitleCount.textContent = `(${quantity})`;
     if (elements.accountBagSubtotalLabel) {
       elements.accountBagSubtotalLabel.textContent = hasWeekly
-        ? 'First-month plan subtotal'
+        ? 'Four-delivery wallet cover'
         : 'Subtotal';
     }
     if (elements.accountBagSubtotal) elements.accountBagSubtotal.textContent = currency.format(summary.subtotal);
@@ -819,7 +854,7 @@
     if (elements.accountBagCredit) elements.accountBagCredit.textContent = `−${currency.format(summary.discount)}`;
     if (elements.accountBagTotalLabel) {
       elements.accountBagTotalLabel.textContent = hasWeekly
-        ? 'Wallet debit today'
+        ? 'Minimum wallet balance'
         : 'Total after credit';
     }
     if (elements.accountBagTotal) elements.accountBagTotal.textContent = currency.format(summary.total);
@@ -2143,6 +2178,11 @@
   function subscriptionWeight(subscription) {
     const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package, {});
     const catalogPlan = subscriptionCatalogPlan(subscription);
+    if (catalogPlan) {
+      return `${catalogPlan.monthlyKg} kg/month · ${weeklyDeliveryCycleText(catalogPlan)}`;
+    }
+    const monthlyKg = firstFinite(pack?.monthly_quantity, subscription.monthly_quantity, subscription.monthly_kg);
+    if (monthlyKg) return `${monthlyKg} kg/month · ${weeklyDeliveryCycleText({ monthlyKg })}`;
     const weight = firstValue(
       subscription.weekly_kg,
       subscription.quantity_kg,
@@ -2185,7 +2225,7 @@
       ['Delivery day', firstValue(subscription.delivery_day, subscription.weekday, 'As scheduled')],
       ['Plan length', firstValue(subscription.duration_display, subscription.duration, pack?.duration, 'Ongoing')],
       ['Weekly value', formatMoney(firstValue(subscription.price_per_delivery, subscription.weekly_price, pack?.weekly_price, catalogPlan?.price, 0))],
-      ['First month charged', formatMoney(firstValue(subscription.monthly_price, pack?.price, catalogPlan?.monthlyPrice, 0))],
+      ['Wallet cover (4 deliveries)', formatMoney(firstValue(subscription.monthly_price, pack?.price, catalogPlan?.monthlyPrice, 0))],
       ['Plan reference', `#${subscriptionId(subscription) || '—'}`]
     ].forEach(([label, value]) => {
       const stat = create('div', 'subscription-stat');
@@ -2701,6 +2741,44 @@
       fields.append(label);
     });
     const pincodeInput = fields.querySelector('input[name="pincode"]');
+    const areaLabel = create('label', '', 'Area');
+    const areaSelect = create('select');
+    areaSelect.name = 'area';
+    areaSelect.required = true;
+    areaSelect.disabled = true;
+    areaLabel.hidden = true;
+    areaLabel.inert = true;
+    areaLabel.append(areaSelect);
+    fields.append(areaLabel);
+    const initialArea = String(firstValue(address?.area, address?.locality, ''));
+
+    const populateAreas = ({ preserveValue = false } = {}) => {
+      const pincode = String(pincodeInput?.value || '').replace(/\D/g, '').slice(0, 6);
+      if (pincodeInput) pincodeInput.value = pincode;
+      const areas = /^\d{6}$/.test(pincode) && Array.isArray(SERVICEABILITY_AREAS[pincode])
+        ? SERVICEABILITY_AREAS[pincode]
+        : [];
+      const selected = preserveValue ? (areaSelect.value || initialArea) : '';
+      const placeholder = create('option', '', areas.length ? 'Select your area' : 'Enter a launch PIN code first');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      const options = areas
+        .slice()
+        .sort((a, b) => String(a.area).localeCompare(String(b.area)))
+        .map((entry) => {
+          const option = create('option', '', entry.area);
+          option.value = entry.area;
+          return option;
+        });
+      areaSelect.replaceChildren(placeholder, ...options);
+      areaSelect.disabled = !areas.length;
+      areaLabel.hidden = !areas.length;
+      areaLabel.inert = !areas.length;
+      if (areas.some((entry) => entry.area === selected)) areaSelect.value = selected;
+      return areas;
+    };
+    populateAreas({ preserveValue: true });
     const serviceabilityNotice = create('div', 'address-serviceability-notice');
     serviceabilityNotice.hidden = true;
     serviceabilityNotice.setAttribute('role', 'alert');
@@ -2717,7 +2795,10 @@
       pincodeInput.setCustomValidity('');
       serviceabilityNotice.hidden = true;
     };
-    pincodeInput?.addEventListener('input', clearServiceabilityError);
+    pincodeInput?.addEventListener('input', () => {
+      clearServiceabilityError();
+      populateAreas();
+    });
 
     const typeLabel = create('label', '', 'Address type');
     const type = create('select');
@@ -2746,6 +2827,12 @@
       try {
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
+        const eligibleAreas = Array.isArray(SERVICEABILITY_AREAS[payload.pincode])
+          ? SERVICEABILITY_AREAS[payload.pincode]
+          : [];
+        if (!eligibleAreas.some((entry) => entry.area === payload.area)) {
+          throw new Error('Choose a listed delivery area for this PIN code before saving the address.');
+        }
         const activeSession = methodFrom('auth', ['getSession'])?.() || methodFrom(null, ['getSession'])?.() || {};
         payload.customer = firstValue(state.customerId, activeSession.customerId, activeSession.customer_id);
         if (!payload.customer) {
@@ -2756,6 +2843,7 @@
           payload.house_name,
           payload.tower_wing,
           payload.landmark,
+          payload.area,
           payload.city,
           payload.state,
           payload.pincode
@@ -3613,7 +3701,8 @@
             monthlyKg,
             weeklyKg,
             price,
-            monthlyPrice
+            monthlyPrice,
+            weeklyQuantityCycle: firstValue(plan.weekly_quantity_cycle, plan.delivery_quantity_cycle, plan.weekly_cycle, [])
           };
         })
         .filter(Boolean)
@@ -3635,8 +3724,7 @@
         option.dataset.weekly = String(plan.weeklyKg);
         option.dataset.price = String(plan.price);
         option.dataset.monthlyPrice = String(plan.monthlyPrice);
-        const weeklyLabel = Number.isInteger(plan.weeklyKg) ? String(plan.weeklyKg) : plan.weeklyKg.toFixed(1);
-        option.textContent = `${weeklyLabel} kg every week`;
+        option.textContent = `${bagWeightLabel(plan.monthlyKg)} kg/month — ${weeklyDeliveryCycleText(plan)} · ${currency.format(plan.monthlyPrice)} minimum wallet balance`;
         fragment.append(option);
       });
       elements.quickOrderPlan.replaceChildren(fragment);
@@ -3709,7 +3797,8 @@
       monthlyKg,
       weeklyKg,
       price,
-      monthlyPrice
+      monthlyPrice,
+      weeklyQuantityCycle: state.weeklyPlans.find((plan) => String(plan.id) === String(option.value))?.weeklyQuantityCycle || []
     };
   }
 
@@ -3799,28 +3888,28 @@
     }
 
     submit.disabled = state.quickOrderSubmitting;
-    const displayWeight = weekly ? plan.weeklyKg : pack.weight;
+    const displayWeight = weekly ? plan.monthlyKg : pack.weight;
     const total = weekly ? plan.monthlyPrice : pack.price * quantity;
     const compactWeight = Number.isInteger(displayWeight) ? String(displayWeight) : displayWeight.toFixed(1);
     if (weekly) {
       const monthlyWeight = Number.isInteger(plan.monthlyKg) ? String(plan.monthlyKg) : plan.monthlyKg.toFixed(1);
-      if (elements.weeklyChoiceQuantity) elements.weeklyChoiceQuantity.textContent = `${compactWeight} kg`;
-      if (elements.weeklyChoiceCoverage) elements.weeklyChoiceCoverage.textContent = `${monthlyWeight} kg across the first four deliveries`;
+      if (elements.weeklyChoiceQuantity) elements.weeklyChoiceQuantity.textContent = `${monthlyWeight} kg/month`;
+      if (elements.weeklyChoiceCoverage) elements.weeklyChoiceCoverage.textContent = weeklyDeliveryCycleText(plan, { includeWeeks: true });
       if (elements.weeklyChoicePerDelivery) elements.weeklyChoicePerDelivery.textContent = currency.format(plan.price);
       if (elements.weeklyChoiceFirstMonth) elements.weeklyChoiceFirstMonth.textContent = currency.format(plan.monthlyPrice);
       if (elements.weeklyChoicePaymentCopy) {
-        elements.weeklyChoicePaymentCopy.textContent = `${currency.format(plan.monthlyPrice)} is debited from your Atulyash Wallet at checkout and pays for the first four weekly deliveries.`;
+        elements.weeklyChoicePaymentCopy.textContent = `Keep ${currency.format(plan.monthlyPrice)} in your Atulyash Wallet before starting. It is charged delivery by delivery, not as one upfront monthly debit.`;
       }
     }
-    elements.quickOrderWeightBadge.textContent = weekly ? `${compactWeight} kg/wk` : `${compactWeight} kg`;
+    elements.quickOrderWeightBadge.textContent = weekly ? `${compactWeight} kg/mo` : `${compactWeight} kg`;
     elements.quickOrderSelection.textContent = weekly
-      ? `${compactWeight} kg/week · ${plan.monthlyKg} kg/month · ${currency.format(plan.price)}/week`
+      ? `${plan.monthlyKg} kg/month · ${weeklyDeliveryCycleText(plan)} · ${currency.format(plan.price)} per delivery`
       : `${quantity} × ${compactWeight} kg · one-time order`;
-    elements.quickOrderPrice.textContent = weekly ? `${currency.format(total)} first month` : currency.format(total);
+    elements.quickOrderPrice.textContent = weekly ? `${currency.format(total)} minimum balance` : currency.format(total);
     elements.quickOrderCtaLabel.textContent = state.quickOrderSubmitting
       ? 'Adding to your bag…'
       : weekly
-        ? 'Continue with this weekly plan'
+        ? 'Add weekly plan to bag'
         : 'Add to bag';
 
     document.querySelectorAll('input[name="quickOrderMode"]').forEach((input) => {
@@ -3864,7 +3953,7 @@
     );
     elements.accountCalculatorFormula.textContent = `${dailyRotis} rotis × 30 g × 7 days${buffer ? ` + ${buffer}% extra` : ''}`;
 
-    const recommendedPlan = state.weeklyPlans.find((plan) => plan.weeklyKg >= weeklyKg) || null;
+    const recommendedPlan = state.weeklyPlans.find((plan) => plan.monthlyKg >= weeklyKg * 4) || null;
     if (state.weeklyCatalogStatus === 'loading') {
       elements.accountCalculatorPlan.textContent = 'Finding the closest live weekly plan…';
     } else if (!recommendedPlan) {
@@ -3872,10 +3961,7 @@
         ? 'This estimate is above the available plans. Our team can help shape the right quantity.'
         : 'Live weekly plans are not available right now.';
     } else {
-      const planWeight = Number.isInteger(recommendedPlan.weeklyKg)
-        ? recommendedPlan.weeklyKg
-        : recommendedPlan.weeklyKg.toFixed(1);
-      elements.accountCalculatorPlan.textContent = `Closest live plan: ${planWeight} kg every week.`;
+      elements.accountCalculatorPlan.textContent = `Closest live plan: ${recommendedPlan.monthlyKg} kg/month — ${weeklyDeliveryCycleText(recommendedPlan)}.`;
       const option = Array.from(elements.quickOrderPlan?.options || [])
         .find((candidate) => String(candidate.value) === String(recommendedPlan.id));
       if (option) {

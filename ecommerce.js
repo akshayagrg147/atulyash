@@ -27,6 +27,7 @@
   const COUPON_CONTEXT_KEY = 'atulyash-coupon-context-v1';
   const CHECKOUT_CONTEXT_TTL = 2 * 60 * 60 * 1000;
   const API = window.AtulyashAPI || null;
+  const SERVICEABILITY_AREAS = window.AtulyashServiceabilityAreas || Object.freeze({});
   const currency = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -99,6 +100,10 @@
     cartDiscountLabel: document.getElementById('cartDiscountLabel'),
     cartTotalLabel: document.getElementById('cartTotalLabel'),
     cartTotal: document.getElementById('cartTotal'),
+    cartDeliveryChargeRow: document.getElementById('cartDeliveryChargeRow'),
+    cartDeliveryChargeLabel: document.getElementById('cartDeliveryChargeLabel'),
+    cartDeliveryCharge: document.getElementById('cartDeliveryCharge'),
+    cartDeliveryChargeNote: document.getElementById('cartDeliveryChargeNote'),
     couponOffer: document.getElementById('couponOffer'),
     couponToggleButton: document.getElementById('couponToggleButton'),
     couponOfferSummary: document.getElementById('couponOfferSummary'),
@@ -154,6 +159,8 @@
     checkoutAddAddressButton: document.getElementById('checkoutAddAddressButton'),
     checkoutNewAddressFields: document.getElementById('checkoutNewAddressFields'),
     checkoutPincode: document.getElementById('checkoutPincode'),
+    checkoutAreaField: document.getElementById('checkoutAreaField'),
+    checkoutArea: document.getElementById('checkoutArea'),
     checkoutPincodeServiceability: document.getElementById('checkoutPincodeServiceability'),
     checkoutPincodeTitle: document.getElementById('checkoutPincodeTitle'),
     checkoutPincodeStatus: document.getElementById('checkoutPincodeStatus'),
@@ -213,6 +220,10 @@
     checkoutDiscountLabel: document.getElementById('checkoutDiscountLabel'),
     checkoutTotalLabel: document.getElementById('checkoutTotalLabel'),
     checkoutTotal: document.getElementById('checkoutTotal'),
+    checkoutDeliveryChargeRow: document.getElementById('checkoutDeliveryChargeRow'),
+    checkoutDeliveryChargeLabel: document.getElementById('checkoutDeliveryChargeLabel'),
+    checkoutDeliveryCharge: document.getElementById('checkoutDeliveryCharge'),
+    checkoutDeliveryChargeNote: document.getElementById('checkoutDeliveryChargeNote'),
     whatsappOrderLink: document.getElementById('whatsappOrderLink'),
     successCloseButton: document.getElementById('successCloseButton'),
     toast: document.getElementById('commerceToast'),
@@ -678,7 +689,7 @@
       WEEKLY_PLANS.forEach((plan) => {
         const option = document.createElement('option');
         option.value = plan.id;
-        option.textContent = `${plan.monthlyKg.toFixed(2)} kg/month — ${formatWeight(plan.weeklyKg)} kg/week · ${formatPrice(plan.price)}/week · ${formatPrice(plan.monthlyPrice)} first month`;
+        option.textContent = `${formatWeight(plan.monthlyKg)} kg/month — ${weeklyDeliveryCycleText(plan)} · ${formatPrice(plan.monthlyPrice)} minimum wallet balance`;
         fragment.append(option);
       });
       elements.weeklyPlanSelect.replaceChildren(fragment);
@@ -1678,6 +1689,40 @@
     return Number.isInteger(Number(weight)) ? String(Number(weight)) : Number(weight).toFixed(1);
   }
 
+  function weeklyDeliveryCycle(plan) {
+    const monthlyKg = Math.round(Number(plan?.monthlyKg));
+    const apiCycle = Array.isArray(plan?.weeklyQuantityCycle)
+      ? plan.weeklyQuantityCycle.map(Number)
+      : [];
+    if (
+      apiCycle.length === 4
+      && apiCycle.every((quantity) => Number.isInteger(quantity) && quantity > 0)
+      && apiCycle.reduce((total, quantity) => total + quantity, 0) === monthlyKg
+    ) return apiCycle;
+    if (!Number.isInteger(monthlyKg) || monthlyKg < 4) return [];
+    const base = Math.floor(monthlyKg / 4);
+    const remainder = monthlyKg % 4;
+    const extraWeeks = remainder === 2 ? [0, 2] : remainder === 3 ? [0, 1, 2] : remainder === 1 ? [0] : [];
+    return Array.from({ length: 4 }, (_, week) => base + (extraWeeks.includes(week) ? 1 : 0));
+  }
+
+  function weeklyDeliveryCycleText(plan, { includeWeeks = false } = {}) {
+    const cycle = weeklyDeliveryCycle(plan);
+    if (!cycle.length) return `${formatWeight(plan?.weeklyKg || 0)} kg weekly`;
+    if (cycle.every((quantity) => quantity === cycle[0])) return `${cycle[0]} kg every week`;
+    return includeWeeks
+      ? cycle.map((quantity, index) => `Week ${index + 1}: ${quantity} kg`).join(' · ')
+      : `${cycle.map((quantity) => `${quantity} kg`).join(', ')} across four deliveries`;
+  }
+
+  function weeklyPlanSelectionLabel(plan) {
+    const cycle = weeklyDeliveryCycle(plan);
+    if (!cycle.length || cycle.every((quantity) => quantity === cycle[0])) {
+      return `${cycle[0] || formatWeight(plan?.weeklyKg || 0)} kg every week`;
+    }
+    return `${cycle[0]} kg / ${cycle[1]} kg alternating`;
+  }
+
   function selectedQuote() {
     if (selectedPurchaseType === 'weekly') {
       const plan = getWeeklyPlan();
@@ -1688,6 +1733,7 @@
         monthlyPrice: plan.monthlyPrice,
         unitPrice: plan.weeklyKg > 0 ? plan.price / plan.weeklyKg : null,
         monthlyKg: plan.monthlyKg,
+        plan,
         planId: plan.id
       };
     }
@@ -1707,6 +1753,7 @@
         monthlyKg: numericValue(item.monthlyKg, weightKg * 4),
         price: numericValue(item.pricePerDelivery),
         monthlyPrice: numericValue(item.monthlyPrice, numericValue(item.pricePerDelivery) * 4),
+        weeklyQuantityCycle: Array.isArray(item.weeklyQuantityCycle) ? item.weeklyQuantityCycle : [],
         deliveryDay: DELIVERY_DAYS.includes(item.deliveryDay) ? item.deliveryDay : '',
         unavailable: true
       };
@@ -1720,6 +1767,7 @@
         price: matchedPlan?.price ?? numericValue(item.pricePerDelivery),
         monthlyPrice: matchedPlan?.monthlyPrice
           ?? numericValue(item.monthlyPrice, (matchedPlan?.price ?? numericValue(item.pricePerDelivery)) * 4),
+        weeklyQuantityCycle: weeklyDeliveryCycle(matchedPlan || item),
         deliveryDay: DELIVERY_DAYS.includes(item.deliveryDay) ? item.deliveryDay : ''
       };
     }
@@ -1745,14 +1793,56 @@
 
   function cartSubtotal() {
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
-    // The cart endpoint currently reports a weekly instalment for subscription
-    // lines, while order creation debits the complete one-month plan. For any
-    // bag containing a weekly plan, use the catalogue's authoritative monthly
-    // price so the customer sees the amount the order service will charge.
+    // Subscription lines use the catalogue monthly amount as the minimum
+    // four-delivery wallet cover. It is not presented as an upfront debit.
     if (!hasWeekly && serverCartActive && Number.isFinite(serverCartSummary?.subtotal)) {
       return serverCartSummary.subtotal;
     }
     return cart.reduce((total, item) => total + cartItemTotal(item), 0);
+  }
+
+  function deliveryChargeQuote() {
+    const oneTimeWeight = cart
+      .filter((item) => item.purchaseType !== 'weekly')
+      .reduce((total, item) => total + (itemDescriptor(item).weightKg * item.quantity), 0);
+    const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
+    if (oneTimeWeight <= 0) {
+      return {
+        amount: 0,
+        weight: 0,
+        requiresSupport: false,
+        label: 'Scheduled subscription delivery',
+        note: 'Scheduled subscription deliveries are always free.'
+      };
+    }
+    if (!isApiAuthenticated() && !serverCartActive && oneTimeWeight >= 2) {
+      return {
+        amount: 0,
+        weight: oneTimeWeight,
+        requiresSupport: false,
+        label: 'First Atulyash Experience delivery',
+        note: 'Your first Atulyash Experience delivery is free.'
+      };
+    }
+    if (oneTimeWeight > 40) {
+      return {
+        amount: null,
+        weight: oneTimeWeight,
+        requiresSupport: true,
+        label: `Delivery charge · ${formatWeight(oneTimeWeight)} kg`,
+        note: 'Orders above 40 kg are arranged through Atulyash Customer Care.'
+      };
+    }
+    const amount = oneTimeWeight <= 6 ? 40 : oneTimeWeight <= 10 ? 30 : 0;
+    return {
+      amount,
+      weight: oneTimeWeight,
+      requiresSupport: false,
+      label: `One-time delivery · ${formatWeight(oneTimeWeight)} kg`,
+      note: amount === 0
+        ? 'One-time orders of 11–40 kg are delivered free.'
+        : `${hasWeekly ? 'This separately scheduled one-time delivery' : 'This one-time delivery'} has a ${formatPrice(amount)} delivery charge.`
+    };
   }
 
   function experienceCredit() {
@@ -1769,11 +1859,8 @@
   }
 
   function orderTotal() {
-    const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
-    if (!hasWeekly && serverCartActive && Number.isFinite(serverCartSummary?.total)) {
-      return serverCartSummary.total;
-    }
-    return Math.max(0, cartSubtotal() - experienceCredit());
+    const delivery = deliveryChargeQuote();
+    return Math.max(0, cartSubtotal() - experienceCredit()) + (Number.isFinite(delivery.amount) ? delivery.amount : 0);
   }
 
   function cartQuantity() {
@@ -1855,6 +1942,7 @@
     const isWeekly = selectedPurchaseType === 'weekly';
     const total = (isWeekly ? quote.monthlyPrice : quote.price) * selectedQuantity;
     const weightLabel = formatWeight(quote.weightKg);
+    const weeklyLabel = isWeekly ? weeklyPlanSelectionLabel(quote.plan) : '';
 
     if (animate) animateVariantChange(quote.weightKg);
     if (elements.packSelector) {
@@ -1868,21 +1956,25 @@
     if (elements.productPrice) elements.productPrice.textContent = formatPrice(quote.price);
     if (elements.productUnitPrice) {
       elements.productUnitPrice.textContent = isWeekly
-        ? `${formatPrice(quote.price)}/week · ${formatPrice(quote.monthlyPrice)} charged for the first month`
+        ? `${weeklyLabel} · ${formatPrice(quote.monthlyPrice)} wallet balance required for 4 deliveries`
         : `${formatPrice(PRODUCT.unitPrice)} per kg`;
     }
     if (elements.addToCartPrice) elements.addToCartPrice.textContent = formatPrice(total);
-    if (elements.productPackBadge) elements.productPackBadge.textContent = `${weightLabel} kg${isWeekly ? '/wk' : ''}`;
+    if (elements.productPackBadge) {
+      elements.productPackBadge.textContent = isWeekly
+        ? `${formatWeight(quote.monthlyKg)} kg / month`
+        : `${weightLabel} kg`;
+    }
     if (elements.productQuantity) elements.productQuantity.textContent = selectedQuantity;
     if (elements.mobilePackLabel) {
       elements.mobilePackLabel.textContent = isWeekly
-        ? `${weightLabel} kg/wk · first month charged today`
+        ? `${weeklyLabel} · 4 deliveries covered`
         : `${weightLabel} kg · buy once`;
     }
     if (elements.mobilePackPrice) elements.mobilePackPrice.textContent = formatPrice(total);
     if (elements.weeklyPlanSelect) elements.weeklyPlanSelect.value = selectedWeeklyPlanId;
     if (elements.weeklyPlanSummary && isWeekly) {
-      elements.weeklyPlanSummary.textContent = `${weightLabel} kg/week · ${quote.monthlyKg.toFixed(2)} kg/month · ${formatPrice(quote.monthlyPrice)} charged today`;
+      elements.weeklyPlanSummary.textContent = `${formatWeight(quote.monthlyKg)} kg/month · ${weeklyDeliveryCycleText(quote.plan, { includeWeeks: true })} · ${formatPrice(quote.monthlyPrice)} minimum wallet balance`;
     }
     renderWeeklyCalculatorSuggestion();
 
@@ -1931,7 +2023,7 @@
       window.setTimeout(() => elements.weeklyPlanSelect?.focus({ preventScroll: true }), delay);
     }
     if (notify) {
-      announce(`${formatWeight(plan.weeklyKg)} kg per week plan selected for your household.`);
+      announce(`${weeklyPlanSelectionLabel(plan)} plan selected for your household.`);
     }
   }
 
@@ -1966,6 +2058,7 @@
       weightKg: plan.weeklyKg,
       weeklyKg: plan.weeklyKg,
       monthlyKg: plan.monthlyKg,
+      weeklyQuantityCycle: weeklyDeliveryCycle(plan),
       pricePerDelivery: plan.price,
       monthlyPrice: plan.monthlyPrice,
       quantity: selectedQuantity
@@ -1995,7 +2088,7 @@
         await refreshServerCart();
         invalidateCoupons({ reloadOpen: true });
         const selection = isWeekly
-          ? `${formatWeight(plan.weeklyKg)} kg weekly plan`
+          ? `${formatWeight(plan.monthlyKg)} kg/month weekly plan`
           : `${selectedWeight} kg pack`;
         announce(`${selectedQuantity} × ${selection} added to your secure bag.`);
         if (openAfter && !openCheckout()) {
@@ -2038,7 +2131,7 @@
     renderCart({ pulse: true });
     if (actualAdded > 0) {
       const selection = isWeekly
-        ? `${formatWeight(plan.weeklyKg)} kg weekly plan`
+        ? `${formatWeight(plan.monthlyKg)} kg/month weekly plan`
         : `${selectedWeight} kg pack`;
       announce(`${actualAdded} × ${selection} added to your bag.`);
     } else {
@@ -2076,18 +2169,18 @@
         </article>`;
     }
     const weightLabel = formatWeight(descriptor.weightKg);
-    const totalWeeklyWeight = formatWeight(descriptor.weightKg * item.quantity);
-    const totalMonthlyWeight = (descriptor.monthlyKg * item.quantity).toFixed(2);
+    const plan = WEEKLY_PLAN_BY_ID.get(item.planId) || descriptor;
+    const totalMonthlyWeight = formatWeight(descriptor.monthlyKg * item.quantity);
     const deliverySchedule = descriptor.deliveryDay
       ? descriptor.deliveryDay
       : 'Schedule selected at checkout';
     const schedule = isWeekly
-      ? `${totalMonthlyWeight} kg/month total · ${deliverySchedule}`
+      ? `${totalMonthlyWeight} kg/month · ${weeklyDeliveryCycleText(plan)} · ${deliverySchedule}`
       : 'One-time order';
     const priceContext = isWeekly
-      ? `${formatPrice(descriptor.price)}/week · ${formatPrice(descriptor.monthlyPrice)} charged for the first month`
+      ? `${formatPrice(descriptor.monthlyPrice)} wallet balance required for 4 deliveries`
       : `${formatPrice(descriptor.price)} each`;
-    const quantityLabel = isWeekly ? `${weightLabel} kg weekly plan` : `${weightLabel} kg pack`;
+    const quantityLabel = isWeekly ? `${weeklyPlanSelectionLabel(plan)} plan` : `${weightLabel} kg pack`;
 
     return `
       <article class="cart-item unified-bag-item" data-cart-id="${escapeHtml(item.id)}">
@@ -2099,7 +2192,7 @@
             <h3>${escapeHtml(PRODUCT.name)}</h3>
             <strong>${formatPrice(cartItemTotal(item))}</strong>
           </div>
-          <p class="cart-item-meta unified-bag-item-meta">${escapeHtml(isWeekly ? `${totalWeeklyWeight} kg/week total` : `${weightLabel} kg`)} · ${escapeHtml(schedule)} · ${escapeHtml(priceContext)}</p>
+          <p class="cart-item-meta unified-bag-item-meta">${escapeHtml(isWeekly ? weeklyPlanSelectionLabel(plan) : `${weightLabel} kg`)} · ${escapeHtml(schedule)} · ${escapeHtml(priceContext)}</p>
           <div class="cart-item-controls unified-bag-item-controls">
             <div class="cart-item-quantity unified-bag-quantity" aria-label="Quantity for ${escapeHtml(quantityLabel)}">
               <button type="button" data-cart-action="decrease" aria-label="Decrease ${escapeHtml(quantityLabel)} quantity">−</button>
@@ -2126,21 +2219,22 @@
         </div>`;
     }
     const isWeekly = item.purchaseType === 'weekly';
+    const plan = WEEKLY_PLAN_BY_ID.get(item.planId) || descriptor;
     const deliverySchedule = descriptor.deliveryDay
       ? descriptor.deliveryDay
       : 'Schedule selected at checkout';
     const schedule = isWeekly
-      ? `${(descriptor.monthlyKg * item.quantity).toFixed(2)} kg/month · 4 scheduled weekly deliveries · ${deliverySchedule} · first month charged today`
+      ? `${formatWeight(descriptor.monthlyKg * item.quantity)} kg/month · ${weeklyDeliveryCycleText(plan, { includeWeeks: true })} · ${deliverySchedule} · charged delivery by delivery`
       : 'Delivered once · no automatic repeat order';
     const summaryWeight = isWeekly
-      ? `${formatWeight(descriptor.weightKg * item.quantity)} kg every week`
+      ? weeklyPlanSelectionLabel(plan)
       : `${formatWeight(descriptor.weightKg)} kg Atulyash atta × ${item.quantity}`;
     return `
       <div class="checkout-summary-item" data-cart-id="${escapeHtml(item.id)}" data-purchase-type="${isWeekly ? 'weekly' : 'once'}">
         <div class="checkout-summary-item-image"><img src="${escapeHtml(PRODUCT.image)}" width="490" height="512" alt=""></div>
         <div><span class="checkout-summary-cadence">${isWeekly ? 'Weekly plan' : 'One-time purchase'}</span><strong>${escapeHtml(summaryWeight)}</strong><small>${escapeHtml(schedule)}</small></div>
         <div class="checkout-summary-item-aside">
-          <b><span class="checkout-summary-price-label">${isWeekly ? 'First month' : 'Line total'}</span>${formatPrice(cartItemTotal(item))}</b>
+          <b><span class="checkout-summary-price-label">${isWeekly ? '4-delivery wallet cover' : 'Line total'}</span>${formatPrice(cartItemTotal(item))}</b>
           <button class="checkout-summary-remove" type="button" data-cart-action="remove" aria-label="Remove ${escapeHtml(summaryWeight)} from your bag"><span aria-hidden="true">×</span><span>Remove</span></button>
         </div>
       </div>`;
@@ -2185,9 +2279,6 @@
     let walletPolicyDescription = 'This one-time order is debited once from your Atulyash Wallet. If the balance is low, you can add the exact shortfall first.';
 
     if (hasWeekly && !hasOneTime) {
-      const weeklyKg = weeklyItems.reduce((total, item) => (
-        total + (itemDescriptor(item).weightKg * item.quantity)
-      ), 0);
       const monthlyKg = weeklyItems.reduce((total, item) => (
         total + (itemDescriptor(item).monthlyKg * item.quantity)
       ), 0);
@@ -2195,20 +2286,20 @@
         total + (itemDescriptor(item).monthlyPrice * item.quantity)
       ), 0);
       title = 'Fresh weekly plan';
-      description = `${formatWeight(weeklyKg)} kg every week · ${monthlyKg.toFixed(2)} kg across 4 deliveries. ${formatPrice(monthlyCharge)} for the first month is debited from your wallet today.`;
+      description = `${formatWeight(monthlyKg)} kg across 4 scheduled deliveries. Keep at least ${formatPrice(monthlyCharge)} in your wallet; each delivery is charged when it is processed.`;
       deliveryTitle = 'Choose your weekly rhythm.';
       deliveryIntro = 'Select an address, your preferred weekly delivery day and an available starting date.';
-      consent = 'I confirm this 1-month weekly plan, its 4-delivery schedule, address and upfront Atulyash Wallet debit.';
-      walletPolicyTitle = 'First-month wallet payment';
-      walletPolicyDescription = `The full first month (${formatPrice(monthlyCharge)}) is debited from your Atulyash Wallet today and covers 4 scheduled weekly deliveries. If the balance is low, add the exact shortfall first.`;
+      consent = 'I confirm this 1-month weekly plan, its 4-delivery schedule, address and minimum wallet-balance requirement.';
+      walletPolicyTitle = 'Four-delivery wallet requirement';
+      walletPolicyDescription = `Keep at least ${formatPrice(monthlyCharge)} in your Atulyash Wallet to begin this plan. The wallet is charged delivery by delivery, not for the entire month at once.`;
     } else if (hasWeekly && hasOneTime) {
       title = 'One-time + weekly items';
-      description = 'One-time packs are charged once. Each weekly plan is charged for its full first month today and includes 4 scheduled deliveries.';
+      description = 'One-time packs are charged once. Each weekly plan needs enough wallet balance for four scheduled deliveries and is charged delivery by delivery.';
       deliveryTitle = 'Choose delivery for this bag.';
       deliveryIntro = 'Your one-time packs arrive on the selected date; weekly-plan packs follow your chosen weekly day from that date.';
       consent = 'I confirm the one-time order and 1-month weekly plan, their delivery schedules, address and Atulyash Wallet payment.';
-      walletPolicyTitle = 'Complete wallet payment';
-      walletPolicyDescription = 'Your wallet covers every one-time item plus the full first month of each weekly plan before this mixed order begins.';
+      walletPolicyTitle = 'Wallet requirement before delivery';
+      walletPolicyDescription = 'Your wallet covers the one-time items and the minimum four-delivery balance for each weekly plan before this mixed order begins.';
     }
 
     elements.checkoutPurchaseClarity.dataset.mode = mode;
@@ -2479,6 +2570,7 @@
     const subtotal = cartSubtotal();
     const credit = experienceCredit();
     const total = orderTotal();
+    const delivery = deliveryChargeQuote();
 
     if (elements.headerCartCount) {
       elements.headerCartCount.textContent = quantity;
@@ -2504,14 +2596,14 @@
       if (!hasWeekly) elements.checkoutDeliveryDay.value = '';
     }
     const subtotalLabel = cadence === 'weekly'
-      ? 'First-month plan subtotal'
+      ? 'Four-delivery wallet cover'
       : cadence === 'mixed'
         ? 'Bag subtotal'
         : 'Subtotal';
     const totalLabel = cadence === 'weekly'
-      ? 'Wallet debit today'
+      ? 'Minimum wallet balance'
       : cadence === 'mixed'
-        ? 'Wallet debit today'
+        ? 'Wallet needed to begin'
         : 'Order total';
     if (elements.cartSubtotalLabel) elements.cartSubtotalLabel.textContent = subtotalLabel;
     if (elements.checkoutSubtotalLabel) elements.checkoutSubtotalLabel.textContent = subtotalLabel;
@@ -2519,6 +2611,15 @@
     if (elements.checkoutExperienceCreditRow) elements.checkoutExperienceCreditRow.hidden = credit === 0;
     if (elements.cartExperienceCredit) elements.cartExperienceCredit.textContent = `−${formatPrice(credit)}`;
     if (elements.checkoutExperienceCredit) elements.checkoutExperienceCredit.textContent = `−${formatPrice(credit)}`;
+    [
+      [elements.cartDeliveryChargeRow, elements.cartDeliveryChargeLabel, elements.cartDeliveryCharge, elements.cartDeliveryChargeNote],
+      [elements.checkoutDeliveryChargeRow, elements.checkoutDeliveryChargeLabel, elements.checkoutDeliveryCharge, elements.checkoutDeliveryChargeNote]
+    ].forEach(([row, label, amount, note]) => {
+      if (row) row.hidden = cart.length === 0;
+      if (label) label.textContent = delivery.label;
+      if (amount) amount.textContent = delivery.requiresSupport ? 'Contact care' : delivery.amount === 0 ? 'Free' : formatPrice(delivery.amount);
+      if (note) note.textContent = delivery.note;
+    });
     if (elements.cartTotalLabel) elements.cartTotalLabel.textContent = totalLabel;
     if (elements.checkoutTotalLabel) elements.checkoutTotalLabel.textContent = totalLabel;
     if (elements.cartTotal) elements.cartTotal.textContent = formatPrice(total);
@@ -3308,6 +3409,7 @@
       address: document.getElementById('checkoutAddress'),
       building: document.getElementById('checkoutBuilding'),
       pincode: document.getElementById('checkoutPincode'),
+      area: document.getElementById('checkoutArea'),
       city: document.getElementById('checkoutCity'),
       state: document.getElementById('checkoutState'),
       deliveryDay: document.getElementById('checkoutDeliveryDay'),
@@ -3319,6 +3421,7 @@
       if (!fields.address.value.trim()) errors.push([fields.address, 'Please enter your house or flat number.']);
       if (!fields.building.value.trim()) errors.push([fields.building, 'Please enter the building, street or area.']);
       if (!/^\d{6}$/.test(fields.pincode.value.trim())) errors.push([fields.pincode, 'Enter a valid 6-digit PIN code.']);
+      if (!fields.area?.value.trim()) errors.push([fields.area, 'Please select your area.']);
       if (!fields.city.value.trim()) errors.push([fields.city, 'Please enter your city.']);
       if (!fields.state.value) errors.push([fields.state, 'Please select your state.']);
     }
@@ -3338,6 +3441,7 @@
       address?.house_name || address?.house_number,
       address?.tower_wing || address?.building,
       address?.landmark,
+      address?.area,
       address?.city,
       address?.state,
       address?.pincode
@@ -3371,6 +3475,53 @@
     }
     if (pincodeFromRecord(root)) return [root];
     return [];
+  }
+
+  function configuredAreasForPincode(pincode) {
+    const areas = SERVICEABILITY_AREAS[String(pincode)] || [];
+    return Array.isArray(areas) ? areas : [];
+  }
+
+  function renderCheckoutAreaOptions({ preserveValue = false } = {}) {
+    const field = elements.checkoutAreaField;
+    const select = elements.checkoutArea;
+    if (!field || !select) return [];
+    const pincode = String(elements.checkoutPincode?.value || '').replace(/\D/g, '').slice(0, 6);
+    const areas = /^\d{6}$/.test(pincode) ? configuredAreasForPincode(pincode) : [];
+    const selected = preserveValue ? select.value : '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+
+    if (!areas.length) {
+      placeholder.textContent = /^\d{6}$/.test(pincode)
+        ? 'No launch areas listed for this PIN code'
+        : 'Enter PIN code first';
+      select.replaceChildren(placeholder);
+      select.value = '';
+      select.disabled = true;
+      field.hidden = true;
+      field.inert = true;
+      return [];
+    }
+
+    placeholder.textContent = 'Select your area';
+    const options = areas
+      .slice()
+      .sort((a, b) => String(a.area).localeCompare(String(b.area)))
+      .map((entry) => {
+        const option = document.createElement('option');
+        option.value = entry.area;
+        option.textContent = entry.area;
+        return option;
+      });
+    select.replaceChildren(placeholder, ...options);
+    select.disabled = false;
+    field.hidden = false;
+    field.inert = false;
+    if (areas.some((entry) => entry.area === selected)) select.value = selected;
+    return areas;
   }
 
   function renderPincodeServiceability(state = 'idle', {
@@ -3409,6 +3560,25 @@
       });
       return false;
     }
+    const areas = configuredAreasForPincode(pincode);
+    if (!areas.length) {
+      checkedServiceabilityPincode = pincode;
+      checkedServiceabilityResult = false;
+      renderPincodeServiceability('error', {
+        title: 'We do not deliver here yet',
+        message: `PIN ${pincode} is not in the current Atulyash launch-area list.`
+      });
+      return false;
+    }
+    const area = String(elements.checkoutArea?.value || '').trim();
+    if (!areas.some((entry) => entry.area === area)) {
+      setFieldError(elements.checkoutArea, 'Please select your delivery area.');
+      renderPincodeServiceability('error', {
+        title: 'Choose your area',
+        message: 'Select the locality for this PIN code before checking delivery coverage.'
+      });
+      return false;
+    }
     if (!force && checkedServiceabilityPincode === pincode && checkedServiceabilityResult !== null) {
       return checkedServiceabilityResult;
     }
@@ -3435,7 +3605,7 @@
       if (matchingRecord) {
         renderPincodeServiceability('success', {
           title: 'Fresh-batch delivery is available',
-          message: `PIN ${pincode} is inside the current Atulyash delivery area.`
+          message: `${area}, ${pincode} is inside the current Atulyash delivery area.`
         });
         return true;
       }
@@ -3473,7 +3643,7 @@
     const result = await checkPincodeServiceability();
     if (result === true) return true;
     if (result === false) {
-      showCheckoutError('This PIN code is not currently serviceable. Please use another delivery address.');
+      showCheckoutError('This PIN code and area are not currently serviceable. Please use another delivery address.');
       return false;
     }
     showCheckoutError('We could not verify this PIN code from the live service. Check it again before saving the address.');
@@ -3492,6 +3662,7 @@
     if (enabled) {
       selectedAddressId = null;
       resetPincodeServiceability();
+      renderCheckoutAreaOptions();
       elements.checkoutAddressList
         ?.querySelectorAll('input[name="saved_address"]')
         .forEach((input) => { input.checked = false; });
@@ -3587,6 +3758,7 @@
     const house = fieldValue('checkoutAddress');
     const building = fieldValue('checkoutBuilding');
     const landmark = fieldValue('checkoutLandmark');
+    const area = fieldValue('checkoutArea');
     const city = fieldValue('checkoutCity');
     const state = fieldValue('checkoutState');
     const pincode = fieldValue('checkoutPincode');
@@ -3597,6 +3769,7 @@
       house_name: house,
       tower_wing: building,
       landmark,
+      area,
       city,
       state,
       country: 'IN',
@@ -3604,7 +3777,7 @@
       address_type: ['HOME', 'WORK', 'OTHER'].includes(fieldValue('checkoutAddressType').toUpperCase())
         ? fieldValue('checkoutAddressType').toUpperCase()
         : 'HOME',
-      full_address: [house, building, landmark, city, state, pincode].filter(Boolean).join(', '),
+      full_address: [house, building, landmark, area, city, state, pincode].filter(Boolean).join(', '),
       is_default: savedAddresses.length === 0
     };
   }
@@ -3835,9 +4008,10 @@
       .filter((item) => item.purchaseType === 'weekly')
       .forEach((weeklyItem) => {
       const descriptor = itemDescriptor(weeklyItem);
+      const plan = WEEKLY_PLAN_BY_ID.get(weeklyItem.planId) || descriptor;
       const deliveryDay = fieldValue('checkoutDeliveryDay') || descriptor.deliveryDay;
       const scheduleLine = document.createElement('span');
-      scheduleLine.textContent = `Weekly plan: ${formatWeight(descriptor.weightKg * weeklyItem.quantity)} kg every ${deliveryDay} for 1 month · starting ${selectedDeliveryDate}`;
+      scheduleLine.textContent = `Weekly plan: ${weeklyDeliveryCycleText(plan, { includeWeeks: true })} every ${deliveryDay} · starting ${selectedDeliveryDate} · charged delivery by delivery.`;
       reviewLines.push(scheduleLine);
     });
     elements.checkoutReviewAddress.replaceChildren(...reviewLines);
@@ -3878,13 +4052,13 @@
   }
 
   function walletRequiredBalance() {
-    return Math.max(0, cartSubtotal() - experienceCredit());
+    return orderTotal();
   }
 
   function syncWalletOrderAvailability() {
     if (!elements.placeOrderButton) return;
     const shortfall = walletShortfall();
-    const blocked = orderInFlight || (!pendingOrder && (cart.length === 0 ||
+    const blocked = orderInFlight || (!pendingOrder && (cart.length === 0 || deliveryChargeQuote().requiresSupport ||
       !Number.isFinite(checkoutWalletBalanceAmount) || shortfall > 0 || couponDiscountPending()
     ));
     elements.placeOrderButton.disabled = blocked;
@@ -3905,11 +4079,11 @@
     const balance = checkoutWalletBalanceAmount;
     const shortfall = walletShortfall();
     if (elements.checkoutWalletOrderLabel) {
-      elements.checkoutWalletOrderLabel.textContent = hasWeekly ? 'First-month debit' : 'Order total';
+      elements.checkoutWalletOrderLabel.textContent = hasWeekly ? 'Minimum wallet balance' : 'Order total';
     }
     if (elements.checkoutWalletOrderTotal) elements.checkoutWalletOrderTotal.textContent = formatPrice(total);
     if (elements.checkoutWalletRequirementRow) elements.checkoutWalletRequirementRow.hidden = !hasWeekly;
-    if (elements.checkoutWalletRequirementLabel) elements.checkoutWalletRequirementLabel.textContent = 'Plan covers';
+    if (elements.checkoutWalletRequirementLabel) elements.checkoutWalletRequirementLabel.textContent = 'Minimum recharge policy';
     if (elements.checkoutWalletRequirement) elements.checkoutWalletRequirement.textContent = '4 deliveries';
 
     elements.checkoutWalletShortfallRow.hidden = true;
@@ -3946,7 +4120,7 @@
       elements.checkoutWalletExplanation.textContent = walletRechargeVerificationPending
         ? 'A wallet recharge is awaiting confirmation. Refresh the balance before attempting another payment.'
         : hasWeekly
-          ? `Add ${formatPrice(rechargeAmount)} so your wallet can cover the complete first month of this weekly plan.`
+          ? `Add ${formatPrice(rechargeAmount)} so your wallet meets the minimum balance for the next four scheduled deliveries.`
           : `Add ${formatPrice(rechargeAmount)} so your wallet can cover this order.`;
       elements.checkoutPaymentStatus.textContent = walletRechargeVerificationPending
         ? 'Do not recharge again yet. Refresh your wallet balance or contact Atulyash support.'
@@ -3957,10 +4131,10 @@
       elements.checkoutWalletState.textContent = 'Ready';
       elements.checkoutWalletBalance.textContent = formatPrice(balance);
       elements.checkoutWalletExplanation.textContent = hasWeekly
-        ? 'Your verified wallet balance covers the complete first month of this weekly plan.'
+        ? 'Your verified wallet balance meets the minimum recharge policy for the next four scheduled deliveries. Each delivery is charged only when it is processed.'
         : 'Your verified wallet balance covers this order.';
       elements.checkoutPaymentStatus.textContent = hasWeekly
-        ? `${formatPrice(total)} will be debited today for the first month and covers 4 scheduled weekly deliveries.`
+        ? `${formatPrice(total)} is the required wallet balance for four scheduled deliveries. Your wallet is charged delivery by delivery.`
         : 'The final amount will be debited only from your Atulyash Wallet.';
       if (walletRechargePreview) resetWalletRechargePreview();
     }
@@ -4131,7 +4305,7 @@
       if (amount <= 0) {
         resetWalletRechargePreview();
         announce(cart.some((item) => item.purchaseType === 'weekly')
-          ? 'Your Atulyash Wallet already covers the complete first month.'
+          ? 'Your Atulyash Wallet already meets the four-delivery minimum balance.'
           : 'Your Atulyash Wallet already covers this order.');
         return;
       }
@@ -4541,7 +4715,7 @@
       }
 
       setAsyncButton(elements.placeOrderButton, true, 'Placing order…', checkoutOrderActionLabel());
-      if (elements.checkoutPlaceOrderStatusLabel) elements.checkoutPlaceOrderStatusLabel.textContent = 'Debiting your wallet and creating the order…';
+      if (elements.checkoutPlaceOrderStatusLabel) elements.checkoutPlaceOrderStatusLabel.textContent = 'Creating your order from your Atulyash Wallet…';
       const placementAttempt = {
         stage: 'placing',
         paymentMethod,
@@ -4672,13 +4846,13 @@
       && selectedWeeklyPlanId === plan.id
     );
     label.textContent = 'Your calculator suggestion';
-    title.textContent = `${formatWeight(plan.weeklyKg)} kg each week`;
-    text.textContent = `Covers your ${weeklyKg.toFixed(2)} kg/week estimate from ${dailyRotis} rotis a day${buffer ? ` with ${buffer}% extra` : ''} · ${formatPrice(plan.price)}/week.`;
+    title.textContent = `${formatWeight(plan.monthlyKg)} kg/month · ${weeklyPlanSelectionLabel(plan)}`;
+    text.textContent = `Covers your ${weeklyKg.toFixed(2)} kg/week estimate from ${dailyRotis} rotis a day${buffer ? ` with ${buffer}% extra` : ''}. ${weeklyDeliveryCycleText(plan, { includeWeeks: true })}.`;
     applyButton.hidden = false;
     applyButton.disabled = suggestionIsSelected;
     applyButton.firstChild.textContent = suggestionIsSelected
       ? 'Suggested plan selected '
-      : `Use ${formatWeight(plan.weeklyKg)} kg/week plan `;
+      : `Use ${formatWeight(plan.monthlyKg)} kg/month plan `;
     const arrow = applyButton.querySelector('[aria-hidden="true"]');
     if (arrow) arrow.textContent = suggestionIsSelected ? '✓' : '→';
   }
@@ -4689,7 +4863,7 @@
     elements.calculatorCta.disabled = !available;
     elements.calculatorCta.setAttribute('aria-disabled', String(!available));
     const label = available
-      ? `Choose ${formatWeight(recommendation.plan.weeklyKg)} kg weekly plan `
+      ? `Choose ${formatWeight(recommendation.plan.monthlyKg)} kg/month plan `
       : 'Choose my weekly plan ';
     const arrow = document.createElement('span');
     arrow.setAttribute('aria-hidden', 'true');
@@ -4758,7 +4932,7 @@
 
     calculatorRecommendation = { plan, dailyRotis, buffer, weeklyKg, fourWeekKg };
     if (elements.closestPackOutput) {
-      elements.closestPackOutput.textContent = `Recommended live plan: ${formatWeight(plan.weeklyKg)} kg/week · ${formatPrice(plan.price)}/week`;
+      elements.closestPackOutput.textContent = `Recommended live plan: ${formatWeight(plan.monthlyKg)} kg/month · ${weeklyDeliveryCycleText(plan)}.`;
     }
     setCalculatorCta(calculatorRecommendation);
     return calculatorRecommendation;
@@ -4927,8 +5101,15 @@
   elements.checkoutPincode?.addEventListener('input', (event) => {
     event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
     if (event.target.value !== checkedServiceabilityPincode) resetPincodeServiceability();
+    renderCheckoutAreaOptions();
     event.target.removeAttribute('aria-invalid');
     event.target.closest('.checkout-field')?.classList.remove('has-error');
+    const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
+    if (error) error.textContent = '';
+  });
+  elements.checkoutArea?.addEventListener('change', (event) => {
+    resetPincodeServiceability();
+    event.target.removeAttribute('aria-invalid');
     const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
     if (error) error.textContent = '';
   });

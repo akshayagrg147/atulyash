@@ -306,27 +306,27 @@
               </div>
 
               <div class="quick-weekly-fields" id="quickOrderWeeklyFields" hidden>
-                <div class="quick-order-step compact">
+                  <div class="quick-order-step compact">
                   <span>02</span>
-                  <div><strong>How much atta do you need each week?</strong><small>Choose the weekly quantity. You will select the delivery day during checkout.</small></div>
+                  <div><strong>How much atta does your home need each month?</strong><small>Every delivery is packed in whole kilograms. You will select the delivery day during checkout.</small></div>
                 </div>
-                <label class="quick-select-field" for="quickOrderPlan">Weekly quantity
+                <label class="quick-select-field" for="quickOrderPlan">Monthly household need
                   <select id="quickOrderPlan" name="quickOrderPlan" disabled>
                     <option value="" selected disabled>Loading live weekly plans…</option>
                   </select>
                 </label>
                 <section class="weekly-choice-summary" id="weeklyChoiceSummary" aria-label="Selected weekly plan" aria-live="polite" hidden>
                   <div class="weekly-choice-heading">
-                    <div><span>Your plan</span><strong><b id="weeklyChoiceQuantity">—</b> every week</strong><small id="weeklyChoiceCoverage">— across the first four deliveries</small></div>
+                    <div><span>Your weekly rhythm</span><strong><b id="weeklyChoiceQuantity">—</b></strong><small id="weeklyChoiceCoverage">— across four deliveries</small></div>
                     <span class="weekly-choice-live"><i></i> Live plan</span>
                   </div>
                   <div class="weekly-choice-prices">
                     <div><span>Each weekly delivery</span><strong id="weeklyChoicePerDelivery">—</strong><small>Price for one delivery</small></div>
-                    <div><span>Paid when plan starts</span><strong id="weeklyChoiceFirstMonth">—</strong><small>Covers the first 4 deliveries</small></div>
+                    <div><span>Minimum wallet balance</span><strong id="weeklyChoiceFirstMonth">—</strong><small>Required before the plan begins</small></div>
                   </div>
                   <div class="weekly-choice-explanation">
                     <span aria-hidden="true">✓</span>
-                    <p><strong>One clear first payment</strong><small id="weeklyChoicePaymentCopy">Your first-month payment covers four weekly deliveries.</small></p>
+                    <p><strong>Four-delivery wallet cover</strong><small id="weeklyChoicePaymentCopy">Keep enough balance for four deliveries. Your wallet is charged only when each delivery is processed.</small></p>
                   </div>
                 </section>
                 <details class="quick-calculator" id="accountCalculatorDetails">
@@ -349,16 +349,18 @@
                       </div>
                       <fieldset class="account-buffer-options">
                         <legend>Extra atta for other favourites</legend>
-                        <label><input type="radio" name="accountAttaBuffer" value="0" checked><span><strong>No extra</strong><small>Mostly rotis</small></span></label>
-                        <label><input type="radio" name="accountAttaBuffer" value="10"><span><strong>+10%</strong><small>Occasional extras</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="10" checked><span><strong>+10%</strong><small>Minimum extra</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="15"><span><strong>+15%</strong><small>Occasional extras</small></span></label>
                         <label><input type="radio" name="accountAttaBuffer" value="20"><span><strong>+20%</strong><small>Frequent extras</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="25"><span><strong>+25%</strong><small>Busy weeks</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="30"><span><strong>+30%</strong><small>Lots of extras</small></span></label>
                       </fieldset>
                     </div>
                     <div class="account-calculator-result" aria-live="polite">
                       <span>Your estimated requirement</span>
-                      <strong id="accountCalculatorKg">1.68 <small>kg/week</small></strong>
+                      <strong id="accountCalculatorKg">1.85 <small>kg/week</small></strong>
                       <p id="accountCalculatorPlan">Finding the closest live weekly plan…</p>
-                      <small id="accountCalculatorFormula">8 rotis × 30 g × 7 days</small>
+                      <small id="accountCalculatorFormula">8 rotis × 30 g × 7 days + 10% extra</small>
                     </div>
                   </article>
                 </details>
@@ -643,6 +645,7 @@
   <div class="sr-only" id="globalStatus" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="api-client.js?v=20260801-7"></script>
-  <script src="account.js?v=20260802-22"></script>
+  <script src="serviceability-areas.js?v=20260807-1"></script>
+  <script src="account.js?v=20260807-2"></script>
 </body>
 </html>

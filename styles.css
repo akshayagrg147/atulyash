@@ -449,7 +449,7 @@ h3 {
 .hero-lead {
   max-width: 590px;
   margin-bottom: 34px;
-  color: rgba(255, 253, 248, 0.76);
+  color: rgba(255, 253, 248, 0.9);
   font-size: clamp(1rem, 1.35vw, 1.15rem);
 }
 
@@ -3529,6 +3529,82 @@ h3 {
   }
 }
 
+/* Reviewer revision — keep the hero message calm and move the decision
+   actions into their own clear horizontal next step. */
+.hero-journey {
+  position: relative;
+  z-index: 3;
+  padding: 24px 0;
+  background: var(--cream-50);
+  border-bottom: 1px solid rgba(17, 55, 46, 0.12);
+}
+
+.hero-journey-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.hero-journey p {
+  margin: 0 0 5px;
+  color: var(--forest-950);
+  font-family: var(--serif);
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.05;
+}
+
+.hero-journey small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.hero-journey .hero-actions-client {
+  justify-content: flex-end;
+}
+
+.hero-journey .button-primary {
+  color: var(--cream-50);
+  background: var(--forest-900);
+  border-color: var(--forest-900);
+}
+
+.hero-journey .text-action {
+  color: var(--forest-800);
+}
+
+@media (max-width: 780px) {
+  .hero-journey-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hero-journey .hero-actions-client {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 680px) {
+  .hero-journey {
+    padding: 21px 0;
+  }
+
+  .hero-journey .hero-actions-client {
+    gap: 13px;
+  }
+
+  .hero-journey .hero-actions-client .button,
+  .hero-journey .hero-actions-client .text-action {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .calculator-buffer-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 360px) {
   .header-cta {
     display: none;
@@ -3854,6 +3930,10 @@ h3 {
   font-size: clamp(4rem, 7vw, 6.7rem);
 }
 
+.signature-orbit-heading h2 span {
+  display: block;
+}
+
 .signature-orbit-heading > p:last-child {
   margin: 10px 0 0;
   color: rgba(255, 253, 248, 0.62);
@@ -3928,8 +4008,8 @@ h3 {
 .orbit-core-veer img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center 7%;
+  object-fit: contain;
+  object-position: center bottom;
 }
 
 .orbit-core-veer p {
@@ -5014,10 +5094,10 @@ h3 {
 }
 
 .orbit-core-veer img {
-  width: 108%;
-  height: 108%;
+  width: 96%;
+  height: 96%;
   max-width: none;
-  object-position: center 5%;
+  object-position: center bottom;
 }
 
 .calculator-plan-field {

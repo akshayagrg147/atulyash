@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260730-4">
-  <link rel="stylesheet" href="ecommerce.css?v=20260802-14">
+  <link rel="stylesheet" href="ecommerce.css?v=20260807-2">
   <link rel="stylesheet" href="checkout-page.css?v=20260802-5">
 </head>
 <body class="checkout-page checkout-handoff-open" data-commerce-page="checkout">
@@ -187,6 +187,13 @@
                     <label class="checkout-field">
                       <span>PIN code</span>
                       <input id="checkoutPincode" name="pincode" type="text" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{6}" maxlength="6" required>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field" id="checkoutAreaField" hidden>
+                      <span>Area</span>
+                      <select id="checkoutArea" name="area" required disabled>
+                        <option value="">Enter PIN code first</option>
+                      </select>
                       <small class="field-error"></small>
                     </label>
                     <label class="checkout-field">
@@ -380,6 +387,7 @@
             <div class="checkout-summary-items" id="checkoutSummaryItems"></div>
             <div class="checkout-summary-total"><span id="checkoutSubtotalLabel">Subtotal</span><strong id="checkoutSubtotal">₹0</strong></div>
             <div class="checkout-summary-credit" id="checkoutExperienceCreditRow" hidden><span id="checkoutDiscountLabel">Your first Atulyash experience</span><strong id="checkoutExperienceCredit">−₹100</strong></div>
+            <div class="checkout-summary-delivery" id="checkoutDeliveryChargeRow"><span id="checkoutDeliveryChargeLabel">Delivery charge</span><strong id="checkoutDeliveryCharge">₹0</strong></div>
             <section class="commerce-offers" id="couponOffer" aria-labelledby="couponOfferTitle">
               <button class="commerce-offers-toggle" id="couponToggleButton" type="button" aria-expanded="false" aria-controls="couponPanel">
                 <span class="commerce-offers-mark" aria-hidden="true">%</span>
@@ -396,7 +404,7 @@
               </div>
             </section>
             <div class="checkout-summary-grand-total"><span id="checkoutTotalLabel">Total after credit</span><strong id="checkoutTotal">₹0</strong></div>
-            <small>No delivery charges. The final fresh-batch schedule is confirmed after address review.</small>
+            <small id="checkoutDeliveryChargeNote">Delivery charges are based on your one-time pack weight. Scheduled subscription deliveries are always free.</small>
           </aside>
         </div>
       </div>
@@ -406,6 +414,7 @@
   <div class="commerce-toast" id="commerceToast" role="status" aria-live="polite" aria-atomic="true"></div>
   <noscript><p class="checkout-noscript">JavaScript is required for secure checkout. <a href="index.html#shop">Return to your bag</a>.</p></noscript>
   <script src="api-client.js?v=20260801-7"></script>
-  <script src="ecommerce.js?v=20260802-12"></script>
+  <script src="serviceability-areas.js?v=20260807-1"></script>
+  <script src="ecommerce.js?v=20260807-2"></script>
 </body>
 </html>

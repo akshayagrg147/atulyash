@@ -6,6 +6,7 @@
   --cream-50: #fffdf8;
   --cream-100: #f7f1e6;
   --cream-200: #ede2cf;
+  --wheat-200: #eedba9;
   --wheat-300: #dec58f;
   --wheat-400: #cba65d;
   --rust-500: #b84f31;
@@ -1843,9 +1844,9 @@ h3 {
 
 .weekly-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.74fr);
-  align-items: center;
-  gap: clamp(55px, 10vw, 140px);
+  grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.92fr);
+  align-items: start;
+  gap: clamp(42px, 6vw, 88px);
 }
 
 .weekly-copy h2 {
@@ -5318,14 +5319,18 @@ h3 {
 }
 
 .way-answer span {
-  width: max-content;
+  width: fit-content;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   min-height: 34px;
   padding: 7px 11px;
-  color: var(--wheat-200);
+  color: var(--cream-50);
   background: var(--forest-900);
-  border: 1px solid rgba(17, 55, 46, 0.16);
+  border: 1px solid rgba(255, 253, 248, 0.2);
+  font-family: var(--sans);
+  line-height: 1.2;
+  text-shadow: none;
 }
 
 .compromise-card-dark .way-answer span {

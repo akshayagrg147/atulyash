@@ -5,7 +5,7 @@
   const STOREFRONT_INTENT_KEY = 'atulyash-storefront-intent-v1';
   const CHECKOUT_CONTEXT_KEY = 'atulyash-checkout-context-v1';
   const CART_STORAGE_KEY = 'atulyash-cart-v1';
-  const SERVICEABILITY_AREAS = window.AtulyashServiceabilityAreas || Object.freeze({});
+  const GOOGLE_AREA_LOOKUP = window.AtulyashGoogleAreaLookup || null;
   const currency = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -2741,6 +2741,8 @@
       fields.append(label);
     });
     const pincodeInput = fields.querySelector('input[name="pincode"]');
+    const cityInput = fields.querySelector('input[name="city"]');
+    const stateInput = fields.querySelector('input[name="state"]');
     const areaLabel = create('label', '', 'Area');
     const areaSelect = create('select');
     areaSelect.name = 'area';
@@ -2751,34 +2753,6 @@
     areaLabel.append(areaSelect);
     fields.append(areaLabel);
     const initialArea = String(firstValue(address?.area, address?.locality, ''));
-
-    const populateAreas = ({ preserveValue = false } = {}) => {
-      const pincode = String(pincodeInput?.value || '').replace(/\D/g, '').slice(0, 6);
-      if (pincodeInput) pincodeInput.value = pincode;
-      const areas = /^\d{6}$/.test(pincode) && Array.isArray(SERVICEABILITY_AREAS[pincode])
-        ? SERVICEABILITY_AREAS[pincode]
-        : [];
-      const selected = preserveValue ? (areaSelect.value || initialArea) : '';
-      const placeholder = create('option', '', areas.length ? 'Select your area' : 'Enter a launch PIN code first');
-      placeholder.value = '';
-      placeholder.disabled = true;
-      placeholder.selected = true;
-      const options = areas
-        .slice()
-        .sort((a, b) => String(a.area).localeCompare(String(b.area)))
-        .map((entry) => {
-          const option = create('option', '', entry.area);
-          option.value = entry.area;
-          return option;
-        });
-      areaSelect.replaceChildren(placeholder, ...options);
-      areaSelect.disabled = !areas.length;
-      areaLabel.hidden = !areas.length;
-      areaLabel.inert = !areas.length;
-      if (areas.some((entry) => entry.area === selected)) areaSelect.value = selected;
-      return areas;
-    };
-    populateAreas({ preserveValue: true });
     const serviceabilityNotice = create('div', 'address-serviceability-notice');
     serviceabilityNotice.hidden = true;
     serviceabilityNotice.setAttribute('role', 'alert');
@@ -2789,15 +2763,94 @@
     serviceabilityNotice.append(create('span', 'address-serviceability-mark', '!'), serviceabilityContent);
     fields.append(serviceabilityNotice);
 
+    let areaLookupRequest = 0;
+    const showAreaLookupNotice = (title, message) => {
+      serviceabilityTitle.textContent = title;
+      serviceabilityCopy.textContent = message;
+      serviceabilityNotice.hidden = false;
+    };
+    const resetAreaOptions = (message = 'Enter a six-digit PIN code first') => {
+      const placeholder = create('option', '', message);
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      areaSelect.replaceChildren(placeholder);
+      areaSelect.disabled = true;
+      areaSelect.value = '';
+      areaLabel.hidden = true;
+      areaLabel.inert = true;
+    };
+    const renderGoogleAreas = (result) => {
+      const areas = [...new Set((result?.areas || []).map((area) => String(area || '').trim()).filter(Boolean))];
+      if (!areas.length) {
+        resetAreaOptions('Google could not identify an area');
+        return '';
+      }
+      const current = areaSelect.value;
+      const selected = areas.includes(current)
+        ? current
+        : (areas.includes(initialArea) ? initialArea : (areas.includes(result?.selectedArea) ? result.selectedArea : areas[0]));
+      const options = areas.map((area) => create('option', '', area));
+      options.forEach((option) => { option.value = option.textContent; });
+      areaSelect.replaceChildren(...options);
+      areaSelect.disabled = false;
+      areaSelect.value = selected;
+      areaLabel.hidden = false;
+      areaLabel.inert = false;
+      if (result?.city && cityInput && !cityInput.value.trim()) cityInput.value = result.city;
+      if (result?.state && stateInput && !stateInput.value.trim()) stateInput.value = result.state;
+      return selected;
+    };
     const clearServiceabilityError = () => {
       if (!pincodeInput) return;
       pincodeInput.removeAttribute('aria-invalid');
       pincodeInput.setCustomValidity('');
       serviceabilityNotice.hidden = true;
     };
+    const lookupAreaFromPincode = async () => {
+      const pincode = String(pincodeInput?.value || '').replace(/\D/g, '').slice(0, 6);
+      if (pincodeInput) pincodeInput.value = pincode;
+      const request = ++areaLookupRequest;
+      if (!/^\d{6}$/.test(pincode)) {
+        resetAreaOptions();
+        return;
+      }
+      if (!GOOGLE_AREA_LOOKUP?.isConfigured?.()) {
+        resetAreaOptions('Area lookup is unavailable');
+        showAreaLookupNotice('Area lookup is unavailable', 'Google area lookup is not configured. Please try again later.');
+        return;
+      }
+      const loading = create('option', '', 'Finding your area…');
+      loading.value = '';
+      loading.disabled = true;
+      loading.selected = true;
+      areaSelect.replaceChildren(loading);
+      areaSelect.disabled = true;
+      areaLabel.hidden = false;
+      areaLabel.inert = false;
+      try {
+        const result = await GOOGLE_AREA_LOOKUP.lookupIndianPincode(pincode);
+        if (request !== areaLookupRequest || pincode !== String(pincodeInput?.value || '')) return;
+        const area = renderGoogleAreas(result);
+        if (!area) throw new Error('Google could not identify an area for this PIN code.');
+        serviceabilityNotice.hidden = true;
+      } catch (error) {
+        if (request !== areaLookupRequest) return;
+        resetAreaOptions('Area could not be identified');
+        showAreaLookupNotice('Area could not be identified', error?.message || 'Please check the PIN code and try again.');
+      }
+    };
+    if (/^\d{6}$/.test(String(pincodeInput?.value || ''))) {
+      if (initialArea) {
+        renderGoogleAreas({ areas: [initialArea], selectedArea: initialArea });
+      }
+      void lookupAreaFromPincode();
+    } else {
+      resetAreaOptions();
+    }
     pincodeInput?.addEventListener('input', () => {
       clearServiceabilityError();
-      populateAreas();
+      void lookupAreaFromPincode();
     });
 
     const typeLabel = create('label', '', 'Address type');
@@ -2827,11 +2880,11 @@
       try {
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
-        const eligibleAreas = Array.isArray(SERVICEABILITY_AREAS[payload.pincode])
-          ? SERVICEABILITY_AREAS[payload.pincode]
-          : [];
-        if (!eligibleAreas.some((entry) => entry.area === payload.area)) {
-          throw new Error('Choose a listed delivery area for this PIN code before saving the address.');
+        if (!String(payload.area || '').trim()) {
+          showAreaLookupNotice('Area needed', 'Wait for Google to identify the area for this PIN code, then try again.');
+          areaSelect.focus({ preventScroll: true });
+          setButtonBusy(submit, false);
+          return;
         }
         const activeSession = methodFrom('auth', ['getSession'])?.() || methodFrom(null, ['getSession'])?.() || {};
         payload.customer = firstValue(state.customerId, activeSession.customerId, activeSession.customer_id);

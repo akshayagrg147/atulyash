@@ -27,7 +27,7 @@
   const COUPON_CONTEXT_KEY = 'atulyash-coupon-context-v1';
   const CHECKOUT_CONTEXT_TTL = 2 * 60 * 60 * 1000;
   const API = window.AtulyashAPI || null;
-  const SERVICEABILITY_AREAS = window.AtulyashServiceabilityAreas || Object.freeze({});
+  const GOOGLE_AREA_LOOKUP = window.AtulyashGoogleAreaLookup || null;
   const currency = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -299,6 +299,7 @@
   let pincodeCheckInFlight = false;
   let checkedServiceabilityPincode = '';
   let checkedServiceabilityResult = null;
+  let checkoutAreaLookupRequest = 0;
   let accountHandoffActive = false;
   let checkoutReturnUrl = '';
   let cartReturnUrl = '';
@@ -3419,9 +3420,9 @@
 
     if (!selectedAddressId) {
       if (!fields.address.value.trim()) errors.push([fields.address, 'Please enter your house or flat number.']);
-      if (!fields.building.value.trim()) errors.push([fields.building, 'Please enter the building, street or area.']);
+      if (!fields.building.value.trim()) errors.push([fields.building, 'Please enter the building or street.']);
       if (!/^\d{6}$/.test(fields.pincode.value.trim())) errors.push([fields.pincode, 'Enter a valid 6-digit PIN code.']);
-      if (!fields.area?.value.trim()) errors.push([fields.area, 'Please select your area.']);
+      if (!fields.area?.value.trim()) errors.push([fields.area, 'We could not identify your area. Check the PIN code again.']);
       if (!fields.city.value.trim()) errors.push([fields.city, 'Please enter your city.']);
       if (!fields.state.value) errors.push([fields.state, 'Please select your state.']);
     }
@@ -3477,51 +3478,110 @@
     return [];
   }
 
-  function configuredAreasForPincode(pincode) {
-    const areas = SERVICEABILITY_AREAS[String(pincode)] || [];
-    return Array.isArray(areas) ? areas : [];
-  }
-
-  function renderCheckoutAreaOptions({ preserveValue = false } = {}) {
+  function resetCheckoutAreaOptions(message = 'Enter a six-digit PIN code first') {
     const field = elements.checkoutAreaField;
     const select = elements.checkoutArea;
-    if (!field || !select) return [];
-    const pincode = String(elements.checkoutPincode?.value || '').replace(/\D/g, '').slice(0, 6);
-    const areas = /^\d{6}$/.test(pincode) ? configuredAreasForPincode(pincode) : [];
-    const selected = preserveValue ? select.value : '';
+    if (!field || !select) return;
     const placeholder = document.createElement('option');
     placeholder.value = '';
+    placeholder.textContent = message;
     placeholder.disabled = true;
     placeholder.selected = true;
+    select.replaceChildren(placeholder);
+    select.disabled = true;
+    select.value = '';
+    field.hidden = true;
+    field.inert = true;
+  }
 
+  function renderCheckoutGoogleAreas(result) {
+    const field = elements.checkoutAreaField;
+    const select = elements.checkoutArea;
+    if (!field || !select) return '';
+    const areas = [...new Set((result?.areas || []).map((area) => String(area || '').trim()).filter(Boolean))];
     if (!areas.length) {
-      placeholder.textContent = /^\d{6}$/.test(pincode)
-        ? 'No launch areas listed for this PIN code'
-        : 'Enter PIN code first';
-      select.replaceChildren(placeholder);
-      select.value = '';
-      select.disabled = true;
-      field.hidden = true;
-      field.inert = true;
-      return [];
+      resetCheckoutAreaOptions('Google could not identify an area');
+      return '';
     }
-
-    placeholder.textContent = 'Select your area';
-    const options = areas
-      .slice()
-      .sort((a, b) => String(a.area).localeCompare(String(b.area)))
-      .map((entry) => {
-        const option = document.createElement('option');
-        option.value = entry.area;
-        option.textContent = entry.area;
-        return option;
-      });
-    select.replaceChildren(placeholder, ...options);
+    const current = select.value;
+    const selected = areas.includes(current) ? current : (areas.includes(result?.selectedArea) ? result.selectedArea : areas[0]);
+    const options = areas.map((area) => {
+      const option = document.createElement('option');
+      option.value = area;
+      option.textContent = area;
+      return option;
+    });
+    select.replaceChildren(...options);
     select.disabled = false;
+    select.value = selected;
     field.hidden = false;
     field.inert = false;
-    if (areas.some((entry) => entry.area === selected)) select.value = selected;
-    return areas;
+    return selected;
+  }
+
+  function setGoogleAddressContext(result) {
+    const city = String(result?.city || '').trim();
+    const state = String(result?.state || '').trim();
+    const cityField = document.getElementById('checkoutCity');
+    const stateField = document.getElementById('checkoutState');
+    if (city && cityField && !cityField.value.trim()) cityField.value = city;
+    if (state && stateField && !stateField.value.trim()) {
+      const option = [...stateField.options].find((entry) => entry.value.localeCompare(state, 'en', { sensitivity: 'accent' }) === 0);
+      if (option) stateField.value = option.value;
+    }
+  }
+
+  async function lookupCheckoutArea(pincode) {
+    const normalizedPincode = String(pincode || '').replace(/\D/g, '').slice(0, 6);
+    const request = ++checkoutAreaLookupRequest;
+    if (!/^\d{6}$/.test(normalizedPincode)) {
+      resetCheckoutAreaOptions();
+      return null;
+    }
+    if (!GOOGLE_AREA_LOOKUP?.isConfigured?.()) {
+      resetCheckoutAreaOptions('Area lookup is unavailable');
+      renderPincodeServiceability('error', {
+        title: 'Area lookup is unavailable',
+        message: 'Google area lookup is not configured. Please try again later.'
+      });
+      return null;
+    }
+
+    const field = elements.checkoutAreaField;
+    const select = elements.checkoutArea;
+    if (field && select) {
+      const loadingOption = document.createElement('option');
+      loadingOption.value = '';
+      loadingOption.textContent = 'Finding your area…';
+      loadingOption.disabled = true;
+      loadingOption.selected = true;
+      select.replaceChildren(loadingOption);
+      select.disabled = true;
+      field.hidden = false;
+      field.inert = false;
+    }
+    renderPincodeServiceability('checking', {
+      title: 'Finding your area',
+      message: `Looking up the locality for PIN ${normalizedPincode}…`
+    });
+
+    try {
+      const result = await GOOGLE_AREA_LOOKUP.lookupIndianPincode(normalizedPincode);
+      if (request !== checkoutAreaLookupRequest || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return null;
+      const area = renderCheckoutGoogleAreas(result);
+      if (!area) throw new Error('Google could not identify an area for this PIN code.');
+      setGoogleAddressContext(result);
+      await checkPincodeServiceability({ force: true });
+      return result;
+    } catch (error) {
+      if (request !== checkoutAreaLookupRequest) return null;
+      resetCheckoutAreaOptions('Area could not be identified');
+      renderPincodeServiceability('error', {
+        title: 'Area could not be identified',
+        message: error?.message || 'Please check the PIN code and try again.'
+      });
+      return null;
+    }
   }
 
   function renderPincodeServiceability(state = 'idle', {
@@ -3560,22 +3620,12 @@
       });
       return false;
     }
-    const areas = configuredAreasForPincode(pincode);
-    if (!areas.length) {
-      checkedServiceabilityPincode = pincode;
-      checkedServiceabilityResult = false;
-      renderPincodeServiceability('error', {
-        title: 'We do not deliver here yet',
-        message: `PIN ${pincode} is not in the current Atulyash launch-area list.`
-      });
-      return false;
-    }
     const area = String(elements.checkoutArea?.value || '').trim();
-    if (!areas.some((entry) => entry.area === area)) {
-      setFieldError(elements.checkoutArea, 'Please select your delivery area.');
+    if (!area) {
+      setFieldError(elements.checkoutArea, 'We could not identify your area. Check the PIN code again.');
       renderPincodeServiceability('error', {
-        title: 'Choose your area',
-        message: 'Select the locality for this PIN code before checking delivery coverage.'
+        title: 'Area needed',
+        message: 'Wait for Google to identify the area for this PIN code.'
       });
       return false;
     }
@@ -3586,7 +3636,7 @@
 
     pincodeCheckInFlight = true;
     renderPincodeServiceability('checking', {
-      title: 'Checking your area',
+      title: 'Checking your PIN code',
       message: `Confirming live Atulyash delivery coverage for ${pincode}…`
     });
     try {
@@ -3643,7 +3693,7 @@
     const result = await checkPincodeServiceability();
     if (result === true) return true;
     if (result === false) {
-      showCheckoutError('This PIN code and area are not currently serviceable. Please use another delivery address.');
+      showCheckoutError('This PIN code is not currently serviceable. Please use another delivery address.');
       return false;
     }
     showCheckoutError('We could not verify this PIN code from the live service. Check it again before saving the address.');
@@ -3662,7 +3712,7 @@
     if (enabled) {
       selectedAddressId = null;
       resetPincodeServiceability();
-      renderCheckoutAreaOptions();
+      resetCheckoutAreaOptions();
       elements.checkoutAddressList
         ?.querySelectorAll('input[name="saved_address"]')
         .forEach((input) => { input.checked = false; });
@@ -5101,17 +5151,18 @@
   elements.checkoutPincode?.addEventListener('input', (event) => {
     event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
     if (event.target.value !== checkedServiceabilityPincode) resetPincodeServiceability();
-    renderCheckoutAreaOptions();
+    void lookupCheckoutArea(event.target.value);
     event.target.removeAttribute('aria-invalid');
     event.target.closest('.checkout-field')?.classList.remove('has-error');
     const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
     if (error) error.textContent = '';
   });
   elements.checkoutArea?.addEventListener('change', (event) => {
-    resetPincodeServiceability();
     event.target.removeAttribute('aria-invalid');
     const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
     if (error) error.textContent = '';
+    resetPincodeServiceability();
+    void checkPincodeServiceability({ force: true });
   });
   elements.checkoutPincodeCheckButton?.addEventListener('click', async () => {
     const result = await checkPincodeServiceability({ force: true });

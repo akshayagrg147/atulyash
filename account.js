@@ -132,6 +132,7 @@
     subscriptionsList: $('subscriptionsList'),
     accountCalculatorDetails: $('accountCalculatorDetails'),
     accountDailyRotis: $('accountDailyRotis'),
+    accountCustomAttaBuffer: $('accountCustomAttaBuffer'),
     accountRotisMinus: $('accountRotisMinus'),
     accountRotisPlus: $('accountRotisPlus'),
     accountCalculatorKg: $('accountCalculatorKg'),
@@ -272,6 +273,9 @@
     }
 
     if (group === 'subscriptions') {
+      if (/previewChange|updatePack/.test(methodName)) {
+        return [identifier, { subscription_pack_id: value.subscription_pack_id }];
+      }
       if (/skippableDeliveries|getSkippableDeliveries|skipSummary|getSkipSummary/.test(methodName)) {
         return [identifier];
       }
@@ -1179,7 +1183,13 @@
       error.userMessage,
       error.message
     );
-    if (typeof message === 'string' && message.trim()) return message;
+    if (typeof message === 'string' && message.trim()) {
+      const safeMessage = message.trim();
+      if (/unsupported operand type|nonetype.*int|typeerror/i.test(safeMessage)) {
+        return 'This change could not be completed right now. Please choose a future delivery date and try again.';
+      }
+      return safeMessage;
+    }
     if (payload && typeof payload === 'object') {
       const firstKey = Object.keys(payload)[0];
       const value = payload[firstKey];
@@ -1721,6 +1731,17 @@
     return /deliver|complete|fulfilled/i.test(orderStatus(order));
   }
 
+  function canModifyOneTimeOrder(order) {
+    const status = orderStatus(order).toLowerCase();
+    const subscription = firstValue(
+      order.subscription,
+      order.subscription_plan,
+      order.subscription_id,
+      order.is_subscription === true ? 'subscription' : ''
+    );
+    return !subscription && !/deliver|complete|fulfilled|cancel|fail|refund/.test(status);
+  }
+
   function statusPill(status) {
     const normalized = String(status).toLowerCase();
     const pill = create('span', 'status-pill', status);
@@ -1758,6 +1779,7 @@
     const actions = create('div', 'card-actions');
     actions.append(button('View details', 'card-action', () => openOrderDetail(order)));
     if (!compact) {
+      if (canModifyOneTimeOrder(order)) actions.append(button('Modify delivery', 'card-action', () => openOneTimeOrderModification(order)));
       actions.append(button('Order again', 'card-action', () => confirmReorder(order)));
       if (isCompleted(order)) actions.append(button('Review', 'card-action is-rust', () => openReview(order)));
     }
@@ -1844,16 +1866,105 @@
       }
 
       const actions = create('div', 'dialog-actions');
-      actions.append(
-        button('Change delivery address', 'secondary-button', () => openChangeOrderAddress(detail)),
-        button('Order again', 'primary-button', () => confirmReorder(detail))
-      );
+      if (canModifyOneTimeOrder(detail)) actions.append(button('Modify delivery', 'secondary-button', () => openOneTimeOrderModification(detail)));
+      actions.append(button('View receipt', 'secondary-button', () => openOrderReceipt(detail)));
+      actions.append(button('Order again', 'primary-button', () => confirmReorder(detail)));
       if (isCompleted(detail)) actions.append(button('Write a review', 'secondary-button', () => openReview(detail)));
       body.append(actions);
       elements.dialogBody.replaceChildren(body);
     } catch (error) {
       elements.dialogBody.replaceChildren(makeState('error', 'Order details are unavailable.', friendlyError(error), () => openOrderDetail(order)));
     }
+  }
+
+  function openOneTimeOrderModification(order) {
+    const body = create('div');
+    const panel = create('div', 'confirmation-panel');
+    panel.append(
+      create('strong', '', 'Need to change this one-time order?'),
+      create('p', '', 'You can update its saved delivery address while the batch is still being prepared. For a pack, quantity or delivery-date change, our care team will confirm the available options before making any change.')
+    );
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Change delivery address', 'secondary-button', () => openChangeOrderAddress(order)));
+    const help = create('a', 'primary-button', 'Request another change →');
+    help.href = `mailto:info@atulyash.com?subject=${encodeURIComponent(`Order ${orderNumber(order)} change request`)}`;
+    actions.append(help);
+    body.append(panel, actions);
+    openDialog('One-time order', 'Modify delivery', body);
+  }
+
+  function openOrderReceipt(order) {
+    const body = create('div');
+    body.append(create('p', 'dialog-copy', 'This customer receipt brings your order, delivery and payment details together in one place. You can print it for your records.'));
+    const summary = create('div', 'dialog-summary');
+    [
+      ['Order reference', orderNumber(order)],
+      ['Placed on', formatDate(orderDate(order))],
+      ['Status', orderStatus(order)],
+      ['Payment', String(firstValue(order.payment_method_display, order.payment_method, order.payment_status, 'Recorded'))],
+      ['Order total', orderAmountText(order)]
+    ].forEach(([label, value]) => {
+      const row = create('div', 'dialog-summary-row');
+      row.append(create('span', '', label), create('strong', '', value));
+      summary.append(row);
+    });
+    body.append(summary);
+    const address = firstValue(order.delivery_address, order.address, order.customer_address);
+    if (address) body.append(create('p', 'dialog-copy', `Delivering to: ${addressText(address)}`));
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Close', 'secondary-button', closeDialog));
+    actions.append(button('Print receipt', 'primary-button', () => printOrderReceipt(order)));
+    body.append(actions);
+    openDialog('Customer receipt', orderNumber(order), body);
+  }
+
+  function printOrderReceipt(order) {
+    const popup = window.open('', '_blank', 'width=760,height=900');
+    if (!popup) {
+      showToast('Please allow pop-ups to print this receipt.', 'error');
+      return;
+    }
+    popup.opener = null;
+    const documentRef = popup.document;
+    documentRef.write('<!doctype html><html><head><title>Atulyash order receipt</title><style>body{margin:0;padding:42px;color:#092f27;font:16px Arial,sans-serif}h1{font:500 42px Georgia,serif;margin:8px 0 24px}.eyebrow{color:#b95636;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}.row{display:flex;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid #d9d7cc}.row span{color:#64716d}.row strong{text-align:right}footer{margin-top:34px;color:#64716d;font-size:13px}</style></head><body></body></html>');
+    const root = documentRef.body;
+    const eyebrow = documentRef.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'Atulyash · customer receipt';
+    const heading = documentRef.createElement('h1');
+    heading.textContent = orderNumber(order);
+    root.append(eyebrow, heading);
+    [
+      ['Placed on', formatDate(orderDate(order))],
+      ['Status', orderStatus(order)],
+      ['Payment', String(firstValue(order.payment_method_display, order.payment_method, order.payment_status, 'Recorded'))],
+      ['Order total', orderAmountText(order)]
+    ].forEach(([label, value]) => {
+      const row = documentRef.createElement('div');
+      row.className = 'row';
+      const key = documentRef.createElement('span');
+      key.textContent = label;
+      const item = documentRef.createElement('strong');
+      item.textContent = value;
+      row.append(key, item);
+      root.append(row);
+    });
+    const address = firstValue(order.delivery_address, order.address, order.customer_address);
+    if (address) {
+      const row = documentRef.createElement('div');
+      row.className = 'row';
+      const key = documentRef.createElement('span');
+      key.textContent = 'Delivery address';
+      const item = documentRef.createElement('strong');
+      item.textContent = addressText(address);
+      row.append(key, item);
+      root.append(row);
+    }
+    const footer = documentRef.createElement('footer');
+    footer.textContent = 'For help with this order, email info@atulyash.com.';
+    root.append(footer);
+    popup.focus();
+    popup.print();
   }
 
   function confirmReorder(order) {
@@ -2246,12 +2357,68 @@
 
     const actions = create('div', 'subscription-actions');
     actions.append(
+      button('Change plan', 'card-action', () => openChangeSubscriptionPlan(subscription)),
       button('Manage deliveries', 'card-action', () => openManageDeliveries(subscription)),
       button('Vacation', 'card-action', () => openVacationForm(subscription)),
       button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
     );
     card.append(head, body, next, actions);
     return card;
+  }
+
+  async function openChangeSubscriptionPlan(subscription) {
+    const id = subscriptionId(subscription);
+    const loading = makeState('loading', 'Finding weekly plans.', 'Loading the live quantities available for your next batches…');
+    openDialog('Weekly plan', 'Change plan', loading);
+    try {
+      if (!state.weeklyPlans.length) await loadQuickOrderWeeklyPlans();
+      if (!state.weeklyPlans.length) {
+        elements.dialogBody.replaceChildren(makeState('empty', 'No alternative plans are available.', 'Please try again later or contact Atulyash care for help.'));
+        return;
+      }
+      const currentPack = firstValue(subscription.subscription_pack, subscription.pack, {});
+      const currentPackId = firstValue(currentPack?.id, subscription.subscription_pack_id, subscription.pack_id);
+      const form = create('form', 'dialog-form');
+      form.append(create('p', 'dialog-copy', 'Choose the amount you want in each weekly fresh batch. Your revised plan is confirmed by the secure subscription service.'));
+      const label = create('label', '', 'Weekly quantity');
+      const select = create('select');
+      select.required = true;
+      state.weeklyPlans.forEach((plan) => {
+        const option = create('option', '', `${plan.monthlyKg} kg/month · ${weeklyDeliveryCycleText(plan)} · ${formatMoney(plan.price)} per delivery`);
+        option.value = String(plan.id);
+        option.selected = String(plan.id) === String(currentPackId);
+        select.append(option);
+      });
+      label.append(select);
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Keep current plan', 'secondary-button', closeDialog));
+      const submit = create('button', 'primary-button', 'Update weekly plan →');
+      submit.type = 'submit';
+      actions.append(submit);
+      form.append(label, actions);
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setButtonBusy(submit, true, 'Updating…');
+        try {
+          const subscription_pack_id = select.value;
+          await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, subscription_pack_id }, {
+            path: `/subscription/subscription_plan/${id}/update-pack/`,
+            method: 'POST',
+            form: { subscription_pack_id }
+          });
+          closeDialog();
+          state.loaded.delete('subscriptions');
+          showToast('Your weekly plan has been updated.');
+          renderSubscriptions(true);
+        } catch (error) {
+          showToast(friendlyError(error), 'error');
+          setButtonBusy(submit, false);
+        }
+      });
+      elements.dialogBody.replaceChildren(form);
+    } catch (error) {
+      elements.dialogBody.replaceChildren(makeState('error', 'Weekly plans are unavailable.', friendlyError(error), () => openChangeSubscriptionPlan(subscription)));
+    }
   }
 
   function renderVacationBanner() {
@@ -2359,6 +2526,7 @@
         )
       );
       const body = create('div');
+      body.append(create('p', 'dialog-copy', 'Skip or restore an upcoming delivery here. Moving an active plan to a different weekday needs confirmation from Atulyash care so the fresh-batch route stays accurate.'));
       if (Object.keys(summary).length) {
         const summaryBox = create('div', 'dialog-summary');
         [
@@ -3990,6 +4158,10 @@
   }
 
   function accountCalculatorBuffer() {
+    const custom = elements.accountCustomAttaBuffer?.value;
+    if (custom !== '' && custom != null) {
+      return Math.max(0, Math.min(100, Number(custom) || 0));
+    }
     return Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value || 0);
   }
 
@@ -4324,7 +4496,16 @@
     updateAccountAttaCalculator();
   });
   document.querySelectorAll('input[name="accountAttaBuffer"]').forEach((input) => {
-    input.addEventListener('change', updateAccountAttaCalculator);
+    input.addEventListener('change', () => {
+      if (input.checked && elements.accountCustomAttaBuffer) elements.accountCustomAttaBuffer.value = '';
+      updateAccountAttaCalculator();
+    });
+  });
+  elements.accountCustomAttaBuffer?.addEventListener('input', () => {
+    if (elements.accountCustomAttaBuffer.value !== '') {
+      document.querySelectorAll('input[name="accountAttaBuffer"]').forEach((input) => { input.checked = false; });
+    }
+    updateAccountAttaCalculator();
   });
   elements.quickOrderMinus?.addEventListener('click', () => {
     state.quickOrderQuantity = Math.max(1, state.quickOrderQuantity - 1);

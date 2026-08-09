@@ -349,11 +349,10 @@
                       </div>
                       <fieldset class="account-buffer-options">
                         <legend>Extra atta for other favourites</legend>
-                        <label><input type="radio" name="accountAttaBuffer" value="10" checked><span><strong>+10%</strong><small>Minimum extra</small></span></label>
-                        <label><input type="radio" name="accountAttaBuffer" value="15"><span><strong>+15%</strong><small>Occasional extras</small></span></label>
-                        <label><input type="radio" name="accountAttaBuffer" value="20"><span><strong>+20%</strong><small>Frequent extras</small></span></label>
-                        <label><input type="radio" name="accountAttaBuffer" value="25"><span><strong>+25%</strong><small>Busy weeks</small></span></label>
-                        <label><input type="radio" name="accountAttaBuffer" value="30"><span><strong>+30%</strong><small>Lots of extras</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="0"><span><strong>0%</strong><small>Rotis only</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="10" checked><span><strong>+10%</strong><small>Sometimes</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="20"><span><strong>+20%</strong><small>Often</small></span></label>
+                        <label class="account-custom-buffer"><span><small>Custom extra</small><input id="accountCustomAttaBuffer" type="number" inputmode="decimal" min="0" max="100" step="1" placeholder="e.g. 15"><b>%</b></span></label>
                       </fieldset>
                     </div>
                     <div class="account-calculator-result" aria-live="polite">

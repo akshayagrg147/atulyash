@@ -263,6 +263,7 @@
   let apiSession = getApiSession();
   let serverCartId = null;
   let serverCartSummary = null;
+  let firstOrderEligibility = null;
   let serverCartActive = false;
   let cartNeedsAuthentication = false;
   let pendingGuestCart = [];
@@ -1802,6 +1803,35 @@
     return cart.reduce((total, item) => total + cartItemTotal(item), 0);
   }
 
+  async function loadFirstOrderEligibility() {
+    if (!isApiAuthenticated()) {
+      firstOrderEligibility = null;
+      return null;
+    }
+    const query = {
+      page_size: 1,
+      page: 1,
+      is_active: true,
+      pending_order: false
+    };
+    try {
+      const response = await invokeApi('orders', 'list', [query], {
+        path: '/orders/order/',
+        options: { method: 'GET', auth: true, cache: 'no-store', query }
+      });
+      const suppliedCount = Number(response?.count ?? response?.data?.count);
+      const hasEarlierOrder = Number.isFinite(suppliedCount)
+        ? suppliedCount > 0
+        : apiResults(response).length > 0;
+      firstOrderEligibility = !hasEarlierOrder;
+      renderCart();
+      return firstOrderEligibility;
+    } catch (error) {
+      firstOrderEligibility = null;
+      return null;
+    }
+  }
+
   function deliveryChargeQuote() {
     const oneTimeWeight = cart
       .filter((item) => item.purchaseType !== 'weekly')
@@ -1816,7 +1846,22 @@
         note: 'Scheduled subscription deliveries are always free.'
       };
     }
-    if (!isApiAuthenticated() && !serverCartActive && oneTimeWeight >= 2) {
+    if (hasWeekly) {
+      return {
+        amount: 0,
+        weight: oneTimeWeight,
+        requiresSupport: false,
+        label: 'Added to scheduled weekly delivery',
+        note: 'Atta added to the same scheduled subscription delivery has no delivery charge.'
+      };
+    }
+    if (
+      oneTimeWeight >= 2
+      && (
+        firstOrderEligibility === true
+        || (!isApiAuthenticated() && !serverCartActive)
+      )
+    ) {
       return {
         amount: 0,
         weight: oneTimeWeight,
@@ -1842,7 +1887,7 @@
       label: `One-time delivery · ${formatWeight(oneTimeWeight)} kg`,
       note: amount === 0
         ? 'One-time orders of 11–40 kg are delivered free.'
-        : `${hasWeekly ? 'This separately scheduled one-time delivery' : 'This one-time delivery'} has a ${formatPrice(amount)} delivery charge.`
+        : `This one-time delivery has a ${formatPrice(amount)} delivery charge.`
     };
   }
 
@@ -4842,7 +4887,7 @@
   function selectedAttaBuffer() {
     const selected = document.querySelector('input[name="attaBuffer"]:checked');
     const buffer = Number(selected?.value);
-    return [0, 10, 20].includes(buffer) ? buffer : 10;
+    return [10, 15, 20, 25, 30].includes(buffer) ? buffer : 10;
   }
 
   function renderWeeklyCalculatorSuggestion() {
@@ -5446,6 +5491,7 @@
     if (isApiAuthenticated()) {
       clearCartLoginGate();
       renderCart();
+      void loadFirstOrderEligibility();
     }
     updateAccountHeader();
   });
@@ -5454,6 +5500,7 @@
     serverCartActive = false;
     serverCartId = null;
     serverCartSummary = null;
+    firstOrderEligibility = null;
     checkoutWalletBalanceGeneration += 1;
     checkoutWalletBalanceAmount = null;
     walletRechargeVerificationPending = false;
@@ -5650,10 +5697,12 @@
     apiSession = getApiSession();
     if (cart.length) {
       setCartApiStatus('Signed in · your bag will sync securely at checkout.', { state: 'success' });
+      await loadFirstOrderEligibility();
       return;
     }
     try {
       await refreshServerCart();
+      await loadFirstOrderEligibility();
     } catch (error) {
       // The cart status includes the retry action.
     }
@@ -5675,6 +5724,7 @@
         } else {
           await refreshServerCart();
         }
+        await loadFirstOrderEligibility();
       } catch (error) {
         if (isUnauthorizedError(error)) {
           showCartLoginGate();

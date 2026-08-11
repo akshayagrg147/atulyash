@@ -122,6 +122,7 @@
     upcomingDelivery: $('upcomingDelivery'),
     overviewOrders: $('overviewOrders'),
     orderFilter: $('orderFilter'),
+    ordersStatementButton: $('ordersStatementButton'),
     ordersList: $('ordersList'),
     ordersLoadMore: $('ordersLoadMore'),
     chooseWeeklyPlanButton: $('chooseWeeklyPlanButton'),
@@ -132,7 +133,6 @@
     subscriptionsList: $('subscriptionsList'),
     accountCalculatorDetails: $('accountCalculatorDetails'),
     accountDailyRotis: $('accountDailyRotis'),
-    accountCustomAttaBuffer: $('accountCustomAttaBuffer'),
     accountRotisMinus: $('accountRotisMinus'),
     accountRotisPlus: $('accountRotisPlus'),
     accountCalculatorKg: $('accountCalculatorKg'),
@@ -1815,6 +1815,134 @@
     }
   }
 
+  function orderInvoiceUrl(order) {
+    return safeUrl(firstValue(
+      order.invoice_url,
+      order.invoice_pdf_url,
+      order.tax_invoice_url,
+      order.invoice?.url,
+      order.invoice?.pdf_url
+    ));
+  }
+
+  async function loadOrdersForStatement() {
+    const allOrders = [];
+    for (let page = 1; page <= 10; page += 1) {
+      const query = {
+        page_size: 100,
+        page,
+        is_active: true,
+        customer__id: state.customerId,
+        pending_order: false
+      };
+      const result = await apiCall('orders', ['list', 'getMyOrders'], query, {
+        path: '/orders/order/',
+        method: 'GET',
+        query
+      });
+      const pageOrders = responseList(result);
+      allOrders.push(...pageOrders);
+      if (!nextPageExists(result, pageOrders.length, 100)) break;
+    }
+    return allOrders;
+  }
+
+  async function openCustomerStatement() {
+    openDialog('Orders & payments', 'Customer statement', makeState('loading', 'Preparing your statement.', 'Bringing your completed and upcoming orders into one view…'));
+    try {
+      const orders = await loadOrdersForStatement();
+      if (!orders.length) {
+        elements.dialogBody.replaceChildren(makeState('empty', 'No transactions yet.', 'Your invoices and order payments will appear here after your first order.'));
+        return;
+      }
+      const knownAmounts = orders.map(orderAmount).filter((amount) => amount !== null);
+      const body = create('div', 'customer-statement');
+      const introduction = create('p', 'dialog-copy', 'This statement gathers your Atulyash orders and recorded payments in one window. Open an individual order for its printable receipt or official invoice when supplied by the service.');
+      const overview = create('div', 'statement-overview');
+      const orderCount = create('div');
+      orderCount.append(create('span', '', 'Orders shown'), create('strong', '', String(orders.length)));
+      const value = create('div');
+      value.append(create('span', '', 'Recorded order value'), create('strong', '', knownAmounts.length ? formatMoney(knownAmounts.reduce((sum, amount) => sum + amount, 0)) : 'Not supplied'));
+      overview.append(orderCount, value);
+
+      const list = create('div', 'statement-list');
+      orders.forEach((order) => {
+        const row = create('article', 'statement-row');
+        const reference = create('div');
+        reference.append(create('strong', '', orderNumber(order)), create('small', '', orderTitle(order)));
+        const timing = create('div');
+        timing.append(create('span', '', formatDate(orderDate(order))), create('small', '', orderStatus(order)));
+        const amount = create('strong', 'statement-amount', orderAmountText(order));
+        const actions = create('div', 'statement-actions');
+        actions.append(button('Receipt', 'card-action', () => openOrderDetail(order)));
+        const invoiceUrl = orderInvoiceUrl(order);
+        if (invoiceUrl) {
+          const invoice = create('a', 'card-action', 'Invoice');
+          invoice.href = invoiceUrl;
+          invoice.target = '_blank';
+          invoice.rel = 'noopener noreferrer';
+          actions.append(invoice);
+        }
+        row.append(reference, timing, amount, actions);
+        list.append(row);
+      });
+
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Close', 'secondary-button', closeDialog));
+      actions.append(button('Print statement', 'primary-button', () => printCustomerStatement(orders)));
+      body.append(introduction, overview, list, actions);
+      elements.dialogBody.replaceChildren(body);
+    } catch (error) {
+      elements.dialogBody.replaceChildren(makeState('error', 'The statement is unavailable.', friendlyError(error), openCustomerStatement));
+    }
+  }
+
+  function printCustomerStatement(orders) {
+    const popup = window.open('', '_blank', 'width=900,height=980');
+    if (!popup) {
+      showToast('Please allow pop-ups to print this statement.', 'error');
+      return;
+    }
+    popup.opener = null;
+    const documentRef = popup.document;
+    documentRef.write('<!doctype html><html><head><title>Atulyash customer statement</title><style>body{margin:0;padding:42px;color:#092f27;font:15px Arial,sans-serif}h1{font:500 42px Georgia,serif;margin:8px 0 8px}.eyebrow{color:#b95636;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}.muted{margin:0 0 28px;color:#64716d}.row{display:grid;grid-template-columns:1.3fr .8fr .55fr;gap:18px;padding:15px 0;border-bottom:1px solid #d9d7cc}.row span,.row small{display:block;color:#64716d}.row strong:last-child{text-align:right}footer{margin-top:34px;color:#64716d;font-size:13px}@media print{body{padding:18px}}</style></head><body></body></html>');
+    const root = documentRef.body;
+    const eyebrow = documentRef.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'Atulyash · orders & payments';
+    const heading = documentRef.createElement('h1');
+    heading.textContent = 'Customer statement';
+    const subline = documentRef.createElement('p');
+    subline.className = 'muted';
+    subline.textContent = `${displayName()} · ${orders.length} recorded ${orders.length === 1 ? 'order' : 'orders'}`;
+    root.append(eyebrow, heading, subline);
+    orders.forEach((order) => {
+      const row = documentRef.createElement('div');
+      row.className = 'row';
+      const reference = documentRef.createElement('div');
+      const number = documentRef.createElement('strong');
+      number.textContent = orderNumber(order);
+      const item = documentRef.createElement('small');
+      item.textContent = orderTitle(order);
+      reference.append(number, item);
+      const timing = documentRef.createElement('div');
+      const date = documentRef.createElement('span');
+      date.textContent = formatDate(orderDate(order));
+      const status = documentRef.createElement('small');
+      status.textContent = orderStatus(order);
+      timing.append(date, status);
+      const amount = documentRef.createElement('strong');
+      amount.textContent = orderAmountText(order);
+      row.append(reference, timing, amount);
+      root.append(row);
+    });
+    const footer = documentRef.createElement('footer');
+    footer.textContent = 'This is an order statement. Official tax invoices are provided when available from Atulyash. For help, email info@atulyash.com.';
+    root.append(footer);
+    popup.focus();
+    popup.print();
+  }
+
   async function openOrderDetail(order) {
     const id = orderId(order);
     openDialog('Order details', orderNumber(order), makeState('loading', 'Loading order.', 'Bringing the complete order into view…'));
@@ -1868,6 +1996,14 @@
       const actions = create('div', 'dialog-actions');
       if (canModifyOneTimeOrder(detail)) actions.append(button('Modify delivery', 'secondary-button', () => openOneTimeOrderModification(detail)));
       actions.append(button('View receipt', 'secondary-button', () => openOrderReceipt(detail)));
+      const invoiceUrl = orderInvoiceUrl(detail);
+      if (invoiceUrl) {
+        const invoice = create('a', 'secondary-button', 'Download invoice');
+        invoice.href = invoiceUrl;
+        invoice.target = '_blank';
+        invoice.rel = 'noopener noreferrer';
+        actions.append(invoice);
+      }
       actions.append(button('Order again', 'primary-button', () => confirmReorder(detail)));
       if (isCompleted(detail)) actions.append(button('Write a review', 'secondary-button', () => openReview(detail)));
       body.append(actions);
@@ -1886,11 +2022,58 @@
     );
     const actions = create('div', 'dialog-actions');
     actions.append(button('Change delivery address', 'secondary-button', () => openChangeOrderAddress(order)));
-    const help = create('a', 'primary-button', 'Request another change →');
-    help.href = `mailto:info@atulyash.com?subject=${encodeURIComponent(`Order ${orderNumber(order)} change request`)}`;
-    actions.append(help);
+    actions.append(button('Request pack, quantity or date change →', 'primary-button', () => openOneTimeChangeRequest(order)));
     body.append(panel, actions);
     openDialog('One-time order', 'Modify delivery', body);
+  }
+
+  function openOneTimeChangeRequest(order) {
+    const form = create('form', 'dialog-form');
+    form.append(create('p', 'dialog-copy', 'These changes need confirmation because milling and delivery may already be scheduled. Submit the exact request below and Atulyash care will confirm whether it is still possible.'));
+
+    const typeLabel = create('label', '', 'What would you like to change?');
+    const type = create('select');
+    [
+      ['Delivery date', 'Delivery date'],
+      ['Pack size', 'Pack size'],
+      ['Quantity', 'Quantity'],
+      ['Pack and quantity', 'Pack and quantity']
+    ].forEach(([value, text]) => {
+      const option = create('option', '', text);
+      option.value = value;
+      type.append(option);
+    });
+    typeLabel.append(type);
+
+    const requestLabel = create('label', '', 'Requested change');
+    const request = create('textarea');
+    request.name = 'requested_change';
+    request.rows = 4;
+    request.maxLength = 300;
+    request.required = true;
+    request.placeholder = 'Example: Please move delivery to 18 August, or change the order to two 2 kg packs.';
+    requestLabel.append(request);
+
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Back', 'secondary-button', () => openOneTimeOrderModification(order)));
+    const submit = create('button', 'primary-button', 'Send change request →');
+    submit.type = 'submit';
+    actions.append(submit);
+    form.append(typeLabel, requestLabel, actions);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const subject = `Order ${orderNumber(order)} · ${type.value} change request`;
+      const message = [
+        `Order: ${orderNumber(order)}`,
+        `Requested change type: ${type.value}`,
+        `Request: ${request.value.trim()}`,
+        '',
+        'Please confirm whether this change can be completed before milling or dispatch.'
+      ].join('\n');
+      window.location.href = `mailto:info@atulyash.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      showToast('Opening your email app with the change request.');
+    });
+    openDialog('One-time order', 'Request a change', form);
   }
 
   function openOrderReceipt(order) {
@@ -2561,10 +2744,78 @@
         });
         body.append(list);
       }
+      const scheduleHelp = create('div', 'schedule-change-help');
+      const scheduleCopy = create('div');
+      scheduleCopy.append(
+        create('strong', '', 'Need a different delivery weekday or date?'),
+        create('p', '', 'Send the preferred schedule to Atulyash care for route confirmation.')
+      );
+      scheduleHelp.append(scheduleCopy, button('Request schedule change', 'card-action', () => openSubscriptionScheduleRequest(subscription)));
+      body.append(scheduleHelp);
       elements.dialogBody.replaceChildren(body);
     } catch (error) {
-      elements.dialogBody.replaceChildren(makeState('error', 'The schedule is unavailable.', friendlyError(error), () => openManageDeliveries(subscription)));
+      console.warn('Atulyash delivery schedule could not be loaded.', error);
+      const body = create('div');
+      body.append(makeState(
+        'error',
+        'Your schedule could not be opened right now.',
+        'No delivery was changed. You can try again or send your preferred weekday and effective date to Atulyash care.'
+      ));
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Try again', 'secondary-button', () => openManageDeliveries(subscription)));
+      actions.append(button('Request schedule change →', 'primary-button', () => openSubscriptionScheduleRequest(subscription)));
+      body.append(actions);
+      elements.dialogBody.replaceChildren(body);
     }
+  }
+
+  function openSubscriptionScheduleRequest(subscription) {
+    const form = create('form', 'dialog-form');
+    form.append(create('p', 'dialog-copy', 'Your regular delivery day affects milling and the delivery route. Share your preferred day or date and Atulyash care will confirm the next available schedule.'));
+    const fields = create('div', 'form-grid');
+    const weekdayLabel = create('label', '', 'Preferred weekday');
+    const weekday = create('select');
+    ['Sunday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].forEach((day) => {
+      const option = create('option', '', day);
+      option.value = day;
+      weekday.append(option);
+    });
+    weekdayLabel.append(weekday);
+    const dateLabel = create('label', '', 'Preferred effective date');
+    const date = create('input');
+    date.type = 'date';
+    date.required = true;
+    date.min = new Date().toISOString().slice(0, 10);
+    dateLabel.append(date);
+    fields.append(weekdayLabel, dateLabel);
+    const noteLabel = create('label', '', 'Anything else? (Optional)');
+    const note = create('textarea');
+    note.rows = 3;
+    note.maxLength = 250;
+    note.placeholder = 'Add any delivery preference our team should know.';
+    noteLabel.append(note);
+    const actions = create('div', 'dialog-actions');
+    actions.append(button('Back', 'secondary-button', () => openManageDeliveries(subscription)));
+    const submit = create('button', 'primary-button', 'Send schedule request →');
+    submit.type = 'submit';
+    actions.append(submit);
+    form.append(fields, noteLabel, actions);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const subject = `Weekly plan ${subscriptionId(subscription)} schedule change request`;
+      const message = [
+        `Plan: ${subscriptionName(subscription)} · ${subscriptionWeight(subscription)}`,
+        `Plan reference: #${subscriptionId(subscription)}`,
+        `Preferred weekday: ${weekday.value}`,
+        `Preferred effective date: ${date.value}`,
+        note.value.trim() ? `Note: ${note.value.trim()}` : '',
+        '',
+        'Please confirm the available delivery schedule before applying this change.'
+      ].filter(Boolean).join('\n');
+      window.location.href = `mailto:info@atulyash.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      showToast('Opening your email app with the schedule request.');
+    });
+    openDialog('Weekly plan', 'Request schedule change', form);
   }
 
   function confirmDeliveryChange(subscription, deliveryDate, currentlySkipped) {
@@ -3610,8 +3861,8 @@
     callLink.href = `tel:${phone.replace(/[^\d+]/g, '')}`;
     callCard.append(callLink);
     const emailCard = create('article', 'contact-card');
-    emailCard.append(create('span', '', 'Email us'), create('strong', '', 'Customer care'));
-    const emailLink = create('a', '', `${email} →`);
+    emailCard.append(create('span', '', 'Email us'), create('strong', '', email));
+    const emailLink = create('a', '', 'Write to customer care →');
     emailLink.href = `mailto:${email}`;
     emailCard.append(emailLink);
     fragment.append(callCard, emailCard);
@@ -4158,11 +4409,7 @@
   }
 
   function accountCalculatorBuffer() {
-    const custom = elements.accountCustomAttaBuffer?.value;
-    if (custom !== '' && custom != null) {
-      return Math.max(0, Math.min(100, Number(custom) || 0));
-    }
-    return Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value || 0);
+    return Math.max(10, Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value || 10));
   }
 
   function updateAccountAttaCalculator() {
@@ -4496,16 +4743,7 @@
     updateAccountAttaCalculator();
   });
   document.querySelectorAll('input[name="accountAttaBuffer"]').forEach((input) => {
-    input.addEventListener('change', () => {
-      if (input.checked && elements.accountCustomAttaBuffer) elements.accountCustomAttaBuffer.value = '';
-      updateAccountAttaCalculator();
-    });
-  });
-  elements.accountCustomAttaBuffer?.addEventListener('input', () => {
-    if (elements.accountCustomAttaBuffer.value !== '') {
-      document.querySelectorAll('input[name="accountAttaBuffer"]').forEach((input) => { input.checked = false; });
-    }
-    updateAccountAttaCalculator();
+    input.addEventListener('change', updateAccountAttaCalculator);
   });
   elements.quickOrderMinus?.addEventListener('click', () => {
     state.quickOrderQuantity = Math.max(1, state.quickOrderQuantity - 1);
@@ -4550,6 +4788,7 @@
   });
   elements.logoutButton.addEventListener('click', logout);
   elements.ordersLoadMore.addEventListener('click', () => renderOrders({ page: state.orderPage + 1, force: true }));
+  elements.ordersStatementButton?.addEventListener('click', openCustomerStatement);
   elements.orderFilter.addEventListener('change', () => {
     state.orders = [];
     state.orderPage = 1;

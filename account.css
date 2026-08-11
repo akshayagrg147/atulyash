@@ -1192,6 +1192,14 @@ h3 {
   font-weight: 700;
 }
 
+.orders-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 select {
   min-height: 44px;
   padding: 0 35px 0 13px;
@@ -2765,6 +2773,108 @@ select {
   text-align: right;
 }
 
+.statement-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 20px 0;
+  padding: 1px;
+  background: var(--line);
+}
+
+.statement-overview > div {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  background: var(--cream-50);
+}
+
+.statement-overview span {
+  color: var(--muted);
+  font-size: .57rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.statement-overview strong {
+  color: var(--forest-950);
+  font-family: var(--serif);
+  font-size: 1.8rem;
+  font-weight: 500;
+}
+
+.statement-list {
+  max-height: min(430px, 48vh);
+  display: grid;
+  gap: 8px;
+  padding-right: 3px;
+  overflow-y: auto;
+}
+
+.statement-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(110px, .75fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 15px;
+  border: 1px solid var(--line);
+  background: rgba(255, 253, 248, .76);
+}
+
+.statement-row > div:not(.statement-actions) {
+  min-width: 0;
+}
+
+.statement-row strong,
+.statement-row span,
+.statement-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.statement-row > div > strong,
+.statement-amount {
+  color: var(--forest-950);
+  font-size: .72rem;
+}
+
+.statement-row span,
+.statement-row small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .59rem;
+  line-height: 1.4;
+}
+
+.statement-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.schedule-change-help {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(17, 55, 46, .14);
+  background: rgba(247, 241, 230, .56);
+}
+
+.schedule-change-help strong {
+  color: var(--forest-950);
+  font-size: .72rem;
+}
+
+.schedule-change-help p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: .62rem;
+  line-height: 1.5;
+}
+
 .delivery-list {
   display: grid;
   gap: 8px;
@@ -3288,17 +3398,13 @@ select {
 .account-buffer-options input:focus-visible + span { outline: 2px solid var(--rust-500); outline-offset: 2px; }
 .account-buffer-options strong { font-family: var(--serif); font-size: 1.05rem; }
 .account-buffer-options small { font-size: .57rem; opacity: .72; }
-.account-buffer-options .account-custom-buffer { grid-column: 1 / -1; cursor: text; }
-.account-buffer-options .account-custom-buffer > span { display: grid; grid-template-columns: 1fr minmax(80px, 110px) auto; align-items: center; min-height: 52px; gap: 10px; }
-.account-custom-buffer input { position: static; width: 100%; min-height: 34px; padding: 0 9px; color: var(--forest-950); background: #fffdf8; border: 1px solid rgba(17, 55, 46, .22); opacity: 1; font: 700 .83rem var(--sans); }
-.account-custom-buffer input:focus { outline: 2px solid var(--rust-500); outline-offset: 1px; }
-.account-custom-buffer b { color: var(--forest-900); font-size: .85rem; }
 .account-calculator-result { display: grid; align-content: center; padding: 24px; color: #fffdf8; background: var(--forest-950); }
 .account-calculator-result > span { color: var(--wheat-300); font-size: .56rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .account-calculator-result > strong { margin: 9px 0 4px; color: #fffdf8; font-family: var(--serif); font-size: clamp(2.7rem, 4vw, 4.3rem); font-weight: 500; line-height: .9; }
 .account-calculator-result > strong small { display: block; margin-top: 6px; font: 500 1rem var(--sans); }
 .account-calculator-result > p { margin: 12px 0 5px; color: #fffdf8; font-size: .68rem; line-height: 1.5; }
 .account-calculator-result > small { color: rgba(255, 253, 248, .55); font-size: .56rem; }
+.account-calculator-result > .account-calculator-plan-note { margin-top: 5px; color: var(--wheat-300); line-height: 1.45; }
 .account-calculator-result .primary-button { margin-top: 17px; }
 @media (max-width: 1100px) {
   .account-atta-calculator { grid-template-columns: 1fr 1.35fr; }
@@ -3310,14 +3416,87 @@ select {
   .account-atta-calculator { grid-template-columns: 1fr; padding: 22px 18px; }
   .account-calculator-result { grid-column: auto; display: grid; }
   .account-calculator-result > strong { grid-row: auto; grid-column: auto; }
-  .account-buffer-options { grid-template-columns: 1fr; }
+  .account-buffer-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-buffer-options span { min-height: 58px; }
-  .account-buffer-options .account-custom-buffer > span { grid-template-columns: 1fr minmax(82px, 110px) auto; }
   .account-shell .promise-card blockquote,
   .account-shell .promise-card p,
   .account-shell .contact-card strong,
   .account-shell .subscription-card h3,
   .account-shell .order-title h3 { overflow-wrap: anywhere; }
+}
+
+@media (max-width: 720px) {
+  .orders-heading-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .orders-heading-actions .secondary-button {
+    width: 100%;
+  }
+
+  .orders-heading-actions .filter-control {
+    justify-content: space-between;
+  }
+
+  .orders-heading-actions .filter-control select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .statement-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .statement-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 14px;
+  }
+
+  .statement-row > div:nth-child(2) {
+    grid-column: 1;
+  }
+
+  .statement-amount {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .statement-actions {
+    grid-column: 1 / -1;
+  }
+
+  .statement-actions .card-action {
+    flex: 1;
+    text-align: center;
+  }
+
+  .schedule-change-help {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedule-change-help .card-action {
+    width: 100%;
+  }
+
+  .dialog-actions > .primary-button,
+  .dialog-actions > .secondary-button,
+  .dialog-actions > .danger-button {
+    flex: 1 1 160px;
+  }
+}
+
+@media (max-width: 370px) {
+  .account-buffer-options {
+    grid-template-columns: 1fr;
+  }
+
+  .order-card .card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

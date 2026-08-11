@@ -4941,3 +4941,13 @@ body.commerce-open .atulyash-cursor {
     animation: none;
   }
 }
+
+/* Keep the client-approved product name on one line where the two-column
+   product layout has room; mobile keeps natural wrapping for readability. */
+@media (min-width: 941px) {
+  .product-title-row h3 {
+    max-width: none;
+    font-size: clamp(1.75rem, 2.45vw, 2.85rem);
+    white-space: nowrap;
+  }
+}

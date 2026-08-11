@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="account.css?v=20260802-17">
+  <link rel="stylesheet" href="account.css?v=20260811-1">
   <link rel="stylesheet" href="commerce-shared.css?v=20260802-3">
 </head>
 <body>
@@ -349,10 +349,11 @@
                       </div>
                       <fieldset class="account-buffer-options">
                         <legend>Extra atta for other favourites</legend>
-                        <label><input type="radio" name="accountAttaBuffer" value="0"><span><strong>0%</strong><small>Rotis only</small></span></label>
-                        <label><input type="radio" name="accountAttaBuffer" value="10" checked><span><strong>+10%</strong><small>Sometimes</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="10" checked><span><strong>+10%</strong><small>Minimum extra</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="15"><span><strong>+15%</strong><small>A little more</small></span></label>
                         <label><input type="radio" name="accountAttaBuffer" value="20"><span><strong>+20%</strong><small>Often</small></span></label>
-                        <label class="account-custom-buffer"><span><small>Custom extra</small><input id="accountCustomAttaBuffer" type="number" inputmode="decimal" min="0" max="100" step="1" placeholder="e.g. 15"><b>%</b></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="25"><span><strong>+25%</strong><small>Regular extras</small></span></label>
+                        <label><input type="radio" name="accountAttaBuffer" value="30"><span><strong>+30%</strong><small>Frequent extras</small></span></label>
                       </fieldset>
                     </div>
                     <div class="account-calculator-result" aria-live="polite">
@@ -360,6 +361,7 @@
                       <strong id="accountCalculatorKg">1.85 <small>kg/week</small></strong>
                       <p id="accountCalculatorPlan">Finding the closest live weekly plan…</p>
                       <small id="accountCalculatorFormula">8 rotis × 30 g × 7 days + 10% extra</small>
+                      <small class="account-calculator-plan-note">The closest live plan may stay the same for nearby percentages because it must fully cover your estimate.</small>
                     </div>
                   </article>
                 </details>
@@ -442,13 +444,16 @@
         <section class="portal-view" id="view-orders" data-view-panel="orders" aria-labelledby="ordersTitle" hidden>
           <div class="view-heading">
             <div><p class="section-label">Every batch, remembered</p><h1 id="ordersTitle">Your orders</h1><p>Track what is on its way, revisit earlier batches or bring a favourite order home again.</p></div>
-            <label class="filter-control">Show
-              <select id="orderFilter">
-                <option value="">All orders</option>
-                <option value="true">One-time orders</option>
-                <option value="false">Subscription orders</option>
-              </select>
-            </label>
+            <div class="orders-heading-actions">
+              <button class="secondary-button" id="ordersStatementButton" type="button">Invoices &amp; transactions</button>
+              <label class="filter-control">Show
+                <select id="orderFilter">
+                  <option value="">All orders</option>
+                  <option value="true">One-time orders</option>
+                  <option value="false">Subscription orders</option>
+                </select>
+              </label>
+            </div>
           </div>
           <div class="list-region" id="ordersList" aria-live="polite"></div>
           <button class="secondary-button load-more" id="ordersLoadMore" type="button" hidden>Show more orders</button>
@@ -604,7 +609,7 @@
           </div>
           <div class="support-grid" id="contactCards">
             <article class="contact-card"><span>Call us</span><strong>+91 98185 88996</strong><a href="tel:+919818588996">Speak to our team →</a></article>
-            <article class="contact-card"><span>Email us</span><strong>Customer care</strong><a href="mailto:info@atulyash.com">info@atulyash.com →</a></article>
+            <article class="contact-card"><span>Email us</span><strong>info@atulyash.com</strong><a href="mailto:info@atulyash.com">Write to customer care →</a></article>
           </div>
           <section class="truth-book-card" id="truthBookCard">
             <div><p class="section-label section-label-light">Know your everyday food</p><h2>The Atulyash Truth Book.</h2><p>Ingredients, process and quality information—shared clearly.</p></div>
@@ -645,6 +650,6 @@
 
   <script src="api-client.js?v=20260801-7"></script>
   <script src="google-area-lookup.js?v=20260808-1"></script>
-  <script src="account.js?v=20260808-1"></script>
+  <script src="account.js?v=20260811-1"></script>
 </body>
 </html>

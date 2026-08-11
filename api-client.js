@@ -1111,12 +1111,14 @@
         options
       );
     },
-    changeAddress: function changeOrderAddress(orderId, address, options) {
-      return formRequest(
-        'POST',
-        '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/change-address/',
-        valuePayload(address, 'address_id'),
-        options
+    modify: function modifyOrder(orderId, payload, options) {
+      return request(
+        '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/modify/',
+        mergeObjects({}, options, {
+          method: 'PATCH',
+          body: payload || {},
+          form: false
+        })
       );
     },
     reorder: function reorderOrder(orderId, options) {
@@ -1263,6 +1265,18 @@
     },
     updatePack: function updateSubscriptionPack(planId, payload, options) {
       return cart.updateSubscription(planId, payload, options);
+    },
+    updateSchedule: function updateSubscriptionSchedule(planId, payload, options) {
+      return request(
+        '/subscription/subscription_plan/' +
+          idPathSegment(planId, '', 'Subscription plan ID') +
+          '/schedule/',
+        mergeObjects({}, options, {
+          method: 'PATCH',
+          body: payload || {},
+          form: false
+        })
+      );
     },
     listActive: function listActiveSubscriptions(params, options) {
       params = params || {};
@@ -1504,6 +1518,10 @@
         withDefaults({ is_active: true, page_size: 200 }, params),
         options
       );
+    },
+    serviceability: function pincodeServiceability(pincode, options) {
+      var query = isPlainObject(pincode) ? pincode : { pincode: pincode };
+      return publicGet('/pincodes/pincode/serviceability/', query, options);
     }
   };
 

@@ -290,6 +290,7 @@
   let checkoutWalletBalanceAmount = null;
   let checkoutWalletBalanceGeneration = 0;
   let walletRechargePreview = null;
+  let walletFundingPolicy = null;
   let walletRechargeInFlight = false;
   let walletRechargeVerificationPending = false;
   let couponData = { valid: [], invalid: [] };
@@ -1191,12 +1192,26 @@
 
   function normalizeServerCartSummary(payload) {
     const sources = cartResponseSources(payload);
-    const subtotal = firstMoney(sources, ['subtotal', 'sub_total', 'cart_subtotal', 'gross_amount', 'total_before_discount']);
-    const discount = firstMoney(sources, ['discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']);
-    const total = firstMoney(sources, ['net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']);
+    const subtotal = firstMoney(sources, ['items_total', 'subtotal', 'sub_total', 'cart_subtotal', 'gross_amount', 'total_before_discount']);
+    const discount = firstMoney(sources, ['applied_coupon_discount', 'discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']);
+    const deliveryCharge = firstMoney(sources, ['delivery_charge']);
+    const total = firstMoney(sources, ['cart_total', 'net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']);
+    let deliveryReason = '';
+    let requiresSupport;
+    for (const source of sources) {
+      if (!deliveryReason && source.delivery_charge_reason) {
+        deliveryReason = String(source.delivery_charge_reason);
+      }
+      if (typeof source.delivery_requires_customer_care === 'boolean') {
+        requiresSupport = source.delivery_requires_customer_care;
+      }
+    }
     return {
       subtotal: Number.isFinite(subtotal) ? subtotal : undefined,
       discount: Number.isFinite(discount) ? Math.max(0, discount) : 0,
+      deliveryCharge: Number.isFinite(deliveryCharge) ? Math.max(0, deliveryCharge) : undefined,
+      deliveryReason,
+      requiresSupport,
       total: Number.isFinite(total) ? total : undefined,
       coupon: appliedCouponFromSources(sources) || appliedCouponOverride
     };
@@ -1837,6 +1852,45 @@
       .filter((item) => item.purchaseType !== 'weekly')
       .reduce((total, item) => total + (itemDescriptor(item).weightKg * item.quantity), 0);
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
+    if (
+      serverCartActive
+      && (
+        Number.isFinite(serverCartSummary?.deliveryCharge)
+        || typeof serverCartSummary?.requiresSupport === 'boolean'
+      )
+    ) {
+      const amount = Number.isFinite(serverCartSummary.deliveryCharge)
+        ? serverCartSummary.deliveryCharge
+        : null;
+      const requiresSupport = serverCartSummary.requiresSupport === true;
+      const reasonLabels = {
+        ONE_TIME_2_TO_6_KG: 'One-time delivery · 2–6 kg',
+        ONE_TIME_7_TO_10_KG: 'One-time delivery · 7–10 kg',
+        ONE_TIME_11_TO_40_KG: 'One-time delivery · 11–40 kg',
+        ABOVE_40_KG_CUSTOMER_CARE: 'Large-order delivery'
+      };
+      return {
+        amount,
+        weight: oneTimeWeight,
+        requiresSupport,
+        label: reasonLabels[serverCartSummary.deliveryReason]
+          || (hasWeekly ? 'Fresh-batch delivery' : `One-time delivery · ${formatWeight(oneTimeWeight)} kg`),
+        note: requiresSupport
+          ? 'This order needs confirmation from Atulyash Customer Care before checkout.'
+          : amount === 0
+            ? 'The live cart confirms free delivery.'
+            : `The live cart confirms a ${formatPrice(amount)} delivery charge.`
+      };
+    }
+    if (serverCartActive) {
+      return {
+        amount: null,
+        weight: oneTimeWeight,
+        requiresSupport: true,
+        label: 'Delivery charge unavailable',
+        note: 'The live cart did not return a delivery-charge decision. Refresh your bag before checkout.'
+      };
+    }
     if (oneTimeWeight <= 0) {
       return {
         amount: 0,
@@ -1906,6 +1960,13 @@
 
   function orderTotal() {
     const delivery = deliveryChargeQuote();
+    if (
+      serverCartActive
+      && !cart.some((item) => item.purchaseType === 'weekly')
+      && Number.isFinite(serverCartSummary?.total)
+    ) {
+      return Math.max(0, serverCartSummary.total);
+    }
     return Math.max(0, cartSubtotal() - experienceCredit()) + (Number.isFinite(delivery.amount) ? delivery.amount : 0);
   }
 
@@ -3498,31 +3559,6 @@
     return savedAddresses.find((address) => String(address.id) === String(selectedAddressId)) || null;
   }
 
-  function pincodeFromRecord(record) {
-    if (record == null) return '';
-    if (typeof record !== 'object') return String(record).replace(/\D/g, '').slice(0, 6);
-    return String(
-      record.pincode
-      ?? record.pin_code
-      ?? record.postal_code
-      ?? record.postcode
-      ?? record.code
-      ?? ''
-    ).replace(/\D/g, '').slice(0, 6);
-  }
-
-  function pincodeRecords(payload) {
-    const root = payload?.data ?? payload;
-    if (Array.isArray(root)) return root;
-    for (const source of [root, payload]) {
-      for (const key of ['results', 'pincodes', 'items', 'data']) {
-        if (Array.isArray(source?.[key])) return source[key];
-      }
-    }
-    if (pincodeFromRecord(root)) return [root];
-    return [];
-  }
-
   function resetCheckoutAreaOptions(message = 'Enter a six-digit PIN code first') {
     const field = elements.checkoutAreaField;
     const select = elements.checkoutArea;
@@ -3685,19 +3721,16 @@
       message: `Confirming live Atulyash delivery coverage for ${pincode}…`
     });
     try {
-      const query = { pincode, is_active: true, page_size: 20 };
-      const payload = await invokeApi('pincodes', 'list', [query], {
-        path: '/pincodes/pincode/',
-        options: { method: 'GET', auth: true, cache: 'no-store', query }
+      const query = { pincode };
+      const payload = await invokeApi('pincodes', 'serviceability', [pincode], {
+        path: '/pincodes/pincode/serviceability/',
+        options: { method: 'GET', auth: false, cache: 'no-store', query }
       });
-      const matchingRecord = pincodeRecords(payload).find((record) => (
-        pincodeFromRecord(record) === pincode
-        && record?.is_active !== false
-        && !/inactive|disabled/i.test(String(record?.status || ''))
-      ));
+      const result = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
       checkedServiceabilityPincode = pincode;
-      checkedServiceabilityResult = Boolean(matchingRecord);
-      if (matchingRecord) {
+      checkedServiceabilityResult = result?.serviceable === true;
+      if (checkedServiceabilityResult) {
+        setGoogleAddressContext(result);
         renderPincodeServiceability('success', {
           title: 'Fresh-batch delivery is available',
           message: `${area}, ${pincode} is inside the current Atulyash delivery area.`
@@ -3706,19 +3739,12 @@
       }
       renderPincodeServiceability('error', {
         title: 'We do not deliver here yet',
-        message: `PIN ${pincode} is not in the live serviceable-area list.`
+        message: `PIN ${pincode} is not currently serviceable. Please use another delivery address.`
       });
       return false;
     } catch (error) {
       checkedServiceabilityPincode = pincode;
       checkedServiceabilityResult = null;
-      if (isUnauthorizedError(error)) {
-        renderPincodeServiceability('auth', {
-          title: 'Sign in to check this PIN code',
-          message: 'Delivery coverage is connected to your secure Atulyash account.'
-        });
-        return null;
-      }
       renderPincodeServiceability('error', {
         title: 'Coverage could not be checked',
         message: error?.message || 'The live PIN-code service is unavailable. Please try again.'
@@ -4143,18 +4169,50 @@
 
   function walletShortfall() {
     if (!Number.isFinite(checkoutWalletBalanceAmount)) return null;
+    const backendShortfall = cart.some((item) => item.purchaseType === 'weekly')
+      ? numericValue(walletFundingPolicy?.shortfall, NaN)
+      : NaN;
+    if (Number.isFinite(backendShortfall)) return Math.max(0, backendShortfall);
     return Math.max(0, walletRequiredBalance() - checkoutWalletBalanceAmount);
   }
 
   function walletRequiredBalance() {
-    return orderTotal();
+    const backendMinimum = cart.some((item) => item.purchaseType === 'weekly')
+      ? numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
+      : NaN;
+    return Number.isFinite(backendMinimum) && backendMinimum >= 0
+      ? backendMinimum
+      : orderTotal();
+  }
+
+  function applyWalletFundingPolicy(payload) {
+    const minimumWalletRequired = numericValue(firstResponseValue(payload, ['minimum_wallet_required']), NaN);
+    const minimumDeliveriesRequired = numericValue(firstResponseValue(payload, ['minimum_deliveries_required']), NaN);
+    const pricePerDelivery = numericValue(firstResponseValue(payload, ['price_per_delivery']), NaN);
+    const shortfall = numericValue(firstResponseValue(payload, ['shortfall']), NaN);
+    const availableBalance = numericValue(firstResponseValue(payload, ['available_balance']), NaN);
+    const canStart = firstResponseValue(payload, ['can_start_subscription']);
+    if (!Number.isFinite(minimumWalletRequired)) return null;
+    walletFundingPolicy = {
+      minimumWalletRequired,
+      minimumDeliveriesRequired: Number.isFinite(minimumDeliveriesRequired)
+        ? minimumDeliveriesRequired
+        : 4,
+      pricePerDelivery: Number.isFinite(pricePerDelivery) ? pricePerDelivery : null,
+      shortfall: Number.isFinite(shortfall) ? Math.max(0, shortfall) : null,
+      availableBalance: Number.isFinite(availableBalance) ? availableBalance : null,
+      canStart: typeof canStart === 'boolean' ? canStart : null
+    };
+    return walletFundingPolicy;
   }
 
   function syncWalletOrderAvailability() {
     if (!elements.placeOrderButton) return;
     const shortfall = walletShortfall();
+    const subscriptionFundingBlocked = cart.some((item) => item.purchaseType === 'weekly')
+      && walletFundingPolicy?.canStart === false;
     const blocked = orderInFlight || (!pendingOrder && (cart.length === 0 || deliveryChargeQuote().requiresSupport ||
-      !Number.isFinite(checkoutWalletBalanceAmount) || shortfall > 0 || couponDiscountPending()
+      !Number.isFinite(checkoutWalletBalanceAmount) || shortfall > 0 || subscriptionFundingBlocked || couponDiscountPending()
     ));
     elements.placeOrderButton.disabled = blocked;
     elements.placeOrderButton.setAttribute('aria-disabled', String(blocked));
@@ -4179,7 +4237,10 @@
     if (elements.checkoutWalletOrderTotal) elements.checkoutWalletOrderTotal.textContent = formatPrice(total);
     if (elements.checkoutWalletRequirementRow) elements.checkoutWalletRequirementRow.hidden = !hasWeekly;
     if (elements.checkoutWalletRequirementLabel) elements.checkoutWalletRequirementLabel.textContent = 'Minimum recharge policy';
-    if (elements.checkoutWalletRequirement) elements.checkoutWalletRequirement.textContent = '4 deliveries';
+    if (elements.checkoutWalletRequirement) {
+      const deliveryCount = numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4);
+      elements.checkoutWalletRequirement.textContent = `${deliveryCount} deliveries`;
+    }
 
     elements.checkoutWalletShortfallRow.hidden = true;
     elements.checkoutWalletAddButton.hidden = true;
@@ -4226,10 +4287,10 @@
       elements.checkoutWalletState.textContent = 'Ready';
       elements.checkoutWalletBalance.textContent = formatPrice(balance);
       elements.checkoutWalletExplanation.textContent = hasWeekly
-        ? 'Your verified wallet balance meets the minimum recharge policy for the next four scheduled deliveries. Each delivery is charged only when it is processed.'
+        ? `Your verified wallet balance meets the minimum recharge policy for the next ${numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4)} scheduled deliveries. Each delivery is charged only when it is processed.`
         : 'Your verified wallet balance covers this order.';
       elements.checkoutPaymentStatus.textContent = hasWeekly
-        ? `${formatPrice(total)} is the required wallet balance for four scheduled deliveries. Your wallet is charged delivery by delivery.`
+        ? `${formatPrice(walletRequiredBalance())} is the required wallet balance for ${numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4)} scheduled deliveries. Your wallet is charged delivery by delivery.`
         : 'The final amount will be debited only from your Atulyash Wallet.';
       if (walletRechargePreview) resetWalletRechargePreview();
     }
@@ -4265,9 +4326,25 @@
       if (!Number.isFinite(balance)) {
         throw new Error('The live service did not return a valid wallet balance.');
       }
-      checkoutWalletBalanceAmount = balance;
+      walletFundingPolicy = null;
+      if (cart.some((item) => item.purchaseType === 'weekly')) {
+        const previewAmount = Math.max(1, Math.ceil(orderTotal()));
+        const policyPayload = await invokeApi('wallet', 'rechargePreview', [previewAmount], {
+          path: '/customers/customer-wallet/recharge/preview/',
+          options: { method: 'POST', auth: true, body: { amount: previewAmount }, form: true }
+        });
+        const policy = applyWalletFundingPolicy(policyPayload);
+        if (!policy) {
+          throw new Error('The live service did not return the four-delivery wallet requirement.');
+        }
+        checkoutWalletBalanceAmount = Number.isFinite(policy.availableBalance)
+          ? policy.availableBalance
+          : balance;
+      } else {
+        checkoutWalletBalanceAmount = balance;
+      }
       renderWalletPaymentState();
-      return balance;
+      return checkoutWalletBalanceAmount;
     } catch (error) {
       if (requestGeneration !== checkoutWalletBalanceGeneration) return checkoutWalletBalanceAmount;
       checkoutWalletBalanceAmount = null;
@@ -4367,13 +4444,20 @@
 
   function renderWalletRechargeSummary(preview) {
     if (!elements.checkoutWalletTopupSummary) return;
-    const rows = [
+    const rows = [];
+    if (walletFundingPolicy) {
+      rows.push(
+        ['Minimum wallet required', formatPrice(walletFundingPolicy.minimumWalletRequired)],
+        ['Available balance', formatPrice(checkoutWalletBalanceAmount)]
+      );
+    }
+    rows.push(
       ['Add to wallet', formatPrice(preview.amount)],
       ['Extra wallet credit', preview.bonus > 0 ? `+${formatPrice(preview.bonus)}` : 'No extra credit'],
       ['Tax / charges', formatPrice(preview.tax)],
       ['Pay securely now', formatPrice(preview.payable)],
       ['Wallet receives', formatPrice(preview.credited)]
-    ];
+    );
     const nodes = [];
     rows.forEach(([label, value]) => {
       const term = document.createElement('dt');
@@ -4409,6 +4493,7 @@
         path: '/customers/customer-wallet/recharge/preview/',
         options: { method: 'POST', auth: true, body: { amount }, form: true }
       });
+      applyWalletFundingPolicy(payload);
       const bonus = numericValue(firstResponseValue(payload, [
         'bonus', 'bonus_amount', 'extra_credit', 'cashback'
       ]), 0);

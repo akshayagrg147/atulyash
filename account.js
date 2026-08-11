@@ -268,11 +268,19 @@
     if (group === 'orders') {
       if (/^detail$|getOrderDetails/.test(methodName)) return [identifier];
       if (/^reorder$/.test(methodName)) return [identifier];
-      if (/changeAddress/.test(methodName)) return [identifier, value.address_id || value.addressId];
+      if (/^modify$|modifyOrder/.test(methodName)) {
+        return [identifier, withoutKeys(value, ['id', 'orderId'])];
+      }
       return [value];
     }
 
     if (group === 'subscriptions') {
+      if (/updateSchedule|changeSchedule/.test(methodName)) {
+        return [identifier, {
+          delivery_day: value.delivery_day,
+          effective_from: value.effective_from
+        }];
+      }
       if (/previewChange|updatePack/.test(methodName)) {
         return [identifier, { subscription_pack_id: value.subscription_pack_id }];
       }
@@ -1173,13 +1181,37 @@
     }, 4400);
   }
 
+  function readableErrorValue(value, field = '') {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const message = readableErrorValue(entry, field);
+        if (message) return message;
+      }
+      return '';
+    }
+    if (!value || typeof value !== 'object') return '';
+
+    for (const key of ['detail', 'message', 'error', 'non_field_errors', 'errors']) {
+      const message = readableErrorValue(value[key], key);
+      if (message) return message;
+    }
+    for (const [key, nested] of Object.entries(value)) {
+      const message = readableErrorValue(nested, key);
+      if (!message) continue;
+      const label = String(key).replaceAll('_', ' ');
+      return ['detail', 'message', 'error', 'non field errors', 'errors'].includes(label)
+        ? message
+        : `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${message}`;
+    }
+    return '';
+  }
+
   function friendlyError(error, fallback = 'Something did not go through. Please try again.') {
     if (!error) return fallback;
-    const payload = error.data || error.response?.data || error.body;
+    const payload = error.data || error.response?.data || error.body || error.details;
     const message = firstValue(
-      payload?.detail,
-      payload?.message,
-      payload?.error,
+      readableErrorValue(payload),
       error.userMessage,
       error.message
     );
@@ -1189,12 +1221,6 @@
         return 'This change could not be completed right now. Please choose a future delivery date and try again.';
       }
       return safeMessage;
-    }
-    if (payload && typeof payload === 'object') {
-      const firstKey = Object.keys(payload)[0];
-      const value = payload[firstKey];
-      if (Array.isArray(value) && value[0]) return String(value[0]);
-      if (typeof value === 'string') return value;
     }
     return fallback;
   }
@@ -1683,12 +1709,13 @@
 
   function orderAmount(order) {
     const amountKeys = [
-      'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
+      'net_payable', 'wallet_debit', 'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
       'total_price', 'payable_amount', 'amount_payable', 'subtotal', 'total', 'amount'
     ];
     const sources = [
       order,
       order.payment_summary,
+      order.payment_breakdown,
       order.summary,
       order.totals,
       order.cart,
@@ -1718,6 +1745,21 @@
     return lineAmounts.length ? lineAmounts.reduce((sum, value) => sum + value, 0) : null;
   }
 
+  function orderPaymentValue(order, ...keys) {
+    const sources = [
+      order?.payment_breakdown,
+      order?.payment_summary,
+      order?.summary,
+      order?.totals,
+      order
+    ].filter((source) => source && typeof source === 'object');
+    for (const source of sources) {
+      const value = finiteMoney(...keys.map((key) => source[key]));
+      if (value !== null) return value;
+    }
+    return null;
+  }
+
   function orderAmountText(order) {
     const amount = orderAmount(order);
     return amount === null ? 'See details' : formatMoney(amount);
@@ -1731,6 +1773,24 @@
     return /deliver|complete|fulfilled/i.test(orderStatus(order));
   }
 
+  function orderHasSuccessfulPayment(order) {
+    const paymentSources = [
+      order?.payment,
+      order?.payment_detail,
+      order?.payment_details,
+      order?.payment_summary,
+      order
+    ].filter((source) => source && typeof source === 'object');
+    const successfulStatus = paymentSources.some((source) => /paid|success|captured|received|complete/i.test(String(firstValue(
+      source.payment_status,
+      source.status_display,
+      source.status,
+      ''
+    ))));
+    const walletDebit = finiteMoney(...paymentSources.map((source) => source.wallet_debit));
+    return successfulStatus || (walletDebit !== null && walletDebit > 0);
+  }
+
   function canModifyOneTimeOrder(order) {
     const status = orderStatus(order).toLowerCase();
     const subscription = firstValue(
@@ -1739,7 +1799,9 @@
       order.subscription_id,
       order.is_subscription === true ? 'subscription' : ''
     );
-    return !subscription && !/deliver|complete|fulfilled|cancel|fail|refund/.test(status);
+    return !subscription
+      && !orderHasSuccessfulPayment(order)
+      && !/deliver|complete|fulfilled|cancel|fail|refund/.test(status);
   }
 
   function statusPill(status) {
@@ -1954,7 +2016,7 @@
       const detail = responseData(result);
       const body = create('div');
       const summary = create('div', 'dialog-summary');
-      [
+      const summaryRows = [
         ['Status', orderStatus(detail)],
         ['Placed on', formatDate(orderDate(detail))],
         ['Payment', String(firstValue(detail.payment_method_display, detail.payment_method, detail.payment_status, 'Recorded'))],
@@ -1965,7 +2027,16 @@
           detail.expected_delivery_date
         ))],
         ['Order total', orderAmountText(detail)]
-      ].forEach(([label, value]) => {
+      ];
+      const itemsTotal = orderPaymentValue(detail, 'items_total');
+      const deliveryCharge = orderPaymentValue(detail, 'delivery_charge');
+      const couponDiscount = orderPaymentValue(detail, 'coupon_discount', 'applied_coupon_discount');
+      const walletDebit = orderPaymentValue(detail, 'wallet_debit');
+      if (itemsTotal !== null) summaryRows.splice(-1, 0, ['Items total', formatMoney(itemsTotal)]);
+      if (deliveryCharge !== null) summaryRows.splice(-1, 0, ['Delivery charge', deliveryCharge === 0 ? 'Free' : formatMoney(deliveryCharge)]);
+      if (couponDiscount !== null && couponDiscount > 0) summaryRows.splice(-1, 0, ['Coupon saving', `−${formatMoney(couponDiscount)}`]);
+      if (walletDebit !== null) summaryRows.splice(-1, 0, ['Wallet debit', formatMoney(walletDebit)]);
+      summaryRows.forEach(([label, value]) => {
         const row = create('div', 'dialog-summary-row');
         row.append(create('span', '', label), create('strong', '', value));
         summary.append(row);
@@ -2013,67 +2084,201 @@
     }
   }
 
-  function openOneTimeOrderModification(order) {
+  async function openOneTimeOrderModification(order) {
     const body = create('div');
-    const panel = create('div', 'confirmation-panel');
-    panel.append(
-      create('strong', '', 'Need to change this one-time order?'),
-      create('p', '', 'You can update its saved delivery address while the batch is still being prepared. For a pack, quantity or delivery-date change, our care team will confirm the available options before making any change.')
-    );
-    const actions = create('div', 'dialog-actions');
-    actions.append(button('Change delivery address', 'secondary-button', () => openChangeOrderAddress(order)));
-    actions.append(button('Request pack, quantity or date change →', 'primary-button', () => openOneTimeChangeRequest(order)));
-    body.append(panel, actions);
-    openDialog('One-time order', 'Modify delivery', body);
-  }
+    renderLoading(body, 'Checking which changes are still available…');
+    openDialog('One-time order', 'Modify order', body);
 
-  function openOneTimeChangeRequest(order) {
-    const form = create('form', 'dialog-form');
-    form.append(create('p', 'dialog-copy', 'These changes need confirmation because milling and delivery may already be scheduled. Submit the exact request below and Atulyash care will confirm whether it is still possible.'));
+    try {
+      const id = orderId(order);
+      const detailResult = await apiCall('orders', ['detail', 'getOrderDetails'], { id, orderId: id }, {
+        path: `/orders/order/${id}/`,
+        method: 'GET'
+      });
+      const detail = responseData(detailResult);
+      if (!canModifyOneTimeOrder(detail)) {
+        const statePanel = makeState(
+          'empty',
+          'Self-service changes are closed.',
+          orderHasSuccessfulPayment(detail)
+            ? 'This order already has a successful payment. Please contact Atulyash care so any change and payment adjustment can be handled safely.'
+            : 'Delivered, cancelled and closed orders cannot be changed.'
+        );
+        const actions = create('div', 'dialog-actions');
+        const care = create('a', 'primary-button', 'Contact customer care →');
+        care.href = 'mailto:info@atulyash.com';
+        actions.append(button('Close', 'secondary-button', closeDialog), care);
+        body.replaceChildren(statePanel, actions);
+        return;
+      }
 
-    const typeLabel = create('label', '', 'What would you like to change?');
-    const type = create('select');
-    [
-      ['Delivery date', 'Delivery date'],
-      ['Pack size', 'Pack size'],
-      ['Quantity', 'Quantity'],
-      ['Pack and quantity', 'Pack and quantity']
-    ].forEach(([value, text]) => {
-      const option = create('option', '', text);
-      option.value = value;
-      type.append(option);
-    });
-    typeLabel.append(type);
+      await Promise.all([
+        ensureAddresses(),
+        state.quickProductCatalogStatus === 'ready'
+          ? Promise.resolve()
+          : loadQuickOrderProducts()
+      ]);
+      if (!state.addresses.length) {
+        renderEmpty(body, 'No saved delivery home.', 'Add an address before modifying this order.', button('Add an address', 'primary-button', () => openAddressForm()));
+        return;
+      }
 
-    const requestLabel = create('label', '', 'Requested change');
-    const request = create('textarea');
-    request.name = 'requested_change';
-    request.rows = 4;
-    request.maxLength = 300;
-    request.required = true;
-    request.placeholder = 'Example: Please move delivery to 18 August, or change the order to two 2 kg packs.';
-    requestLabel.append(request);
+      const rawItems = orderItems(detail);
+      const itemControls = rawItems.map((item, index) => {
+        const itemId = firstValue(item.order_item_id, item.id, item.pk);
+        const packObject = item.product_pack && typeof item.product_pack === 'object'
+          ? item.product_pack
+          : null;
+        const packId = firstValue(
+          item.product_pack_id,
+          packObject?.id,
+          packObject?.pk,
+          packObject ? null : item.product_pack
+        );
+        if (itemId == null || packId == null) return null;
 
-    const actions = create('div', 'dialog-actions');
-    actions.append(button('Back', 'secondary-button', () => openOneTimeOrderModification(order)));
-    const submit = create('button', 'primary-button', 'Send change request →');
-    submit.type = 'submit';
-    actions.append(submit);
-    form.append(typeLabel, requestLabel, actions);
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const subject = `Order ${orderNumber(order)} · ${type.value} change request`;
-      const message = [
-        `Order: ${orderNumber(order)}`,
-        `Requested change type: ${type.value}`,
-        `Request: ${request.value.trim()}`,
-        '',
-        'Please confirm whether this change can be completed before milling or dispatch.'
-      ].join('\n');
-      window.location.href = `mailto:info@atulyash.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-      showToast('Opening your email app with the change request.');
-    });
-    openDialog('One-time order', 'Request a change', form);
+        const wrapper = create('fieldset', 'order-modification-item');
+        const legend = create('legend', '', `Item ${index + 1} · ${firstValue(item.product_name, packObject?.product?.name, 'Atulyash Whole Wheat Atta')}`);
+        const grid = create('div', 'form-grid');
+        const packLabel = create('label', '', 'Pack size');
+        const pack = create('select');
+        pack.required = true;
+        const availablePacks = [...state.quickProductPacks];
+        if (!availablePacks.some((candidate) => String(candidate.apiId) === String(packId))) {
+          availablePacks.push({
+            apiId: packId,
+            weight: firstFinite(packObject?.weight, item.weight, weightFromLabel(packObject?.name)),
+            price: firstFinite(packObject?.price, item.unit_price, item.price)
+          });
+        }
+        availablePacks
+          .filter((candidate) => candidate?.apiId != null)
+          .sort((left, right) => Number(left.weight || 0) - Number(right.weight || 0))
+          .forEach((candidate) => {
+            const option = create('option', '', [
+              candidate.weight ? `${bagWeightLabel(candidate.weight)} kg` : `Pack #${candidate.apiId}`,
+              Number.isFinite(Number(candidate.price)) ? formatMoney(candidate.price) : ''
+            ].filter(Boolean).join(' · '));
+            option.value = String(candidate.apiId);
+            option.selected = String(candidate.apiId) === String(packId);
+            pack.append(option);
+          });
+        packLabel.append(pack);
+
+        const quantityLabel = create('label', '', 'Quantity');
+        const quantity = create('input');
+        quantity.type = 'number';
+        quantity.min = '1';
+        quantity.max = '50';
+        quantity.step = '1';
+        quantity.required = true;
+        quantity.value = String(Math.max(1, Math.round(firstFinite(item.quantity, item.qty) || 1)));
+        quantityLabel.append(quantity);
+        grid.append(packLabel, quantityLabel);
+        wrapper.append(legend, grid);
+        return { wrapper, itemId, pack, quantity };
+      });
+
+      if (!rawItems.length || itemControls.some((entry) => !entry)) {
+        throw new Error('The live order does not include the item IDs required for a safe modification. Please contact customer care.');
+      }
+
+      const form = create('form', 'dialog-form');
+      form.append(create('p', 'dialog-copy', 'Update the delivery home, date, pack or quantity below. The live service will reprice the order and confirm the change before it is saved.'));
+      const detailsGrid = create('div', 'form-grid');
+      const addressLabel = create('label', '', 'Delivery home');
+      const addressSelect = create('select');
+      addressSelect.required = true;
+      const currentAddress = firstValue(detail.delivery_address, detail.address, detail.customer_address);
+      const currentAddressId = idOf(currentAddress);
+      state.addresses.forEach((address) => {
+        const option = create('option', '', `${firstValue(address.address_type, 'Address')} — ${addressText(address)}`);
+        option.value = String(addressId(address));
+        option.selected = String(addressId(address)) === String(currentAddressId);
+        addressSelect.append(option);
+      });
+      addressLabel.append(addressSelect);
+
+      const dateLabel = create('label', '', 'Delivery date');
+      const deliveryDate = create('input');
+      deliveryDate.type = 'date';
+      deliveryDate.required = true;
+      const today = new Date();
+      const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+      deliveryDate.min = localToday;
+      const currentDeliveryDate = String(firstValue(
+        detail.requested_delivery_date,
+        detail.order_delivery_date,
+        detail.delivery_date,
+        detail.expected_delivery_date,
+        ''
+      )).slice(0, 10);
+      deliveryDate.value = /^\d{4}-\d{2}-\d{2}$/.test(currentDeliveryDate) && currentDeliveryDate >= localToday
+        ? currentDeliveryDate
+        : localToday;
+      dateLabel.append(deliveryDate);
+      detailsGrid.append(addressLabel, dateLabel);
+      form.append(detailsGrid, ...itemControls.map((entry) => entry.wrapper));
+
+      const policy = create('div', 'confirmation-panel');
+      policy.append(
+        create('strong', '', 'No payment is taken in this step'),
+        create('p', '', 'Only unpaid, open one-time orders can be modified. Delivery charges and the final total are recalculated by Atulyash after you confirm.')
+      );
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Cancel', 'secondary-button', closeDialog));
+      const submit = create('button', 'primary-button', 'Save order changes →');
+      submit.type = 'submit';
+      actions.append(submit);
+      form.append(policy, actions);
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const payload = {
+          address_id: Number(addressSelect.value),
+          delivery_date: deliveryDate.value,
+          items: itemControls.map((entry) => ({
+            order_item_id: entry.itemId,
+            quantity: Number(entry.quantity.value),
+            product_pack_id: Number(entry.pack.value)
+          }))
+        };
+        setButtonBusy(submit, true, 'Saving…');
+        try {
+          const result = await apiCall('orders', ['modify', 'modifyOrder'], {
+            id,
+            orderId: id,
+            ...payload
+          }, {
+            path: `/orders/order/${id}/modify/`,
+            method: 'PATCH',
+            body: payload
+          });
+          const data = responseData(result);
+          closeDialog();
+          state.loaded.forEach((key) => {
+            if (String(key).startsWith('orders:')) state.loaded.delete(key);
+          });
+          await renderOrders({ page: 1, force: true });
+          const updatedTotal = finiteMoney(data.total_amount);
+          showToast(updatedTotal !== null
+            ? `Order updated. New total: ${formatMoney(updatedTotal)}.`
+            : String(firstValue(data.message, 'Your order has been updated.'))
+          );
+        } catch (error) {
+          showToast(friendlyError(error, 'The order could not be modified. No changes were saved.'), 'error');
+          setButtonBusy(submit, false);
+        }
+      });
+      body.replaceChildren(form);
+    } catch (error) {
+      body.replaceChildren(makeState(
+        'error',
+        'This order cannot be changed here.',
+        friendlyError(error, 'The live order details required for a safe modification are unavailable.'),
+        () => openOneTimeOrderModification(order)
+      ));
+    }
   }
 
   function openOrderReceipt(order) {
@@ -2255,60 +2460,6 @@
     const total = Math.max(0, Number(count));
     elements.deliveryHomeCount.textContent = String(total).padStart(2, '0');
     elements.deliveryHomeCountLabel.textContent = total === 1 ? 'Saved delivery home' : 'Saved delivery homes';
-  }
-
-  async function openChangeOrderAddress(order) {
-    const body = create('div');
-    renderLoading(body, 'Loading your saved addresses…');
-    openDialog('Delivery details', 'Change address', body);
-    try {
-      const addresses = await ensureAddresses();
-      if (!addresses.length) {
-        renderEmpty(body, 'No saved address yet.', 'Add an address before changing this delivery.', button('Add an address', 'primary-button', () => openAddressForm()));
-        return;
-      }
-      const form = create('form', 'dialog-form');
-      const label = create('label', '', 'Choose a saved address');
-      const select = create('select');
-      select.name = 'address_id';
-      select.required = true;
-      addresses.forEach((address) => {
-        const option = create('option', '', `${firstValue(address.address_type, 'Address')} — ${addressText(address)}`);
-        option.value = String(addressId(address));
-        select.append(option);
-      });
-      label.append(select);
-      const note = create('p', 'dialog-copy', 'The address can be changed only while the order is still eligible for an update.');
-      const actions = create('div', 'dialog-actions');
-      actions.append(button('Cancel', 'secondary-button', closeDialog));
-      const submit = create('button', 'primary-button', 'Update address →');
-      submit.type = 'submit';
-      actions.append(submit);
-      form.append(label, note, actions);
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        setButtonBusy(submit, true, 'Updating…');
-        try {
-          const id = orderId(order);
-          const address_id = select.value;
-          await apiCall('orders', ['changeAddress'], { id, orderId: id, address_id, addressId: address_id }, {
-            path: `/orders/order/${id}/change-address/`,
-            method: 'POST',
-            form: { address_id }
-          });
-          closeDialog();
-          state.loaded.delete(`orders:${elements.orderFilter.value}`);
-          showToast('The delivery address has been updated.');
-          renderOrders({ force: true });
-        } catch (error) {
-          showToast(friendlyError(error), 'error');
-          setButtonBusy(submit, false);
-        }
-      });
-      body.replaceChildren(form);
-    } catch (error) {
-      renderError(body, error, () => openChangeOrderAddress(order));
-    }
   }
 
   function openReview(order) {
@@ -2709,7 +2860,7 @@
         )
       );
       const body = create('div');
-      body.append(create('p', 'dialog-copy', 'Skip or restore an upcoming delivery here. Moving an active plan to a different weekday needs confirmation from Atulyash care so the fresh-batch route stays accurate.'));
+      body.append(create('p', 'dialog-copy', 'Skip or restore an eligible upcoming delivery here. You can also move future deliveries to another supported weekday; the live service will confirm the effective date before anything changes.'));
       if (Object.keys(summary).length) {
         const summaryBox = create('div', 'dialog-summary');
         [
@@ -2748,9 +2899,9 @@
       const scheduleCopy = create('div');
       scheduleCopy.append(
         create('strong', '', 'Need a different delivery weekday or date?'),
-        create('p', '', 'Send the preferred schedule to Atulyash care for route confirmation.')
+        create('p', '', 'Choose a supported weekday and effective date. Existing deliveries before that date stay unchanged.')
       );
-      scheduleHelp.append(scheduleCopy, button('Request schedule change', 'card-action', () => openSubscriptionScheduleRequest(subscription)));
+      scheduleHelp.append(scheduleCopy, button('Change schedule', 'card-action', () => openSubscriptionScheduleRequest(subscription)));
       body.append(scheduleHelp);
       elements.dialogBody.replaceChildren(body);
     } catch (error) {
@@ -2763,7 +2914,7 @@
       ));
       const actions = create('div', 'dialog-actions');
       actions.append(button('Try again', 'secondary-button', () => openManageDeliveries(subscription)));
-      actions.append(button('Request schedule change →', 'primary-button', () => openSubscriptionScheduleRequest(subscription)));
+      actions.append(button('Change schedule →', 'primary-button', () => openSubscriptionScheduleRequest(subscription)));
       body.append(actions);
       elements.dialogBody.replaceChildren(body);
     }
@@ -2771,51 +2922,74 @@
 
   function openSubscriptionScheduleRequest(subscription) {
     const form = create('form', 'dialog-form');
-    form.append(create('p', 'dialog-copy', 'Your regular delivery day affects milling and the delivery route. Share your preferred day or date and Atulyash care will confirm the next available schedule.'));
+    form.append(create('p', 'dialog-copy', 'Choose the weekday for future fresh batches and when the new rhythm should begin. Deliveries already scheduled before that date will not move.'));
     const fields = create('div', 'form-grid');
     const weekdayLabel = create('label', '', 'Preferred weekday');
     const weekday = create('select');
+    const currentWeekday = String(firstValue(subscription.delivery_day, subscription.preferred_delivery_day, '')).toLowerCase();
     ['Sunday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].forEach((day) => {
       const option = create('option', '', day);
       option.value = day;
+      option.selected = day.toLowerCase() === currentWeekday;
       weekday.append(option);
     });
     weekdayLabel.append(weekday);
-    const dateLabel = create('label', '', 'Preferred effective date');
+    const dateLabel = create('label', '', 'Effective from');
     const date = create('input');
     date.type = 'date';
     date.required = true;
-    date.min = new Date().toISOString().slice(0, 10);
+    const earliest = new Date();
+    earliest.setDate(earliest.getDate() + 1);
+    const localEarliest = new Date(earliest.getTime() - (earliest.getTimezoneOffset() * 60000));
+    date.min = localEarliest.toISOString().slice(0, 10);
+    date.value = date.min;
     dateLabel.append(date);
     fields.append(weekdayLabel, dateLabel);
-    const noteLabel = create('label', '', 'Anything else? (Optional)');
-    const note = create('textarea');
-    note.rows = 3;
-    note.maxLength = 250;
-    note.placeholder = 'Add any delivery preference our team should know.';
-    noteLabel.append(note);
+    const policy = create('div', 'confirmation-panel');
+    policy.append(
+      create('strong', '', 'Before you confirm'),
+      create('p', '', 'Monday is unavailable. A minimum one-day lead time and the 6:20 PM IST cutoff apply. Your delivery route must also be active.')
+    );
     const actions = create('div', 'dialog-actions');
     actions.append(button('Back', 'secondary-button', () => openManageDeliveries(subscription)));
-    const submit = create('button', 'primary-button', 'Send schedule request →');
+    const submit = create('button', 'primary-button', 'Update schedule →');
     submit.type = 'submit';
     actions.append(submit);
-    form.append(fields, noteLabel, actions);
-    form.addEventListener('submit', (event) => {
+    form.append(fields, policy, actions);
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const subject = `Weekly plan ${subscriptionId(subscription)} schedule change request`;
-      const message = [
-        `Plan: ${subscriptionName(subscription)} · ${subscriptionWeight(subscription)}`,
-        `Plan reference: #${subscriptionId(subscription)}`,
-        `Preferred weekday: ${weekday.value}`,
-        `Preferred effective date: ${date.value}`,
-        note.value.trim() ? `Note: ${note.value.trim()}` : '',
-        '',
-        'Please confirm the available delivery schedule before applying this change.'
-      ].filter(Boolean).join('\n');
-      window.location.href = `mailto:info@atulyash.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-      showToast('Opening your email app with the schedule request.');
+      const id = subscriptionId(subscription);
+      const payload = {
+        id,
+        subscriptionId: id,
+        delivery_day: weekday.value,
+        effective_from: date.value
+      };
+      setButtonBusy(submit, true, 'Updating…');
+      try {
+        const result = await apiCall('subscriptions', ['updateSchedule', 'changeSchedule'], payload, {
+          path: `/subscription/subscription_plan/${id}/schedule/`,
+          method: 'PATCH',
+          body: {
+            delivery_day: payload.delivery_day,
+            effective_from: payload.effective_from
+          }
+        });
+        const data = responseData(result);
+        closeDialog();
+        state.loaded.delete('subscriptions');
+        await renderSubscriptions(true);
+        const nextDate = firstValue(data.next_delivery_date, data.effective_from);
+        showToast(nextDate
+          ? `Weekly delivery moved to ${String(firstValue(data.confirmed_weekday, data.new_day, weekday.value))}. Next date: ${formatDate(nextDate)}.`
+          : String(firstValue(data.message, 'Your weekly delivery schedule has been updated.'))
+        );
+      } catch (error) {
+        showToast(friendlyError(error, 'The schedule could not be updated. No delivery was changed.'), 'error');
+        setButtonBusy(submit, false);
+      }
     });
-    openDialog('Weekly plan', 'Request schedule change', form);
+    openDialog('Weekly plan', 'Change delivery schedule', form);
   }
 
   function confirmDeliveryChange(subscription, deliveryDate, currentlySkipped) {
@@ -3179,13 +3353,17 @@
     const serviceabilityCopy = create('small');
     const serviceabilityContent = create('div', 'address-serviceability-copy');
     serviceabilityContent.append(serviceabilityTitle, serviceabilityCopy);
-    serviceabilityNotice.append(create('span', 'address-serviceability-mark', '!'), serviceabilityContent);
+    const serviceabilityMark = create('span', 'address-serviceability-mark', '!');
+    serviceabilityNotice.append(serviceabilityMark, serviceabilityContent);
     fields.append(serviceabilityNotice);
 
     let areaLookupRequest = 0;
-    const showAreaLookupNotice = (title, message) => {
+    let verifiedPincode = '';
+    const showAreaLookupNotice = (title, message, status = 'error') => {
       serviceabilityTitle.textContent = title;
       serviceabilityCopy.textContent = message;
+      serviceabilityNotice.dataset.state = status;
+      serviceabilityMark.textContent = status === 'success' ? '✓' : status === 'checking' ? '·' : '!';
       serviceabilityNotice.hidden = false;
     };
     const resetAreaOptions = (message = 'Enter a six-digit PIN code first') => {
@@ -3222,9 +3400,38 @@
     };
     const clearServiceabilityError = () => {
       if (!pincodeInput) return;
+      verifiedPincode = '';
       pincodeInput.removeAttribute('aria-invalid');
       pincodeInput.setCustomValidity('');
       serviceabilityNotice.hidden = true;
+    };
+    const checkLiveServiceability = async (pincode) => {
+      showAreaLookupNotice('Checking delivery coverage', `Confirming live Atulyash service for PIN ${pincode}…`, 'checking');
+      const result = await apiCall('pincodes', ['serviceability'], { pincode }, {
+        path: '/pincodes/pincode/serviceability/',
+        method: 'GET',
+        query: { pincode },
+        auth: false
+      });
+      const data = responseData(result);
+      if (data.serviceable !== true) {
+        verifiedPincode = '';
+        showAreaLookupNotice(
+          'This PIN code is not serviceable yet',
+          `Atulyash does not currently deliver to ${pincode}. Please use another delivery address.`
+        );
+        pincodeInput?.setAttribute('aria-invalid', 'true');
+        return null;
+      }
+      verifiedPincode = pincode;
+      if (data.city && cityInput && !cityInput.value.trim()) cityInput.value = data.city;
+      if (data.state && stateInput && !stateInput.value.trim()) stateInput.value = data.state;
+      showAreaLookupNotice(
+        'Fresh-batch delivery is available',
+        `${data.city || 'This area'}, ${pincode} is served by Atulyash. Choose the locality below to complete the address.`,
+        'success'
+      );
+      return data;
     };
     const lookupAreaFromPincode = async () => {
       const pincode = String(pincodeInput?.value || '').replace(/\D/g, '').slice(0, 6);
@@ -3248,15 +3455,26 @@
       areaLabel.hidden = false;
       areaLabel.inert = false;
       try {
+        const serviceability = await checkLiveServiceability(pincode);
+        if (request !== areaLookupRequest || pincode !== String(pincodeInput?.value || '')) return;
+        if (!serviceability) {
+          resetAreaOptions('Delivery is not available for this PIN');
+          return;
+        }
         const result = await GOOGLE_AREA_LOOKUP.lookupIndianPincode(pincode);
         if (request !== areaLookupRequest || pincode !== String(pincodeInput?.value || '')) return;
         const area = renderGoogleAreas(result);
         if (!area) throw new Error('Google could not identify an area for this PIN code.');
-        serviceabilityNotice.hidden = true;
+        showAreaLookupNotice(
+          'Fresh-batch delivery is available',
+          `${area}, ${pincode} is inside the current Atulyash delivery area.`,
+          'success'
+        );
       } catch (error) {
         if (request !== areaLookupRequest) return;
+        verifiedPincode = '';
         resetAreaOptions('Area could not be identified');
-        showAreaLookupNotice('Area could not be identified', error?.message || 'Please check the PIN code and try again.');
+        showAreaLookupNotice('Address could not be verified', friendlyError(error, 'Please check the PIN code and try again.'));
       }
     };
     if (/^\d{6}$/.test(String(pincodeInput?.value || ''))) {
@@ -3299,6 +3517,15 @@
       try {
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
+        const normalizedPincode = String(payload.pincode || '').replace(/\D/g, '').slice(0, 6);
+        if (verifiedPincode !== normalizedPincode) {
+          const serviceability = await checkLiveServiceability(normalizedPincode);
+          if (!serviceability) {
+            pincodeInput?.focus({ preventScroll: true });
+            setButtonBusy(submit, false);
+            return;
+          }
+        }
         if (!String(payload.area || '').trim()) {
           showAreaLookupNotice('Area needed', 'Wait for Google to identify the area for this PIN code, then try again.');
           areaSelect.focus({ preventScroll: true });

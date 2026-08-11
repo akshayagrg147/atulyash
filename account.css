@@ -2678,6 +2678,22 @@ select {
   resize: vertical;
 }
 
+.order-modification-item {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(244, 237, 222, .42);
+}
+
+.order-modification-item legend {
+  padding: 0 7px;
+  color: var(--forest-900);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2699,6 +2715,24 @@ select {
 
 .address-serviceability-notice[hidden] {
   display: none;
+}
+
+.address-serviceability-notice[data-state="success"] {
+  background: rgba(31, 112, 84, .07);
+  border-color: rgba(31, 112, 84, .28);
+}
+
+.address-serviceability-notice[data-state="success"] .address-serviceability-mark {
+  background: var(--green-600, #276f58);
+}
+
+.address-serviceability-notice[data-state="checking"] {
+  background: rgba(205, 164, 76, .08);
+  border-color: rgba(205, 164, 76, .32);
+}
+
+.address-serviceability-notice[data-state="checking"] .address-serviceability-mark {
+  background: var(--gold-500, #c89f4d);
 }
 
 .address-serviceability-mark {

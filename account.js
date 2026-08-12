@@ -3480,9 +3480,13 @@
       areaLabel.inert = true;
     };
     const renderGoogleAreas = (result) => {
-      const areas = [...new Set((result?.areas || []).map((area) => String(area || '').trim()).filter(Boolean))];
+      const rawAreas = result?.areas || result?.available_areas || result?.serviceable_areas || result?.area_options || [];
+      const areas = [...new Set((Array.isArray(rawAreas) ? rawAreas : []).map((area) => {
+        if (area && typeof area === 'object') return firstValue(area.name, area.area, area.label, area.locality, '');
+        return String(area || '').trim();
+      }).map((area) => String(area || '').trim()).filter(Boolean))];
       if (!areas.length) {
-        resetAreaOptions('Google could not identify an area');
+        resetAreaOptions('No delivery areas returned for this PIN');
         return '';
       }
       const current = areaSelect.value;
@@ -3507,12 +3511,13 @@
       pincodeInput.setCustomValidity('');
       serviceabilityNotice.hidden = true;
     };
-    const checkLiveServiceability = async (pincode) => {
-      showAreaLookupNotice('Checking delivery coverage', `Confirming live Atulyash service for PIN ${pincode}…`, 'checking');
-      const result = await apiCall('pincodes', ['serviceability'], { pincode }, {
+    const checkLiveServiceability = async (pincode, area = '') => {
+      showAreaLookupNotice('Checking delivery coverage', `Confirming live Atulyash service for PIN ${pincode}${area ? ` and ${area}` : ''}…`, 'checking');
+      const query = { pincode, ...(area ? { area } : {}) };
+      const result = await apiCall('pincodes', ['serviceability'], { pincode, area }, {
         path: '/pincodes/pincode/serviceability/',
         method: 'GET',
-        query: { pincode },
+        query,
         auth: false
       });
       const data = responseData(result);
@@ -3525,7 +3530,7 @@
         pincodeInput?.setAttribute('aria-invalid', 'true');
         return null;
       }
-      verifiedPincode = pincode;
+      verifiedPincode = `${pincode}|${area}`;
       if (data.city && cityInput && !cityInput.value.trim()) cityInput.value = data.city;
       if (data.state && stateInput && !stateInput.value.trim()) stateInput.value = data.state;
       showAreaLookupNotice(
@@ -3543,11 +3548,6 @@
         resetAreaOptions();
         return;
       }
-      if (!GOOGLE_AREA_LOOKUP?.isConfigured?.()) {
-        resetAreaOptions('Area lookup is unavailable');
-        showAreaLookupNotice('Area lookup is unavailable', 'Google area lookup is not configured. Please try again later.');
-        return;
-      }
       const loading = create('option', '', 'Finding your area…');
       loading.value = '';
       loading.disabled = true;
@@ -3563,10 +3563,25 @@
           resetAreaOptions('Delivery is not available for this PIN');
           return;
         }
-        const result = await GOOGLE_AREA_LOOKUP.lookupIndianPincode(pincode);
+        let result = serviceability;
+        const returnedAreas = result?.areas || result?.available_areas || result?.serviceable_areas || result?.area_options;
+        if (!Array.isArray(returnedAreas) || !returnedAreas.length) {
+          try {
+            const areaResponse = await apiCall('pincodes', ['areas'], { pincode }, {
+              path: '/pincodes/area/',
+              method: 'GET',
+              query: { pincode },
+              auth: false
+            });
+            const areaData = responseData(areaResponse);
+            result = { ...result, areas: areaData?.areas || areaData?.results || areaData?.data || areaData };
+          } catch (_areaError) {
+            // The serviceability response remains authoritative if the area list endpoint is unavailable.
+          }
+        }
         if (request !== areaLookupRequest || pincode !== String(pincodeInput?.value || '')) return;
         const area = renderGoogleAreas(result);
-        if (!area) throw new Error('Google could not identify an area for this PIN code.');
+        if (!area) throw new Error('The service did not return any areas for this PIN code.');
         showAreaLookupNotice(
           'Fresh-batch delivery is available',
           `${area}, ${pincode} is inside the current Atulyash delivery area.`,
@@ -3620,16 +3635,17 @@
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
         const normalizedPincode = String(payload.pincode || '').replace(/\D/g, '').slice(0, 6);
-        if (verifiedPincode !== normalizedPincode) {
-          const serviceability = await checkLiveServiceability(normalizedPincode);
+        const selectedArea = String(payload.area || '').trim();
+        if (verifiedPincode !== `${normalizedPincode}|${selectedArea}`) {
+          const serviceability = await checkLiveServiceability(normalizedPincode, selectedArea);
           if (!serviceability) {
             pincodeInput?.focus({ preventScroll: true });
             setButtonBusy(submit, false);
             return;
           }
         }
-        if (!String(payload.area || '').trim()) {
-          showAreaLookupNotice('Area needed', 'Wait for Google to identify the area for this PIN code, then try again.');
+        if (!selectedArea) {
+          showAreaLookupNotice('Area needed', 'Wait for Atulyash to return the available areas for this PIN code, then try again.');
           areaSelect.focus({ preventScroll: true });
           setButtonBusy(submit, false);
           return;

@@ -1522,6 +1522,9 @@
     serviceability: function pincodeServiceability(pincode, options) {
       var query = isPlainObject(pincode) ? pincode : { pincode: pincode };
       return publicGet('/pincodes/pincode/serviceability/', query, options);
+    },
+    areas: function pincodeAreas(params, options) {
+      return publicGet('/pincodes/area/', params || {}, options);
     }
   };
 

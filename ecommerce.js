@@ -27,7 +27,6 @@
   const COUPON_CONTEXT_KEY = 'atulyash-coupon-context-v1';
   const CHECKOUT_CONTEXT_TTL = 2 * 60 * 60 * 1000;
   const API = window.AtulyashAPI || null;
-  const GOOGLE_AREA_LOOKUP = window.AtulyashGoogleAreaLookup || null;
   const currency = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -3579,9 +3578,13 @@
     const field = elements.checkoutAreaField;
     const select = elements.checkoutArea;
     if (!field || !select) return '';
-    const areas = [...new Set((result?.areas || []).map((area) => String(area || '').trim()).filter(Boolean))];
+    const rawAreas = result?.areas || result?.available_areas || result?.serviceable_areas || result?.area_options || [];
+    const areas = [...new Set((Array.isArray(rawAreas) ? rawAreas : []).map((area) => {
+      if (area && typeof area === 'object') return String(area.name || area.area || area.label || area.locality || '').trim();
+      return String(area || '').trim();
+    }).filter(Boolean))];
     if (!areas.length) {
-      resetCheckoutAreaOptions('Google could not identify an area');
+      resetCheckoutAreaOptions('No delivery areas returned for this PIN');
       return '';
     }
     const current = select.value;
@@ -3619,15 +3622,6 @@
       resetCheckoutAreaOptions();
       return null;
     }
-    if (!GOOGLE_AREA_LOOKUP?.isConfigured?.()) {
-      resetCheckoutAreaOptions('Area lookup is unavailable');
-      renderPincodeServiceability('error', {
-        title: 'Area lookup is unavailable',
-        message: 'Google area lookup is not configured. Please try again later.'
-      });
-      return null;
-    }
-
     const field = elements.checkoutAreaField;
     const select = elements.checkoutArea;
     if (field && select) {
@@ -3647,16 +3641,35 @@
     });
 
     try {
-      const result = await GOOGLE_AREA_LOOKUP.lookupIndianPincode(normalizedPincode);
+      const serviceability = await invokeApi('pincodes', 'serviceability', [normalizedPincode], {
+        path: '/pincodes/pincode/serviceability/',
+        options: { method: 'GET', auth: false, cache: 'no-store', query: { pincode: normalizedPincode } }
+      });
+      let result = serviceability?.data && typeof serviceability.data === 'object' ? serviceability.data : serviceability;
+      if (request !== checkoutAreaLookupRequest || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return null;
+      const returnedAreas = result?.areas || result?.available_areas || result?.serviceable_areas || result?.area_options;
+      if (!Array.isArray(returnedAreas) || !returnedAreas.length) {
+        try {
+          const areaResponse = await invokeApi('pincodes', 'areas', [normalizedPincode], {
+            path: '/pincodes/area/',
+            options: { method: 'GET', auth: false, cache: 'no-store', query: { pincode: normalizedPincode } }
+          });
+          const areaData = areaResponse?.data && typeof areaResponse.data === 'object' ? areaResponse.data : areaResponse;
+          const areas = areaData?.areas || areaData?.results || areaData?.data || areaData;
+          if (Array.isArray(areas)) result = { ...result, areas };
+        } catch (_areaError) {
+          // The serviceability response remains authoritative if the area list endpoint is unavailable.
+        }
+      }
       if (request !== checkoutAreaLookupRequest || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return null;
       const area = renderCheckoutGoogleAreas(result);
-      if (!area) throw new Error('Google could not identify an area for this PIN code.');
+      if (!area) throw new Error('The service did not return any areas for this PIN code.');
       setGoogleAddressContext(result);
       await checkPincodeServiceability({ force: true });
       return result;
     } catch (error) {
       if (request !== checkoutAreaLookupRequest) return null;
-      resetCheckoutAreaOptions('Area could not be identified');
+      resetCheckoutAreaOptions('No delivery areas returned for this PIN');
       renderPincodeServiceability('error', {
         title: 'Area could not be identified',
         message: error?.message || 'Please check the PIN code and try again.'
@@ -3706,7 +3719,7 @@
       setFieldError(elements.checkoutArea, 'We could not identify your area. Check the PIN code again.');
       renderPincodeServiceability('error', {
         title: 'Area needed',
-        message: 'Wait for Google to identify the area for this PIN code.'
+        message: 'Wait for Atulyash to return the available areas for this PIN code.'
       });
       return false;
     }
@@ -3721,7 +3734,7 @@
       message: `Confirming live Atulyash delivery coverage for ${pincode}…`
     });
     try {
-      const query = { pincode };
+      const query = { pincode, area };
       const payload = await invokeApi('pincodes', 'serviceability', [pincode], {
         path: '/pincodes/pincode/serviceability/',
         options: { method: 'GET', auth: false, cache: 'no-store', query }

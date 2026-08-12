@@ -81,6 +81,11 @@
     accountBagSubtotal: $('accountBagSubtotal'),
     accountBagCreditRow: $('accountBagCreditRow'),
     accountBagCredit: $('accountBagCredit'),
+    accountBagDeliveryRow: $('accountBagDeliveryRow'),
+    accountBagDeliveryLabel: $('accountBagDeliveryLabel'),
+    accountBagDeliveryNote: $('accountBagDeliveryNote'),
+    accountBagDeliveryCharge: $('accountBagDeliveryCharge'),
+    accountBagDeliveryPolicy: $('accountBagDeliveryPolicy'),
     accountBagTotalLabel: $('accountBagTotalLabel'),
     accountBagTotal: $('accountBagTotal'),
     accountBagCheckoutButton: $('accountBagCheckoutButton'),
@@ -714,31 +719,110 @@
     return NaN;
   }
 
+  function accountBagDeliverySummary(payload, { hasWeekly = false, hasLocalSelections = false } = {}) {
+    if (hasLocalSelections) {
+      return {
+        amount: null,
+        known: false,
+        requiresSupport: false,
+        label: 'Delivery charge pending sync',
+        note: 'Your saved selection will be priced by the live bag before checkout.'
+      };
+    }
+    const hasLiveCart = serverBagItems(payload).length > 0 || (bagQuantityFromPayload(payload) || 0) > 0;
+    if (!hasLiveCart) {
+      return {
+        amount: null,
+        known: false,
+        requiresSupport: false,
+        label: 'Delivery charge pending sync',
+        note: 'Your saved selection will be priced by the live bag before checkout.'
+      };
+    }
+
+    const amount = accountBagMoney(payload, ['delivery_charge']);
+    let reason = '';
+    let requiresSupport;
+    for (const source of bagPayloadSources(payload)) {
+      if (!reason && source.delivery_charge_reason) reason = String(source.delivery_charge_reason);
+      if (typeof source.delivery_requires_customer_care === 'boolean') {
+        requiresSupport = source.delivery_requires_customer_care;
+      }
+    }
+    const reasonLabels = {
+      ONE_TIME_2_TO_6_KG: 'One-time delivery · 2–6 kg',
+      ONE_TIME_7_TO_10_KG: 'One-time delivery · 7–10 kg',
+      ONE_TIME_11_TO_40_KG: 'One-time delivery · 11–40 kg',
+      ABOVE_40_KG_CUSTOMER_CARE: 'Large-order delivery',
+      WEEKLY_SUBSCRIPTION: 'Fresh-batch delivery'
+    };
+    if (requiresSupport === true) {
+      return {
+        amount: null,
+        known: true,
+        requiresSupport: true,
+        label: reasonLabels[reason] || 'Delivery requires customer care',
+        note: 'This order needs confirmation from Atulyash Customer Care before checkout.'
+      };
+    }
+    if (!Number.isFinite(amount)) {
+      return {
+        amount: null,
+        known: false,
+        requiresSupport: true,
+        label: 'Delivery charge unavailable',
+        note: 'The live bag did not return a delivery-charge decision. Refresh your bag before checkout.'
+      };
+    }
+    return {
+      amount: Math.max(0, amount),
+      known: true,
+      requiresSupport: false,
+      label: reasonLabels[reason] || (hasWeekly ? 'Fresh-batch delivery' : 'Delivery charge'),
+      note: amount === 0
+        ? 'The live bag confirms free delivery.'
+        : `The live bag confirms a ${currency.format(amount)} delivery charge.`
+    };
+  }
+
   function accountBagSummary(lines, lineSubtotal) {
     const hasLocalSelections = readLocalBagItems().length > 0;
     const hasWeekly = lines.some((line) => line.weekly);
+    const hasLiveCart = serverBagItems(state.accountBagPayload).length > 0
+      || (bagQuantityFromPayload(state.accountBagPayload) || 0) > 0;
     const serverSubtotal = accountBagMoney(
       state.accountBagPayload,
-      ['subtotal', 'sub_total', 'cart_subtotal', 'gross_amount', 'total_before_discount']
+      ['items_total', 'subtotal', 'sub_total', 'cart_subtotal', 'gross_amount', 'total_before_discount']
     );
     const serverDiscount = accountBagMoney(
       state.accountBagPayload,
-      ['discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']
+      ['applied_coupon_discount', 'discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']
     );
     const serverTotal = accountBagMoney(
       state.accountBagPayload,
-      ['net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']
+      ['cart_total', 'net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']
     );
-    const subtotal = !hasLocalSelections && !hasWeekly && Number.isFinite(serverSubtotal)
+    const useServerSummary = !hasLocalSelections && hasLiveCart;
+    const subtotal = useServerSummary && Number.isFinite(serverSubtotal)
       ? serverSubtotal
       : lineSubtotal;
-    const discount = !hasLocalSelections && Number.isFinite(serverDiscount)
+    const discount = useServerSummary && Number.isFinite(serverDiscount)
       ? Math.max(0, serverDiscount)
       : 0;
-    const total = !hasLocalSelections && !hasWeekly && Number.isFinite(serverTotal)
+    const total = useServerSummary && Number.isFinite(serverTotal)
       ? serverTotal
       : Math.max(0, subtotal - discount);
-    return { subtotal, discount, total };
+    const delivery = accountBagDeliverySummary(state.accountBagPayload, { hasWeekly, hasLocalSelections });
+    return {
+      subtotal,
+      discount,
+      total,
+      deliveryCharge: delivery.amount,
+      deliveryKnown: delivery.known,
+      deliveryLabel: delivery.label,
+      deliveryNote: delivery.note,
+      deliveryRequiresSupport: delivery.requiresSupport
+    };
   }
 
   function showPortalBagCount(count) {
@@ -864,10 +948,27 @@
     if (elements.accountBagSubtotal) elements.accountBagSubtotal.textContent = currency.format(summary.subtotal);
     if (elements.accountBagCreditRow) elements.accountBagCreditRow.hidden = summary.discount <= 0;
     if (elements.accountBagCredit) elements.accountBagCredit.textContent = `−${currency.format(summary.discount)}`;
+    if (elements.accountBagDeliveryRow) elements.accountBagDeliveryRow.hidden = state.accountBagItems.length === 0;
+    if (elements.accountBagDeliveryLabel) elements.accountBagDeliveryLabel.textContent = summary.deliveryLabel;
+    if (elements.accountBagDeliveryNote) elements.accountBagDeliveryNote.textContent = summary.deliveryNote;
+    if (elements.accountBagDeliveryCharge) {
+      elements.accountBagDeliveryCharge.textContent = summary.deliveryRequiresSupport
+        ? 'Contact care'
+        : summary.deliveryKnown
+          ? summary.deliveryCharge === 0 ? 'Free' : currency.format(summary.deliveryCharge)
+          : 'At checkout';
+    }
+    if (elements.accountBagDeliveryPolicy) {
+      elements.accountBagDeliveryPolicy.textContent = summary.deliveryRequiresSupport
+        ? 'Checkout is paused until Atulyash Customer Care confirms this delivery.'
+        : summary.deliveryKnown
+          ? 'This delivery amount comes from your live Atulyash bag and is included in the total.'
+          : 'Your live delivery amount will appear as soon as this saved selection is synchronised.';
+    }
     if (elements.accountBagTotalLabel) {
       elements.accountBagTotalLabel.textContent = hasWeekly
         ? 'Minimum wallet balance'
-        : 'Total after credit';
+        : 'Order total';
     }
     if (elements.accountBagTotal) elements.accountBagTotal.textContent = currency.format(summary.total);
 
@@ -882,6 +983,7 @@
         state.accountBagItems.length === 0
         || state.accountBagLoading
         || state.accountBagItems.some((item) => item.unavailable)
+        || summary.deliveryRequiresSupport
       );
     }
   }

@@ -535,6 +535,39 @@
   font-size: 1.05rem;
 }
 
+.unified-bag .unified-bag-delivery {
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid rgba(17, 55, 46, .12);
+}
+
+.unified-bag .unified-bag-delivery > span {
+  display: grid;
+  gap: 4px;
+}
+
+.unified-bag .unified-bag-delivery b {
+  color: #194b3e;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.unified-bag .unified-bag-delivery small {
+  max-width: 260px;
+  color: #65706a;
+  font-size: .62rem;
+  line-height: 1.4;
+}
+
+.unified-bag .unified-bag-delivery strong {
+  white-space: nowrap;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
 .unified-bag .unified-bag-total {
   padding: 12px 0 8px;
   margin-top: 4px;

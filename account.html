@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="account.css?v=20260812-1">
-  <link rel="stylesheet" href="commerce-shared.css?v=20260802-3">
+  <link rel="stylesheet" href="account.css?v=20260812-2">
+  <link rel="stylesheet" href="commerce-shared.css?v=20260812-1">
 </head>
 <body>
   <a class="skip-link" id="skipLink" href="#authTitle">Skip to sign in</a>
@@ -185,11 +185,18 @@
           <span>Your first Atulyash experience</span>
           <strong id="accountBagCredit">−₹0</strong>
         </div>
+        <div class="account-bag-delivery unified-bag-delivery" id="accountBagDeliveryRow">
+          <span>
+            <b id="accountBagDeliveryLabel">Delivery charge</b>
+            <small id="accountBagDeliveryNote">Waiting for the live bag total.</small>
+          </span>
+          <strong id="accountBagDeliveryCharge">—</strong>
+        </div>
         <div class="account-bag-total unified-bag-total">
-          <span id="accountBagTotalLabel">Total after credit</span>
+          <span id="accountBagTotalLabel">Order total</span>
           <strong id="accountBagTotal">₹0</strong>
         </div>
-        <p>No delivery charges. Availability and the fresh-batch schedule are confirmed from your address.</p>
+        <p id="accountBagDeliveryPolicy">Delivery charges are confirmed by the live Atulyash bag.</p>
         <button id="accountBagCheckoutButton" type="button">Proceed to delivery <span aria-hidden="true">→</span></button>
         <button class="account-bag-continue unified-bag-continue" id="accountBagContinueButton" type="button">Continue shopping</button>
       </footer>
@@ -650,6 +657,6 @@
 
   <script src="api-client.js?v=20260812-1"></script>
   <script src="google-area-lookup.js?v=20260808-1"></script>
-  <script src="account.js?v=20260812-1"></script>
+  <script src="account.js?v=20260812-2"></script>
 </body>
 </html>

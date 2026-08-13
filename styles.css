@@ -4635,33 +4635,83 @@ h3 {
   }
 
   .signature-orbit-stage {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    flex-direction: column;
-    aspect-ratio: auto;
-    background: none;
+    width: min(100%, 360px);
+    min-height: 360px;
+    display: block;
+    aspect-ratio: 1;
+    background:
+      radial-gradient(circle at center, rgba(222, 197, 143, 0.16) 0 22%, transparent 22.5%),
+      radial-gradient(circle at center, rgba(255, 253, 248, 0.045) 0 50%, transparent 50.5%);
   }
 
   .signature-orbit-stage::before,
-  .signature-orbit-stage::after,
+  .signature-orbit-stage::after {
+    display: block;
+  }
+
   .signature-orbit-stage .orbit-ring {
-    display: none;
+    display: block;
+  }
+
+  .signature-orbit-stage .orbit-ring-outer {
+    width: 296px;
+    height: 296px;
+    margin: -148px 0 0 -148px;
+    animation-duration: 42s;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner {
+    width: 208px;
+    height: 208px;
+    margin: -104px 0 0 -104px;
+    animation-duration: 30s;
+  }
+
+  .signature-orbit-stage .orbit-ring-outer .orbit-node {
+    --radius: 148px;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner .orbit-node {
+    --radius: 104px;
+  }
+
+  .signature-orbit-stage .orbit-node span {
+    width: 92px;
+    min-height: 34px;
+    padding: 6px 7px;
+    border-radius: 24px;
+    font-size: 0.48rem;
+    letter-spacing: 0.025em;
+    animation-duration: 42s;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner .orbit-node span {
+    animation-duration: 30s;
   }
 
   .orbit-core-veer {
-    position: relative;
-    top: auto;
-    left: auto;
-    width: 245px;
-    height: 245px;
-    margin: 0 auto 38px;
-    transform: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 166px;
+    height: 166px;
+    margin: 0;
+    transform: translate(-50%, -50%);
   }
 
   .signature-orbit-stage .orbit-mobile-list {
-    width: 100%;
-    display: grid;
+    display: none;
+  }
+
+  .orbit-veer-caption {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(100%, 300px);
+    max-width: none;
+    margin: 0;
+    transform: translate(-50%, 124px);
+    font-size: 0.92rem;
   }
 
   .signature-orbit-stage .orbit-mobile-list li:last-child {
@@ -5405,17 +5455,20 @@ h3 {
   }
 
   .orbit-core-veer {
-    width: 245px;
-    height: 245px;
-    transform: none;
+    width: 166px;
+    height: 166px;
+    transform: translate(-50%, -50%);
   }
 
   .orbit-veer-caption {
-    position: static;
-    width: min(100%, 330px);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(100%, 300px);
     max-width: none;
-    margin: -20px auto 28px;
-    transform: none;
+    margin: 0;
+    transform: translate(-50%, 124px);
+    font-size: 0.92rem;
   }
 
   .veer-investigation-card > img {

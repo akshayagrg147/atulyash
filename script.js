@@ -6,6 +6,7 @@ const menuToggle = document.getElementById('menuToggle');
 const primaryNav = document.getElementById('primaryNav');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+const compactHeaderBreakpoint = 1180;
 
 const updateHeaderDepth = () => {
   siteHeader?.classList.toggle('is-scrolled', window.scrollY > 12);
@@ -34,7 +35,7 @@ if (menuToggle && primaryNav) {
   });
 
   primaryNav.querySelectorAll('a').forEach((link) => {
-    link.addEventListener('click', () => closeMenu({ returnFocus: window.innerWidth <= 1040 }));
+    link.addEventListener('click', () => closeMenu({ returnFocus: window.innerWidth <= compactHeaderBreakpoint }));
   });
 
   document.addEventListener('keydown', (event) => {
@@ -54,7 +55,7 @@ if (menuToggle && primaryNav) {
   });
 
   window.addEventListener('resize', () => {
-    if (window.innerWidth > 1040) closeMenu();
+    if (window.innerWidth > compactHeaderBreakpoint) closeMenu();
   });
 }
 

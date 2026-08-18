@@ -2726,7 +2726,7 @@ h3 {
   transform: none;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .primary-nav {
     gap: 18px;
   }
@@ -2794,7 +2794,7 @@ h3 {
   }
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1180px) {
   :root {
     --header-height: 72px;
   }
@@ -4459,7 +4459,7 @@ h3 {
   transform: none;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .hero h1 {
     font-size: clamp(4.5rem, 7vw, 5.8rem);
   }
@@ -4782,6 +4782,17 @@ h3 {
 
   .start-visual img {
     width: min(72%, 280px);
+  }
+}
+
+/* Compact desktop guard for Windows laptops using 125% display scaling. */
+@media (min-width: 681px) and (max-width: 1280px) {
+  .film-stamp {
+    right: 0;
+    bottom: -24px;
+    width: 96px;
+    height: 96px;
+    font-size: 1rem;
   }
 }
 

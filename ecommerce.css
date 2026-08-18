@@ -3425,7 +3425,7 @@ button {
   text-underline-offset: 3px;
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1180px) {
   .header-inner {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     gap: 10px;
@@ -4728,7 +4728,7 @@ body.commerce-open .atulyash-cursor {
 }
 
 /* API checkout final responsive safeguards. */
-@media (max-width: 1040px) {
+@media (max-width: 1180px) {
   .header-inner { grid-template-columns: auto minmax(0, 1fr) auto auto auto; gap: 10px; }
   .header-account { grid-column: 3; }
   .header-cart { grid-column: 4; }

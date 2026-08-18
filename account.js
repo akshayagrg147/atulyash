@@ -4754,7 +4754,8 @@
   }
 
   function accountCalculatorBuffer() {
-    return Math.max(10, Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value || 10));
+    const buffer = Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value);
+    return [15, 20, 25, 30].includes(buffer) ? buffer : 15;
   }
 
   function updateAccountAttaCalculator() {

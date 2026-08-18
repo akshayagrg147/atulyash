@@ -4985,7 +4985,7 @@
   function selectedAttaBuffer() {
     const selected = document.querySelector('input[name="attaBuffer"]:checked');
     const buffer = Number(selected?.value);
-    return [10, 15, 20, 25, 30].includes(buffer) ? buffer : 10;
+    return [15, 20, 25, 30].includes(buffer) ? buffer : 15;
   }
 
   function renderWeeklyCalculatorSuggestion() {

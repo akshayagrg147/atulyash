@@ -4180,6 +4180,42 @@
     return null;
   }
 
+  function minimumRechargeAmountFromError(error) {
+    const message = String(error?.message || '');
+    const match = message.match(/minimum\s+recharge[\s\S]*?(?:₹|INR|Rs\.?)[\s]*([\d,]+(?:\.\d+)?)/i);
+    if (!match) return NaN;
+    const amount = Number(String(match[1]).replace(/,/g, ''));
+    return Number.isFinite(amount) ? Math.ceil(amount) : NaN;
+  }
+
+  async function requestWalletFundingPreview(amount) {
+    const initialAmount = Math.max(1, Math.ceil(numericValue(amount, 0)));
+    const requestPreview = (previewAmount) => invokeApi('wallet', 'rechargePreview', [previewAmount], {
+      path: '/customers/customer-wallet/recharge/preview/',
+      options: { method: 'POST', auth: true, body: { amount: previewAmount }, form: true }
+    });
+
+    try {
+      return {
+        amount: initialAmount,
+        payload: await requestPreview(initialAmount)
+      };
+    } catch (error) {
+      /*
+       * Weekly funding preview is server-authoritative. When the cart total
+       * is below the subscription's minimum recharge, the API returns that
+       * minimum in the error. Retry once with that server-provided amount;
+       * never invent a client-side policy value.
+       */
+      const requiredAmount = minimumRechargeAmountFromError(error);
+      if (!Number.isFinite(requiredAmount) || requiredAmount <= initialAmount) throw error;
+      return {
+        amount: requiredAmount,
+        payload: await requestPreview(requiredAmount)
+      };
+    }
+  }
+
   function walletShortfall() {
     if (!Number.isFinite(checkoutWalletBalanceAmount)) return null;
     const backendShortfall = cart.some((item) => item.purchaseType === 'weekly')
@@ -4204,6 +4240,11 @@
     const pricePerDelivery = numericValue(firstResponseValue(payload, ['price_per_delivery']), NaN);
     const shortfall = numericValue(firstResponseValue(payload, ['shortfall']), NaN);
     const availableBalance = numericValue(firstResponseValue(payload, ['available_balance']), NaN);
+    const minimumRechargeAmount = numericValue(firstResponseValue(payload, [
+      'minimum_recharge_amount',
+      'minimum_recharge',
+      'min_recharge_amount'
+    ]), NaN);
     const canStart = firstResponseValue(payload, ['can_start_subscription']);
     if (!Number.isFinite(minimumWalletRequired)) return null;
     walletFundingPolicy = {
@@ -4214,6 +4255,7 @@
       pricePerDelivery: Number.isFinite(pricePerDelivery) ? pricePerDelivery : null,
       shortfall: Number.isFinite(shortfall) ? Math.max(0, shortfall) : null,
       availableBalance: Number.isFinite(availableBalance) ? availableBalance : null,
+      minimumRechargeAmount: Number.isFinite(minimumRechargeAmount) ? minimumRechargeAmount : null,
       canStart: typeof canStart === 'boolean' ? canStart : null
     };
     return walletFundingPolicy;
@@ -4278,7 +4320,11 @@
       elements.checkoutWalletExplanation.textContent = error || 'Your live wallet balance could not be confirmed.';
       elements.checkoutPaymentStatus.textContent = 'Refresh the balance before placing your order. No order payment will be taken directly.';
     } else if (shortfall > 0) {
-      const rechargeAmount = Math.ceil(shortfall);
+      const minimumRechargeAmount = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
+      const rechargeAmount = Math.max(
+        Math.ceil(shortfall),
+        Number.isFinite(minimumRechargeAmount) ? Math.ceil(minimumRechargeAmount) : 0
+      );
       elements.checkoutWalletCard.dataset.state = 'low';
       elements.checkoutWalletState.textContent = walletRechargeVerificationPending ? 'Confirming' : 'Add money';
       elements.checkoutWalletBalance.textContent = formatPrice(balance);
@@ -4341,14 +4387,13 @@
       }
       walletFundingPolicy = null;
       if (cart.some((item) => item.purchaseType === 'weekly')) {
-        const previewAmount = Math.max(1, Math.ceil(orderTotal()));
-        const policyPayload = await invokeApi('wallet', 'rechargePreview', [previewAmount], {
-          path: '/customers/customer-wallet/recharge/preview/',
-          options: { method: 'POST', auth: true, body: { amount: previewAmount }, form: true }
-        });
-        const policy = applyWalletFundingPolicy(policyPayload);
+        const preview = await requestWalletFundingPreview(orderTotal());
+        const policy = applyWalletFundingPolicy(preview.payload);
         if (!policy) {
           throw new Error('The live service did not return the four-delivery wallet requirement.');
+        }
+        if (!Number.isFinite(policy.minimumRechargeAmount)) {
+          policy.minimumRechargeAmount = preview.amount;
         }
         checkoutWalletBalanceAmount = Number.isFinite(policy.availableBalance)
           ? policy.availableBalance
@@ -4493,7 +4538,11 @@
           || 'Your live wallet balance must be available before money can be added.'
         );
       }
-      const amount = Math.ceil(walletShortfall());
+      const minimumRechargeAmount = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
+      const amount = Math.max(
+        Math.ceil(walletShortfall()),
+        Number.isFinite(minimumRechargeAmount) ? Math.ceil(minimumRechargeAmount) : 0
+      );
       if (amount <= 0) {
         resetWalletRechargePreview();
         announce(cart.some((item) => item.purchaseType === 'weekly')
@@ -4502,11 +4551,12 @@
         return;
       }
       setAsyncButton(elements.checkoutWalletAddButton, true, 'Preparing…', `Add ${formatPrice(amount)} to wallet`);
-      const payload = await invokeApi('wallet', 'rechargePreview', [amount], {
-        path: '/customers/customer-wallet/recharge/preview/',
-        options: { method: 'POST', auth: true, body: { amount }, form: true }
-      });
-      applyWalletFundingPolicy(payload);
+      const preview = await requestWalletFundingPreview(amount);
+      const payload = preview.payload;
+      const policy = applyWalletFundingPolicy(payload);
+      if (policy && !Number.isFinite(policy.minimumRechargeAmount)) {
+        policy.minimumRechargeAmount = preview.amount;
+      }
       const bonus = numericValue(firstResponseValue(payload, [
         'bonus', 'bonus_amount', 'extra_credit', 'cashback'
       ]), 0);

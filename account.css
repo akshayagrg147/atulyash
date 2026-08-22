@@ -3438,6 +3438,11 @@ select {
 .account-calculator-result > strong small { display: block; margin-top: 6px; font: 500 1rem var(--sans); }
 .account-calculator-result > p { margin: 12px 0 5px; color: #fffdf8; font-size: .68rem; line-height: 1.5; }
 .account-calculator-result > small { color: rgba(255, 253, 248, .55); font-size: .56rem; }
+.account-calculator-formula-card { display: grid; gap: 7px; padding: 13px 14px; margin-top: 8px; color: var(--forest-950); background: #fffdf8; border: 1px solid rgba(222, 197, 143, .58); border-left: 4px solid var(--wheat-400); }
+.account-calculator-formula-card > span { color: var(--rust-500); font-size: .56rem; font-weight: 800; letter-spacing: .1em; line-height: 1.2; text-transform: uppercase; }
+.account-calculator-formula-card > strong { color: var(--forest-950); font: 700 clamp(.83rem, 1.2vw, 1rem) var(--sans); letter-spacing: .01em; line-height: 1.4; overflow-wrap: anywhere; }
+.account-calculator-formula-card > small { color: var(--muted); font-size: .62rem; line-height: 1.45; }
+.account-calculator-result > .account-calculator-disclaimer { margin-top: 9px; color: rgba(255, 253, 248, .78); font-size: .62rem; line-height: 1.45; }
 .account-calculator-result > .account-calculator-plan-note { margin-top: 5px; color: var(--wheat-300); line-height: 1.45; }
 .account-calculator-result .primary-button { margin-top: 17px; }
 @media (max-width: 1100px) {

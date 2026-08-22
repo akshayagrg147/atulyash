@@ -2250,10 +2250,9 @@ h3 {
 .calculator-result-method {
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 14px;
-  padding-top: 17px;
+  display: grid;
+  gap: 10px;
+  padding-top: 18px;
   margin-top: 18px;
   border-top: 1px solid rgba(222, 197, 143, 0.18);
 }
@@ -2265,8 +2264,48 @@ h3 {
 }
 
 .calculator-result-method .calculator-plan-band-note {
-  flex-basis: 100%;
+  display: block;
   color: var(--wheat-300);
+}
+
+.calculator-formula-card {
+  display: grid;
+  gap: 7px;
+  padding: 14px 16px;
+  color: var(--forest-950);
+  background: var(--cream-50);
+  border: 1px solid rgba(222, 197, 143, 0.58);
+  border-left: 4px solid var(--wheat-400);
+}
+
+.calculator-formula-label {
+  color: var(--rust-500);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.calculator-formula-card .calculator-formula {
+  margin: 0;
+  color: var(--forest-950);
+  font: 700 clamp(0.92rem, 1.5vw, 1.1rem) var(--sans);
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.calculator-formula-card .calculator-formula-note {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.calculator-result-method .calculator-result-disclaimer {
+  color: rgba(255, 253, 248, 0.78);
+  font-size: 0.68rem;
+  line-height: 1.45;
 }
 
 .discipline-section {
@@ -5323,7 +5362,6 @@ h3 {
 
 .calculator-result-method .calculator-formula {
   margin: 0;
-  color: var(--wheat-300);
   font-weight: 700;
 }
 
@@ -5689,5 +5727,162 @@ h3 {
 
   .calculator-buffer-options label > span {
     min-height: 72px;
+  }
+}
+
+/* Hero palette preview — useful while reviewing the banner direction. */
+.hero {
+  --hero-start: #0a241d;
+  --hero-mid: #0d3027;
+  --hero-end: #174438;
+  --hero-glow: rgba(222, 197, 143, 0.16);
+  --hero-accent: var(--wheat-300);
+  --hero-seal: var(--rust-500);
+  background:
+    radial-gradient(circle at 76% 40%, var(--hero-glow), transparent 34%),
+    linear-gradient(118deg, var(--hero-start) 0%, var(--hero-mid) 56%, var(--hero-end) 100%);
+}
+
+.hero[data-hero-theme="harvest"] {
+  --hero-start: #6f3025;
+  --hero-mid: #8f3f2a;
+  --hero-end: #b45d3c;
+  --hero-glow: rgba(255, 238, 193, 0.22);
+  --hero-accent: #f4d697;
+  --hero-seal: #173b31;
+}
+
+.hero[data-hero-theme="stone"] {
+  --hero-start: #28332f;
+  --hero-mid: #3b4740;
+  --hero-end: #5a5f50;
+  --hero-glow: rgba(225, 202, 147, 0.2);
+  --hero-accent: #e5cb92;
+  --hero-seal: #b84f31;
+}
+
+.hero[data-hero-theme="olive"] {
+  --hero-start: #2d3b2d;
+  --hero-mid: #46573b;
+  --hero-end: #687044;
+  --hero-glow: rgba(241, 226, 184, 0.2);
+  --hero-accent: #f1e2b8;
+  --hero-seal: #173b31;
+}
+
+.hero[data-hero-theme="midnight"] {
+  --hero-start: #031916;
+  --hero-mid: #06201c;
+  --hero-end: #103b32;
+  --hero-glow: rgba(203, 166, 93, 0.18);
+  --hero-accent: #cba65d;
+  --hero-seal: #b84f31;
+}
+
+.hero h1 em,
+.hero-support {
+  color: var(--hero-accent);
+}
+
+.hero-origin-seal {
+  background: var(--hero-seal);
+}
+
+.hero-theme-picker {
+  position: absolute;
+  z-index: 8;
+  top: 18px;
+  right: max(18px, calc((100vw - var(--container)) / 2));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px 7px 12px;
+  color: rgba(255, 253, 248, 0.82);
+  background: rgba(4, 25, 20, 0.42);
+  border: 1px solid rgba(255, 253, 248, 0.2);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.hero-theme-picker-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hero-theme-options {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hero-theme-option {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.hero-theme-option:hover,
+.hero-theme-option:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 253, 248, 0.7);
+}
+
+.hero-theme-option.is-active {
+  border-color: var(--wheat-200);
+}
+
+.hero-theme-swatch {
+  width: 15px;
+  height: 15px;
+  display: block;
+  border: 1px solid rgba(255, 253, 248, 0.45);
+  border-radius: 50%;
+  box-shadow: inset -4px -3px 0 rgba(0, 0, 0, 0.14);
+}
+
+.hero-theme-swatch-forest { background: linear-gradient(135deg, #0a241d 0 58%, #dec58f 58%); }
+.hero-theme-swatch-harvest { background: linear-gradient(135deg, #8f3f2a 0 58%, #f4d697 58%); }
+.hero-theme-swatch-stone { background: linear-gradient(135deg, #3b4740 0 58%, #e5cb92 58%); }
+.hero-theme-swatch-olive { background: linear-gradient(135deg, #46573b 0 58%, #f1e2b8 58%); }
+.hero-theme-swatch-midnight { background: linear-gradient(135deg, #06201c 0 58%, #cba65d 58%); }
+
+@media (max-width: 780px) {
+  .hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-theme-picker {
+    position: relative;
+    top: auto;
+    right: auto;
+    align-self: flex-end;
+    margin: 14px 18px 0;
+  }
+
+  .hero-layout {
+    padding-top: 24px;
+  }
+}
+
+@media (max-width: 420px) {
+  .hero-theme-picker {
+    align-self: center;
+    margin-inline: 12px;
+  }
+
+  .hero-theme-picker-label {
+    display: none;
   }
 }

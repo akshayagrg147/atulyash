@@ -4769,7 +4769,7 @@
       document.createTextNode(weeklyKg.toFixed(2)),
       Object.assign(create('small'), { textContent: 'kg/week' })
     );
-    elements.accountCalculatorFormula.textContent = `${dailyRotis} rotis × 30 g × 7 days${buffer ? ` + ${buffer}% extra` : ''}`;
+    elements.accountCalculatorFormula.textContent = `${dailyRotis} rotis/day × 30 g/roti × 7 days${buffer ? ` + ${buffer}% buffer` : ''}`;
 
     const recommendedPlan = state.weeklyPlans.find((plan) => plan.monthlyKg >= weeklyKg * 4) || null;
     if (state.weeklyCatalogStatus === 'loading') {

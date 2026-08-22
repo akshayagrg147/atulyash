@@ -5158,7 +5158,7 @@
       elements.monthlyOutput.textContent = `${fourWeekKg.toFixed(2)} kg across 4 weeks`;
     }
     if (elements.calculatorFormulaSummary) {
-      elements.calculatorFormulaSummary.textContent = `${dailyRotis} rotis × ${ROTI_ATTA_GRAMS} g × 7 days${buffer ? ` + ${buffer}% buffer` : ''}`;
+      elements.calculatorFormulaSummary.textContent = `${dailyRotis} rotis/day × ${ROTI_ATTA_GRAMS} g/roti × 7 days${buffer ? ` + ${buffer}% buffer` : ''}`;
     }
 
     const plan = findCoveringWeeklyPlan(weeklyKg);

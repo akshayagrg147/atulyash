@@ -179,6 +179,50 @@ const configureEntranceItems = (motionPreference = reducedMotion) => {
 };
 
 const heroDepthScene = document.querySelector('[data-hero-depth]');
+const heroTheme = document.querySelector('.hero[data-hero-theme]') || document.querySelector('.hero');
+const heroThemeOptions = [...document.querySelectorAll('[data-hero-theme]')].filter((option) => option.matches('button'));
+const heroThemeNames = new Set(['forest', 'harvest', 'stone', 'olive', 'midnight']);
+const heroThemeStorageKey = 'atulyash-hero-theme-preview';
+
+const readHeroThemePreference = () => {
+  const queryTheme = new URLSearchParams(window.location.search).get('heroPalette');
+  if (heroThemeNames.has(queryTheme)) return queryTheme;
+
+  try {
+    const storedTheme = window.localStorage.getItem(heroThemeStorageKey);
+    if (heroThemeNames.has(storedTheme)) return storedTheme;
+  } catch {
+    // Storage can be unavailable in private browsing; the default still works.
+  }
+
+  return 'forest';
+};
+
+const setHeroTheme = (theme, { persist = true } = {}) => {
+  if (!heroTheme || !heroThemeNames.has(theme)) return;
+  heroTheme.dataset.heroTheme = theme;
+
+  heroThemeOptions.forEach((option) => {
+    const isActive = option.dataset.heroTheme === theme;
+    option.classList.toggle('is-active', isActive);
+    option.setAttribute('aria-checked', String(isActive));
+  });
+
+  if (!persist) return;
+  try {
+    window.localStorage.setItem(heroThemeStorageKey, theme);
+  } catch {
+    // Keep the selected theme for this page even when storage is unavailable.
+  }
+};
+
+if (heroTheme) {
+  setHeroTheme(readHeroThemePreference(), { persist: false });
+  heroThemeOptions.forEach((option) => {
+    option.addEventListener('click', () => setHeroTheme(option.dataset.heroTheme));
+  });
+}
+
 let heroDepthFrame = 0;
 let heroPointerX = 0;
 let heroPointerY = 0;

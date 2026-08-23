@@ -4755,7 +4755,7 @@
 
   function accountCalculatorBuffer() {
     const buffer = Number(document.querySelector('input[name="accountAttaBuffer"]:checked')?.value);
-    return [15, 20, 25, 30].includes(buffer) ? buffer : 15;
+    return [15, 20, 25, 30].includes(buffer) ? buffer : 10;
   }
 
   function updateAccountAttaCalculator() {
@@ -5088,8 +5088,22 @@
     elements.accountDailyRotis.value = String(Math.max(8, Number(elements.accountDailyRotis.value || 8) + 1));
     updateAccountAttaCalculator();
   });
+  let activeAccountBufferInput = document.querySelector('input[name="accountAttaBuffer"]:checked');
   document.querySelectorAll('input[name="accountAttaBuffer"]').forEach((input) => {
-    input.addEventListener('change', updateAccountAttaCalculator);
+    input.addEventListener('click', (event) => {
+      // Allow a second click on the selected card to return to the neutral 10% buffer.
+      if (!input.checked || input !== activeAccountBufferInput) return;
+      event.preventDefault();
+      activeAccountBufferInput = null;
+      window.setTimeout(() => {
+        input.checked = false;
+        updateAccountAttaCalculator();
+      }, 0);
+    });
+    input.addEventListener('change', () => {
+      activeAccountBufferInput = input.checked ? input : null;
+      updateAccountAttaCalculator();
+    });
   });
   elements.quickOrderMinus?.addEventListener('click', () => {
     state.quickOrderQuantity = Math.max(1, state.quickOrderQuantity - 1);

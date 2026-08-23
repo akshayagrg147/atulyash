@@ -5032,10 +5032,12 @@
     }
   }
 
+  const DEFAULT_ATTA_BUFFER = 10;
+
   function selectedAttaBuffer() {
     const selected = document.querySelector('input[name="attaBuffer"]:checked');
     const buffer = Number(selected?.value);
-    return [15, 20, 25, 30].includes(buffer) ? buffer : 15;
+    return [15, 20, 25, 30].includes(buffer) ? buffer : DEFAULT_ATTA_BUFFER;
   }
 
   function renderWeeklyCalculatorSuggestion() {
@@ -5589,8 +5591,28 @@
   elements.dailyRotis?.addEventListener('blur', () => normalizeDailyRotiCount({ markUsed: true }));
   elements.dailyRotisMinus?.addEventListener('click', () => changeDailyRotiCount(-1));
   elements.dailyRotisPlus?.addEventListener('click', () => changeDailyRotiCount(1));
+  let activeAttaBufferInput = document.querySelector('input[name="attaBuffer"]:checked');
   document.querySelectorAll('input[name="attaBuffer"]').forEach((input) => {
-    input.addEventListener('change', () => updateRotiCalculator({ markUsed: true }));
+    input.addEventListener('click', (event) => {
+      // Radios normally cannot be deselected. Allow a second click so the
+      // calculator can return to its neutral 10% buffer estimate.
+      if (!input.checked) return;
+      if (input === activeAttaBufferInput) {
+        event.preventDefault();
+        activeAttaBufferInput = null;
+        // The browser may restore a radio's checked state after click handlers
+        // finish, so clear it on the next turn as well as updating the result.
+        window.setTimeout(() => {
+          input.checked = false;
+          updateRotiCalculator({ markUsed: true });
+        }, 0);
+        return;
+      }
+    });
+    input.addEventListener('change', () => {
+      activeAttaBufferInput = input.checked ? input : null;
+      updateRotiCalculator({ markUsed: true });
+    });
   });
   elements.calculatorCta?.addEventListener('click', () => {
     const recommendation = calculatorRecommendation?.plan

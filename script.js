@@ -183,6 +183,19 @@ const heroTheme = document.querySelector('.hero[data-hero-theme]') || document.q
 const heroThemeOptions = [...document.querySelectorAll('[data-hero-theme]')].filter((option) => option.matches('button'));
 const heroThemeNames = new Set(['forest', 'harvest', 'stone', 'olive', 'midnight']);
 const heroThemeStorageKey = 'atulyash-hero-theme-preview';
+const heroCustomColorStorageKey = 'atulyash-hero-custom-color';
+const heroCustomToggle = document.querySelector('[data-hero-custom-toggle]');
+const heroCustomPicker = document.querySelector('[data-hero-custom-picker]');
+const heroCustomClose = document.querySelector('[data-hero-custom-close]');
+const heroCustomReset = document.querySelector('[data-hero-custom-reset]');
+const heroCustomSwatch = document.querySelector('[data-hero-custom-swatch]');
+const heroCustomSaturation = document.querySelector('[data-hero-saturation]');
+const heroCustomPointer = document.querySelector('[data-hero-color-pointer]');
+const heroCustomHue = document.querySelector('[data-hero-hue]');
+const heroCustomNativeColor = document.querySelector('[data-hero-native-color]');
+const heroCustomNativeChip = document.querySelector('[data-hero-native-chip]');
+const heroCustomValue = document.querySelector('[data-hero-color-value]');
+const heroCustomCssVariables = ['--hero-start', '--hero-mid', '--hero-end', '--hero-glow', '--hero-accent', '--hero-seal'];
 
 const readHeroThemePreference = () => {
   const queryTheme = new URLSearchParams(window.location.search).get('heroPalette');
@@ -191,6 +204,7 @@ const readHeroThemePreference = () => {
   try {
     const storedTheme = window.localStorage.getItem(heroThemeStorageKey);
     if (heroThemeNames.has(storedTheme)) return storedTheme;
+    if (storedTheme === 'custom' && /^#[0-9a-f]{6}$/i.test(String(window.localStorage.getItem(heroCustomColorStorageKey) || ''))) return 'custom';
   } catch {
     // Storage can be unavailable in private browsing; the default still works.
   }
@@ -201,6 +215,9 @@ const readHeroThemePreference = () => {
 const setHeroTheme = (theme, { persist = true } = {}) => {
   if (!heroTheme || !heroThemeNames.has(theme)) return;
   heroTheme.dataset.heroTheme = theme;
+  heroCustomCssVariables.forEach((name) => heroTheme.style.removeProperty(name));
+  heroCustomToggle?.classList.remove('is-active');
+  heroCustomToggle?.setAttribute('aria-pressed', 'false');
 
   heroThemeOptions.forEach((option) => {
     const isActive = option.dataset.heroTheme === theme;
@@ -217,11 +234,176 @@ const setHeroTheme = (theme, { persist = true } = {}) => {
 };
 
 if (heroTheme) {
-  setHeroTheme(readHeroThemePreference(), { persist: false });
   heroThemeOptions.forEach((option) => {
     option.addEventListener('click', () => setHeroTheme(option.dataset.heroTheme));
   });
 }
+
+const clampUnit = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+const clampDegrees = (value) => ((Number(value) || 0) % 360 + 360) % 360;
+
+const hsvToRgb = (hue, saturation, value) => {
+  const h = clampDegrees(hue) / 60;
+  const s = clampUnit(saturation);
+  const v = clampUnit(value);
+  const chroma = v * s;
+  const x = chroma * (1 - Math.abs((h % 2) - 1));
+  const match = v - chroma;
+  let rgb;
+  if (h < 1) rgb = [chroma, x, 0];
+  else if (h < 2) rgb = [x, chroma, 0];
+  else if (h < 3) rgb = [0, chroma, x];
+  else if (h < 4) rgb = [0, x, chroma];
+  else if (h < 5) rgb = [x, 0, chroma];
+  else rgb = [chroma, 0, x];
+  return rgb.map((channel) => Math.round((channel + match) * 255));
+};
+
+const rgbToHex = ([red, green, blue]) => `#${[red, green, blue]
+  .map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, '0'))
+  .join('')}`.toUpperCase();
+
+const hexToRgb = (value) => {
+  const match = String(value || '').trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return null;
+  return match[1].match(/.{2}/g).map((channel) => parseInt(channel, 16));
+};
+
+const rgbToHsv = ([red, green, blue]) => {
+  const r = red / 255;
+  const g = green / 255;
+  const b = blue / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let hue = 0;
+  if (delta) {
+    if (max === r) hue = 60 * (((g - b) / delta) % 6);
+    else if (max === g) hue = 60 * ((b - r) / delta + 2);
+    else hue = 60 * ((r - g) / delta + 4);
+  }
+  return { h: clampDegrees(hue), s: max ? delta / max : 0, v: max };
+};
+
+const mixRgb = (base, target, amount) => base.map((channel, index) => channel + (target[index] - channel) * clampUnit(amount));
+
+let heroCustomHsv = { h: 148, s: 0.72, v: 0.19 };
+
+const heroCustomColor = () => rgbToHex(hsvToRgb(heroCustomHsv.h, heroCustomHsv.s, heroCustomHsv.v));
+
+const updateHeroCustomControls = () => {
+  if (!heroCustomSaturation) return;
+  const color = heroCustomColor();
+  heroCustomSaturation.style.setProperty('--hero-picker-hue', `${heroCustomHsv.h}deg`);
+  heroCustomPointer.style.left = `${heroCustomHsv.s * 100}%`;
+  heroCustomPointer.style.top = `${(1 - heroCustomHsv.v) * 100}%`;
+  heroCustomHue.value = String(Math.round(heroCustomHsv.h));
+  heroCustomNativeColor.value = color;
+  heroCustomNativeChip.style.background = color;
+  heroCustomSwatch.style.background = color;
+  heroCustomValue.textContent = color;
+  heroCustomSaturation.setAttribute('aria-valuetext', color);
+};
+
+const applyHeroCustomColor = (color, { persist = true } = {}) => {
+  const rgb = hexToRgb(color);
+  if (!heroTheme || !rgb) return;
+  heroCustomHsv = rgbToHsv(rgb);
+  const start = rgbToHex(mixRgb(rgb, [0, 0, 0], .68));
+  const mid = rgbToHex(mixRgb(rgb, [0, 0, 0], .38));
+  const end = rgbToHex(mixRgb(rgb, [255, 255, 255], .18));
+  heroTheme.dataset.heroTheme = 'custom';
+  heroTheme.style.setProperty('--hero-start', start);
+  heroTheme.style.setProperty('--hero-mid', mid);
+  heroTheme.style.setProperty('--hero-end', end);
+  heroTheme.style.setProperty('--hero-glow', `rgba(${rgb.join(', ')}, .24)`);
+  heroTheme.style.setProperty('--hero-accent', '#f3d99b');
+  heroTheme.style.setProperty('--hero-seal', start);
+  heroThemeOptions.forEach((option) => {
+    option.classList.remove('is-active');
+    option.setAttribute('aria-checked', 'false');
+  });
+  heroCustomToggle?.classList.add('is-active');
+  heroCustomToggle?.setAttribute('aria-pressed', 'true');
+  updateHeroCustomControls();
+  if (!persist) return;
+  try {
+    window.localStorage.setItem(heroThemeStorageKey, 'custom');
+    window.localStorage.setItem(heroCustomColorStorageKey, heroCustomColor());
+  } catch {
+    // The live preview still works when storage is unavailable.
+  }
+};
+
+const updateHeroCustomFromPointer = (event) => {
+  if (!heroCustomSaturation) return;
+  const bounds = heroCustomSaturation.getBoundingClientRect();
+  const saturation = clampUnit((event.clientX - bounds.left) / bounds.width);
+  const value = 1 - clampUnit((event.clientY - bounds.top) / bounds.height);
+  heroCustomHsv = { ...heroCustomHsv, s: saturation, v: value };
+  applyHeroCustomColor(heroCustomColor());
+};
+
+if (heroCustomSaturation) {
+  let dragging = false;
+  heroCustomSaturation.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    heroCustomSaturation.setPointerCapture?.(event.pointerId);
+    updateHeroCustomFromPointer(event);
+  });
+  heroCustomSaturation.addEventListener('pointermove', (event) => {
+    if (dragging) updateHeroCustomFromPointer(event);
+  });
+  heroCustomSaturation.addEventListener('pointerup', () => { dragging = false; });
+  heroCustomSaturation.addEventListener('pointercancel', () => { dragging = false; });
+  heroCustomSaturation.addEventListener('keydown', (event) => {
+    const step = event.shiftKey ? .1 : .03;
+    const next = { ...heroCustomHsv };
+    if (event.key === 'ArrowLeft') next.s -= step;
+    else if (event.key === 'ArrowRight') next.s += step;
+    else if (event.key === 'ArrowUp') next.v += step;
+    else if (event.key === 'ArrowDown') next.v -= step;
+    else return;
+    event.preventDefault();
+    heroCustomHsv = { ...next, s: clampUnit(next.s), v: clampUnit(next.v) };
+    applyHeroCustomColor(heroCustomColor());
+  });
+}
+
+heroCustomHue?.addEventListener('input', () => {
+  heroCustomHsv = { ...heroCustomHsv, h: Number(heroCustomHue.value) };
+  applyHeroCustomColor(heroCustomColor());
+});
+
+heroCustomNativeColor?.addEventListener('input', () => applyHeroCustomColor(heroCustomNativeColor.value));
+heroCustomToggle?.addEventListener('click', () => {
+  const opening = heroCustomPicker?.hidden !== false;
+  if (!heroCustomPicker) return;
+  heroCustomPicker.hidden = !opening;
+  heroCustomToggle.setAttribute('aria-expanded', String(opening));
+  if (opening) heroCustomSaturation?.focus({ preventScroll: true });
+});
+heroCustomClose?.addEventListener('click', () => {
+  if (!heroCustomPicker) return;
+  heroCustomPicker.hidden = true;
+  heroCustomToggle?.setAttribute('aria-expanded', 'false');
+  heroCustomToggle?.focus({ preventScroll: true });
+});
+heroCustomReset?.addEventListener('click', () => {
+  setHeroTheme('forest');
+  try {
+    window.localStorage.removeItem(heroCustomColorStorageKey);
+  } catch {
+    // Keep the default preview when storage is unavailable.
+  }
+});
+
+const storedHeroCustomColor = (() => {
+  try { return window.localStorage.getItem(heroCustomColorStorageKey); } catch { return null; }
+})();
+const storedHeroTheme = readHeroThemePreference();
+if (storedHeroTheme === 'custom' && hexToRgb(storedHeroCustomColor)) applyHeroCustomColor(storedHeroCustomColor, { persist: false });
+else setHeroTheme(storedHeroTheme, { persist: false });
 
 let heroDepthFrame = 0;
 let heroPointerX = 0;

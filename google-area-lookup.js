@@ -103,8 +103,40 @@
     return { ...result };
   }
 
+  async function reverseGeocodeCoordinates(latitude, longitude) {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new Error('A valid map location is required.');
+    }
+
+    const maps = await loadMaps();
+    if (typeof maps.importLibrary === 'function') await maps.importLibrary('geocoding');
+    const geocoder = new maps.Geocoder();
+    const response = await geocoder.geocode({ location: { lat, lng } });
+    const results = Array.isArray(response?.results) ? response.results : [];
+    const first = results[0];
+    if (!first) throw new Error('Google could not identify this map location.');
+
+    const components = results.flatMap((result) => result?.address_components || []);
+    const pincode = componentValue(components, ['postal_code']).replace(/\D/g, '').slice(0, 6);
+    const areas = areaCandidates(results);
+    return {
+      latitude: lat,
+      longitude: lng,
+      formattedAddress: first.formatted_address || '',
+      pincode,
+      areas,
+      selectedArea: areas[0] || '',
+      city: componentValue(components, ['locality', 'postal_town']) || componentValue(components, ['administrative_area_level_2']),
+      state: componentValue(components, ['administrative_area_level_1'])
+    };
+  }
+
   window.AtulyashGoogleAreaLookup = Object.freeze({
     isConfigured: () => Boolean(configuredKey()),
-    lookupIndianPincode
+    loadMaps,
+    lookupIndianPincode,
+    reverseGeocodeCoordinates
   });
 })();

@@ -23,7 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="images/atta-packet-2026.webp" fetchpriority="high">
   <link rel="preload" as="image" href="images/natural-stone-hero.webp" fetchpriority="high">
-  <link rel="stylesheet" href="styles.css?v=20260822-1">
+  <link rel="stylesheet" href="styles.css?v=20260823-2">
   <link rel="stylesheet" href="ecommerce.css?v=20260818-1">
   <link rel="stylesheet" href="commerce-shared.css?v=20260802-3">
 </head>
@@ -142,6 +142,35 @@
           <button class="hero-theme-option" type="button" data-hero-theme="midnight" role="radio" aria-checked="false" aria-label="Midnight green and gold" title="Midnight green and gold">
             <span class="hero-theme-swatch hero-theme-swatch-midnight" aria-hidden="true"></span>
           </button>
+        </div>
+        <button class="hero-theme-custom-toggle" type="button" data-hero-custom-toggle aria-expanded="false" aria-controls="heroCustomPicker">
+          <span class="hero-theme-custom-swatch" data-hero-custom-swatch aria-hidden="true"></span>
+          <span>Custom</span>
+        </button>
+        <div class="hero-custom-picker" id="heroCustomPicker" data-hero-custom-picker hidden>
+          <div class="hero-custom-picker-head">
+            <div>
+              <span>Make it yours</span>
+              <strong>Choose any hero colour</strong>
+            </div>
+            <button class="hero-custom-close" type="button" data-hero-custom-close aria-label="Close custom colour picker">×</button>
+          </div>
+          <div class="hero-color-saturation" data-hero-saturation role="slider" tabindex="0" aria-label="Colour saturation and brightness" aria-valuetext="Custom colour">
+            <span class="hero-color-pointer" data-hero-color-pointer aria-hidden="true"></span>
+          </div>
+          <label class="hero-color-hue-label" for="heroHueRange">
+            <span>Hue</span>
+            <input id="heroHueRange" data-hero-hue type="range" min="0" max="360" value="148" aria-label="Colour hue">
+          </label>
+          <div class="hero-custom-picker-footer">
+            <label class="hero-native-color-label" for="heroNativeColor">
+              <span class="hero-native-color-chip" data-hero-native-chip aria-hidden="true"></span>
+              <span>Pick exact colour</span>
+              <input id="heroNativeColor" data-hero-native-color type="color" value="#0d3027" aria-label="Choose an exact hero colour">
+            </label>
+            <code data-hero-color-value>#0D3027</code>
+            <button class="hero-custom-reset" type="button" data-hero-custom-reset>Reset</button>
+          </div>
         </div>
       </div>
       <div class="container hero-layout">
@@ -799,7 +828,7 @@
     </div>
   </footer>
 
-  <script src="script.js?v=20260822-1"></script>
+  <script src="script.js?v=20260823-2"></script>
   <script src="api-client.js?v=20260812-1"></script>
   <script src="ecommerce.js?v=20260823-2"></script>
 </body>

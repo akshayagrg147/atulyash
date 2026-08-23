@@ -3399,6 +3399,28 @@
     const editing = Boolean(address);
     const form = create('form', 'dialog-form');
     const fields = create('div', 'form-grid');
+    const mapPicker = create('section', 'address-map-picker');
+    mapPicker.setAttribute('aria-labelledby', 'addressMapPickerTitle');
+    const mapPickerHeader = create('div', 'address-map-picker-header');
+    const mapPickerTitle = create('div');
+    mapPickerTitle.append(
+      create('span', 'address-map-kicker', 'Pin your doorstep'),
+      create('strong', '', 'Where should we deliver?')
+    );
+    mapPickerTitle.querySelector('strong').id = 'addressMapPickerTitle';
+    const mapLocationButton = create('button', 'address-map-location-button', 'Use my current location');
+    mapLocationButton.type = 'button';
+    mapPickerHeader.append(mapPickerTitle, mapLocationButton);
+    const mapStatus = create('p', 'address-map-status', 'Requesting your location…');
+    mapStatus.setAttribute('role', 'status');
+    mapStatus.setAttribute('aria-live', 'polite');
+    const mapCanvas = create('div', 'address-map-canvas');
+    mapCanvas.setAttribute('role', 'application');
+    mapCanvas.setAttribute('aria-label', 'Map location picker. Pan the map underneath the fixed pin to choose a delivery location.');
+    const mapCenterPin = create('span', 'address-map-center-pin');
+    mapCenterPin.setAttribute('aria-hidden', 'true');
+    const mapAddress = create('small', 'address-map-selected-address', 'Move the map so the pin sits on your doorstep.');
+    mapPicker.append(mapPickerHeader, mapStatus, mapCanvas, mapAddress);
     const definitions = [
       ['receiver_name', 'Receiver name', 'text', firstValue(address?.receiver_name, displayName() === 'Atulyash family' ? '' : displayName())],
       ['address_phone', 'Delivery mobile', 'tel', firstValue(address?.address_phone, state.mobile)],
@@ -3458,6 +3480,173 @@
     const serviceabilityMark = create('span', 'address-serviceability-mark', '!');
     serviceabilityNotice.append(serviceabilityMark, serviceabilityContent);
     fields.append(serviceabilityNotice);
+
+    const coordinateFrom = (...values) => {
+      for (const value of values) {
+        if (value === undefined || value === null || value === '') continue;
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return null;
+    };
+    const existingLatitude = coordinateFrom(
+      address?.latitude,
+      address?.lat,
+      address?.location?.latitude,
+      address?.location?.lat,
+      address?.coordinates?.latitude,
+      address?.coordinates?.lat
+    );
+    const existingLongitude = coordinateFrom(
+      address?.longitude,
+      address?.lng,
+      address?.location?.longitude,
+      address?.location?.lng,
+      address?.coordinates?.longitude,
+      address?.coordinates?.lng
+    );
+    const hasExistingCoordinates = Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude)
+      && Math.abs(existingLatitude) <= 90 && Math.abs(existingLongitude) <= 180;
+    const defaultMapCenter = { lat: 28.6139, lng: 77.2090 };
+    let addressMap = null;
+    let mapReverseRequest = 0;
+    let mapReverseTimer = null;
+    let currentLocationRequest = null;
+    let selectedMapPoint = hasExistingCoordinates
+      ? { lat: existingLatitude, lng: existingLongitude }
+      : null;
+
+    const setMapStatus = (message, stateName = 'idle') => {
+      mapStatus.textContent = message;
+      mapPicker.dataset.state = stateName;
+    };
+
+    const requestCurrentLocation = () => {
+      if (!navigator.geolocation) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve({
+            lat: Number(position.coords.latitude),
+            lng: Number(position.coords.longitude)
+          }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 300000 }
+        );
+      });
+    };
+
+    const applyMapResult = async (result) => {
+      if (!result) return;
+      if (result.formattedAddress) mapAddress.textContent = result.formattedAddress;
+      if (result.city && cityInput) cityInput.value = result.city;
+      if (result.state && stateInput) stateInput.value = result.state;
+
+      const pincode = String(result.pincode || '').replace(/\D/g, '').slice(0, 6);
+      if (!/^\d{6}$/.test(pincode)) {
+        setMapStatus('Location found. Move the pin to a serviceable PIN code.', 'warning');
+        return;
+      }
+
+      pincodeInput.value = pincode;
+      clearServiceabilityError();
+      let area = renderGoogleAreas(result);
+      if (!area) {
+        await lookupAreaFromPincode();
+        area = areaSelect.value;
+      }
+      if (!area) {
+        setMapStatus('Location found. Choose the delivery area below.', 'warning');
+        return;
+      }
+
+      try {
+        const serviceability = await checkLiveServiceability(pincode, area);
+        if (serviceability) setMapStatus('Location selected. Review the address fields below.', 'success');
+      } catch (_error) {
+        setMapStatus('Location found. Confirm the address fields below.', 'warning');
+      }
+    };
+
+    const reverseGeocodeMapPoint = async (point) => {
+      if (!GOOGLE_AREA_LOOKUP?.reverseGeocodeCoordinates) {
+        setMapStatus('Map lookup is not configured. Enter the address below.', 'error');
+        return;
+      }
+      const request = ++mapReverseRequest;
+      selectedMapPoint = point;
+      setMapStatus('Reading this location…', 'checking');
+      try {
+        const result = await GOOGLE_AREA_LOOKUP.reverseGeocodeCoordinates(point.lat, point.lng);
+        if (request !== mapReverseRequest) return;
+        await applyMapResult(result);
+      } catch (error) {
+        if (request !== mapReverseRequest) return;
+        setMapStatus(friendlyError(error, 'Could not read this location. Drag the pin and try again.'), 'error');
+      }
+    };
+
+    const scheduleMapReverseGeocode = () => {
+      window.clearTimeout(mapReverseTimer);
+      mapReverseTimer = window.setTimeout(() => {
+        const center = addressMap?.getCenter?.();
+        if (center) void reverseGeocodeMapPoint({ lat: center.lat(), lng: center.lng() });
+      }, 350);
+    };
+
+    const initializeAddressMap = async (locationPromise) => {
+      if (!GOOGLE_AREA_LOOKUP?.loadMaps) {
+        setMapStatus('Map service is unavailable. Enter your address below.', 'error');
+        return;
+      }
+      try {
+        const maps = await GOOGLE_AREA_LOOKUP.loadMaps();
+        if (typeof maps.importLibrary === 'function') await maps.importLibrary('maps');
+        const center = hasExistingCoordinates ? selectedMapPoint : defaultMapCenter;
+        addressMap = new maps.Map(mapCanvas, {
+          center,
+          zoom: hasExistingCoordinates ? 16 : 5,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          gestureHandling: 'greedy'
+        });
+        mapCanvas.append(mapCenterPin);
+        addressMap.addListener('dragend', scheduleMapReverseGeocode);
+
+        if (hasExistingCoordinates) {
+          setMapStatus('Move the map so the pin sits on your doorstep.', 'idle');
+          return;
+        }
+
+        setMapStatus('Requesting your location…', 'checking');
+        const location = await locationPromise;
+        if (location && Number.isFinite(location.lat) && Number.isFinite(location.lng)) {
+          addressMap.setCenter(location);
+          addressMap.setZoom(16);
+          await reverseGeocodeMapPoint(location);
+        } else {
+          addressMap.setCenter(defaultMapCenter);
+          addressMap.setZoom(5);
+          setMapStatus('Location access was not granted. Drag the map or use the button to choose a location.', 'warning');
+        }
+      } catch (error) {
+        setMapStatus(friendlyError(error, 'Map could not be loaded. Enter your address below.'), 'error');
+      }
+    };
+
+    mapLocationButton.addEventListener('click', async () => {
+      setMapStatus('Requesting your location…', 'checking');
+      currentLocationRequest = requestCurrentLocation();
+      const location = await currentLocationRequest;
+      if (!location) {
+        setMapStatus('Location access was not granted. Please allow it and try again.', 'warning');
+        return;
+      }
+      if (!addressMap) return;
+      addressMap.setCenter(location);
+      addressMap.setZoom(16);
+      void reverseGeocodeMapPoint(location);
+    });
 
     let areaLookupRequest = 0;
     let verifiedPincode = '';
@@ -3621,7 +3810,7 @@
       type.append(option);
     });
     typeLabel.append(type);
-    form.append(fields, typeLabel);
+    form.append(mapPicker, fields, typeLabel);
     const actions = create('div', 'dialog-actions');
     actions.append(button('Cancel', 'secondary-button', closeDialog));
     const submit = create('button', 'primary-button', editing ? 'Save changes →' : 'Save address →');
@@ -3699,7 +3888,11 @@
         setButtonBusy(submit, false);
       }
     });
+    currentLocationRequest = (!editing && !hasExistingCoordinates)
+      ? requestCurrentLocation()
+      : Promise.resolve(null);
     openDialog('Delivery address', editing ? 'Edit saved address' : 'Add an address', form);
+    window.setTimeout(() => void initializeAddressMap(currentLocationRequest), 0);
   }
 
   async function loadWallet(force = false) {

@@ -5842,6 +5842,210 @@ h3 {
   border-color: var(--wheat-200);
 }
 
+.hero-theme-custom-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 25px;
+  padding: 3px 7px 3px 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.hero-theme-custom-toggle:hover,
+.hero-theme-custom-toggle:focus-visible,
+.hero-theme-custom-toggle.is-active {
+  border-color: rgba(255, 253, 248, .7);
+  background: rgba(255, 253, 248, .1);
+}
+
+.hero-theme-custom-swatch,
+.hero-native-color-chip {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border: 1px solid rgba(255, 253, 248, .55);
+  border-radius: 50%;
+  background: #0d3027;
+  box-shadow: inset -4px -3px 0 rgba(0, 0, 0, .14);
+}
+
+.hero-custom-picker {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  width: min(360px, calc(100vw - 28px));
+  gap: 12px;
+  padding: 15px;
+  color: var(--forest-950);
+  background: rgba(255, 253, 248, .98);
+  border: 1px solid rgba(17, 55, 46, .18);
+  border-radius: 16px;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, .24);
+  text-align: left;
+}
+
+.hero-custom-picker[hidden] {
+  display: none;
+}
+
+.hero-custom-picker-head,
+.hero-custom-picker-footer,
+.hero-native-color-label {
+  display: flex;
+  align-items: center;
+}
+
+.hero-custom-picker-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hero-custom-picker-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.hero-custom-picker-head span {
+  color: var(--rust-500);
+  font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.hero-custom-picker-head strong {
+  color: var(--forest-950);
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.hero-custom-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(17, 55, 46, .18);
+  border-radius: 50%;
+  color: var(--forest-900);
+  background: transparent;
+  font-size: 1.15rem;
+}
+
+.hero-color-saturation {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.9;
+  overflow: hidden;
+  border: 1px solid rgba(17, 55, 46, .2);
+  border-radius: 9px;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, hsl(var(--hero-picker-hue, 148deg) 100% 50%));
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.hero-color-pointer {
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(17, 55, 46, .72), 0 2px 6px rgba(0, 0, 0, .24);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hero-color-hue-label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.hero-color-hue-label input {
+  width: 100%;
+  height: 17px;
+  margin: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  cursor: pointer;
+}
+
+.hero-color-hue-label input::-webkit-slider-thumb {
+  width: 17px;
+  height: 17px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--forest-950);
+  box-shadow: 0 0 0 1px rgba(17, 55, 46, .5);
+  appearance: none;
+}
+
+.hero-color-hue-label input::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--forest-950);
+  box-shadow: 0 0 0 1px rgba(17, 55, 46, .5);
+}
+
+.hero-custom-picker-footer {
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.hero-native-color-label {
+  position: relative;
+  gap: 6px;
+  color: var(--forest-900);
+  font-size: .6rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-native-color-label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.hero-native-color-chip {
+  border-color: rgba(17, 55, 46, .35);
+}
+
+.hero-custom-picker code {
+  color: var(--forest-900);
+  font-size: .62rem;
+  font-weight: 800;
+}
+
+.hero-custom-reset {
+  padding: 4px 7px;
+  border: 0;
+  color: var(--rust-500);
+  background: transparent;
+  font-size: .6rem;
+  font-weight: 800;
+}
+
 .hero-theme-swatch {
   width: 15px;
   height: 15px;
@@ -5884,5 +6088,10 @@ h3 {
 
   .hero-theme-picker-label {
     display: none;
+  }
+
+  .hero-custom-picker {
+    right: 50%;
+    transform: translateX(50%);
   }
 }

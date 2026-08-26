@@ -2165,6 +2165,33 @@ select {
   color: var(--rust-600);
 }
 
+.transaction-row.is-pending .transaction-icon {
+  color: var(--forest-700);
+  background: rgba(222, 197, 143, .22);
+}
+
+.transaction-amount.is-pending {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.wallet-pending-note {
+  margin: 13px 0 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(222, 197, 143, .55);
+  background: rgba(222, 197, 143, .13);
+  color: var(--muted);
+  font-size: .62rem;
+  line-height: 1.5;
+}
+
+.wallet-pending-note strong {
+  color: var(--forest-900);
+}
+
 .notification-filters {
   display: flex;
   align-items: center;

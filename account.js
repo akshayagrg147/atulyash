@@ -4678,21 +4678,56 @@
       return;
     }
     const fragment = document.createDocumentFragment();
+    let hasPendingRecharge = false;
     transactions.forEach((transaction) => {
       const amount = numberFrom(firstValue(transaction.amount, transaction.transaction_amount, transaction.value));
       const type = String(firstValue(transaction.transaction_type, transaction.type, transaction.entry_type, 'Transaction'));
-      const debit = /debit|payment|purchase|spent/i.test(type) || amount < 0;
-      const row = create('div', 'transaction-row');
-      row.append(create('span', 'transaction-icon', debit ? '−' : '+'));
-      const copy = create('div');
-      copy.append(
-        create('h3', '', firstValue(transaction.description, transaction.title, type)),
-        create('p', '', `${formatDate(firstValue(transaction.created_at, transaction.date, transaction.created), true)} · ${firstValue(transaction.reference, transaction.status, 'Recorded')}`)
+      const statusValue = firstValue(
+        transaction.status,
+        transaction.payment_status,
+        transaction.transaction_status,
+        transaction.state,
+        ''
       );
-      const amountText = create('strong', `transaction-amount${debit ? ' is-debit' : ''}`, `${debit ? '−' : '+'}${formatMoney(Math.abs(amount))}`);
+      const status = ['undefined', 'null'].includes(String(statusValue).toLowerCase()) ? '' : String(statusValue || '');
+      const referenceValue = firstValue(transaction.reference, '');
+      const reference = ['undefined', 'null'].includes(String(referenceValue).toLowerCase()) ? '' : String(referenceValue || '');
+      const title = String(firstValue(transaction.description, transaction.title, type));
+      // A pending recharge is an initiated payment, not a wallet credit. Keep it
+      // visually neutral so customers do not mistake it for available balance.
+      const pendingDescriptor = `${status} ${reference} ${type} ${title}`;
+      const isPending = /pending|initiated|created|processing|awaiting|in[ -]?progress/i.test(pendingDescriptor);
+      const debit = !isPending && (/debit|payment|purchase|spent/i.test(type) || amount < 0);
+      if (isPending && /recharge/i.test(`${type} ${title}`)) hasPendingRecharge = true;
+      const row = create('div', `transaction-row${isPending ? ' is-pending' : ''}`);
+      row.append(create('span', 'transaction-icon', isPending ? '…' : debit ? '−' : '+'));
+      const copy = create('div');
+      const displayTitle = isPending && /recharge/i.test(title)
+        ? 'Wallet recharge awaiting confirmation'
+        : title;
+      const displayStatus = isPending
+        ? 'Payment initiated · pending confirmation'
+        : firstValue(reference, status, 'Recorded');
+      copy.append(
+        create('h3', '', displayTitle),
+        create('p', '', `${formatDate(firstValue(transaction.created_at, transaction.date, transaction.created), true)} · ${displayStatus}`)
+      );
+      const amountText = create(
+        'strong',
+        `transaction-amount${debit ? ' is-debit' : isPending ? ' is-pending' : ''}`,
+        isPending ? `${formatMoney(Math.abs(amount))} pending` : `${debit ? '−' : '+'}${formatMoney(Math.abs(amount))}`
+      );
       row.append(copy, amountText);
       fragment.append(row);
     });
+    if (hasPendingRecharge) {
+      const note = create('p', 'wallet-pending-note');
+      note.append(
+        create('strong', '', 'Pending recharges are not credited yet.'),
+        document.createTextNode(' Available balance updates only after Razorpay payment verification succeeds.')
+      );
+      fragment.append(note);
+    }
     elements.walletTransactions.replaceChildren(fragment);
   }
 

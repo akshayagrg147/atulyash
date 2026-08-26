@@ -244,6 +244,7 @@
     const identifier = firstValue(
       value.id,
       value.orderId,
+      value.deliveryId,
       value.addressId,
       value.subscriptionId,
       value.subPlanId,
@@ -272,6 +273,22 @@
 
     if (group === 'orders') {
       if (/^detail$|getOrderDetails/.test(methodName)) return [identifier];
+      if (/subscriptionDeliveries|subscriptionOrders|getSubscriptionDeliveries/.test(methodName)) {
+        return [identifier, value.params && typeof value.params === 'object'
+          ? value.params
+          : withoutKeys(value, ['id', 'orderId', 'deliveryId'])];
+      }
+      if (/^deliveries$|listDeliveries|getOrderDeliveries/.test(methodName)) {
+        return [identifier, value.params && typeof value.params === 'object'
+          ? value.params
+          : withoutKeys(value, ['id', 'orderId', 'deliveryId'])];
+      }
+      if (/^deliveryDetail$|getDeliveryDetails/.test(methodName)) return [identifier];
+      if (/^deliveryHistory$|getDeliveryHistory/.test(methodName)) {
+        return [identifier, value.params && typeof value.params === 'object'
+          ? value.params
+          : withoutKeys(value, ['id', 'orderId', 'deliveryId'])];
+      }
       if (/^reorder$/.test(methodName)) return [identifier];
       if (/^modify$|modifyOrder/.test(methodName)) {
         return [identifier, withoutKeys(value, ['id', 'orderId'])];
@@ -1751,6 +1768,52 @@
     return firstValue(order.id, order.order_id, order.pk, order.uuid);
   }
 
+  function deliveryId(delivery) {
+    return firstValue(delivery?.id, delivery?.delivery_id, delivery?.pk, delivery?.uuid);
+  }
+
+  function deliveryNumber(delivery) {
+    return String(firstValue(
+      delivery?.delivery_number,
+      delivery?.number,
+      delivery?.reference,
+      deliveryId(delivery) ? `DEL-${deliveryId(delivery)}` : 'Delivery'
+    ));
+  }
+
+  function deliveryStatus(delivery) {
+    const status = firstValue(
+      delivery?.delivery_status,
+      delivery?.status_display,
+      delivery?.status,
+      'Pending'
+    );
+    return typeof status === 'object'
+      ? String(firstValue(status.name, status.label, status.status, 'Pending'))
+      : String(status);
+  }
+
+  function deliveryDate(delivery) {
+    return firstValue(
+      delivery?.delivery_date,
+      delivery?.scheduled_for,
+      delivery?.order_delivery_date,
+      delivery?.expected_delivery_date
+    );
+  }
+
+  function deliveryHistoryFor(delivery) {
+    const candidates = [
+      delivery?.history,
+      delivery?.delivery_history,
+      delivery?.tracking_events,
+      delivery?.events,
+      delivery?.data?.history,
+      delivery?.data?.tracking_events
+    ];
+    return candidates.find((candidate) => Array.isArray(candidate)) || [];
+  }
+
   function orderNumber(order) {
     return String(firstValue(order.order_number, order.number, order.order_no, order.reference, order.display_id, `#${orderId(order) || '—'}`));
   }
@@ -1811,7 +1874,7 @@
 
   function orderAmount(order) {
     const amountKeys = [
-      'net_payable', 'wallet_debit', 'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
+      'net_payable', 'net_order_amount', 'wallet_debit', 'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
       'total_price', 'payable_amount', 'amount_payable', 'subtotal', 'total', 'amount'
     ];
     const sources = [
@@ -1868,7 +1931,7 @@
   }
 
   function orderDate(order) {
-    return firstValue(order.created_at, order.order_date, order.created, order.delivery_date);
+    return firstValue(order.created_at, order.placed_at, order.order_date, order.created, order.delivery_date);
   }
 
   function isCompleted(order) {
@@ -1911,6 +1974,7 @@
     const pill = create('span', 'status-pill', status);
     if (/deliver|complete|fulfilled/.test(normalized)) pill.classList.add('is-complete');
     if (/cancel|failed|refund/.test(normalized)) pill.classList.add('is-cancelled');
+    if (/paused|not available|cannot deliver|attention|delay|exception/.test(normalized)) pill.classList.add('is-attention');
     return pill;
   }
 
@@ -1941,7 +2005,7 @@
     );
 
     const actions = create('div', 'card-actions');
-    actions.append(button('View details', 'card-action', () => openOrderDetail(order)));
+    actions.append(button('Track order', 'card-action', () => openOrderDetail(order)));
     if (!compact) {
       if (canModifyOneTimeOrder(order)) actions.append(button('Modify delivery', 'card-action', () => openOneTimeOrderModification(order)));
       actions.append(button('Order again', 'card-action', () => confirmReorder(order)));
@@ -2107,21 +2171,548 @@
     popup.print();
   }
 
+  const ORDER_JOURNEY_STEPS = [
+    { key: 'placed', label: 'Order placed', description: 'Your Atulyash order has been confirmed.' },
+    { key: 'scheduled', label: 'Fresh batch scheduled', description: 'Your fresh batch is queued for its confirmed delivery.' },
+    { key: 'preparing', label: 'Preparing your atta', description: 'Your fresh batch is being prepared with care.' },
+    { key: 'packed', label: 'Packed with care', description: 'Your Atulyash packet is ready for dispatch.' },
+    { key: 'assigned', label: 'Rider assigned', description: 'A delivery partner has been assigned to your batch.' },
+    { key: 'out', label: 'Out for delivery', description: 'Your delivery partner is bringing your fresh batch home.' },
+    { key: 'delivered', label: 'Delivered', description: 'Your order has reached its delivery home.' }
+  ];
+
+  function journeyCatalogStep(key) {
+    return ORDER_JOURNEY_STEPS.find((step) => step.key === key) || null;
+  }
+
+  function journeyKey(value) {
+    const normalized = String(value || '').toLowerCase().replaceAll('_', ' ');
+    if (/cancel|fail|refund|reject/.test(normalized)) return 'cancelled';
+    if (/delivered|delivery complete|fulfilled|received by (customer|you|recipient)/.test(normalized)) return 'delivered';
+    if (/out\s*for|on\s*the\s*way|transit|dispatched/.test(normalized)) return 'out';
+    if (/rider|driver|assigned|delivery partner/.test(normalized)) return 'assigned';
+    if (/pack|ready|shipped/.test(normalized)) return 'packed';
+    if (/prepar|mill|process/.test(normalized)) return 'preparing';
+    if (/schedul|fresh batch|queued/.test(normalized)) return 'scheduled';
+    if (/place|created|confirm|pending|new|accept|paid/.test(normalized)) return 'placed';
+    return '';
+  }
+
+  function trackingEventsForOrder(order) {
+    const candidates = [
+      order?.tracking_events,
+      order?.status_history,
+      order?.tracking_history,
+      order?.delivery_history,
+      order?.deliveryHistory,
+      order?.journey,
+      order?.timeline,
+      order?.tracking?.events,
+      order?.tracking?.history,
+      order?.data?.tracking_events,
+      order?.data?.status_history
+    ];
+    const direct = candidates.find((candidate) => Array.isArray(candidate));
+    if (direct) return direct;
+    if (Array.isArray(order?.deliveries)) {
+      return order.deliveries.flatMap((delivery) => deliveryHistoryFor(delivery));
+    }
+    return [];
+  }
+
+  function normalizeJourneyEvent(event) {
+    const rawStatus = typeof event === 'string'
+      ? event
+      : firstValue(
+        event?.key,
+        event?.code,
+        event?.status,
+        event?.new_status,
+        event?.order_status,
+        event?.delivery_status,
+        event?.event_type_display,
+        event?.event_type,
+        event?.name,
+        event?.label
+      );
+    const key = journeyKey(rawStatus);
+    const catalog = journeyCatalogStep(key);
+    const customLabel = typeof event === 'object'
+      ? firstValue(event.event_type_display, event.label, event.title, event.display_name)
+      : null;
+    const timestamp = typeof event === 'object'
+      ? firstValue(event.timestamp, event.occurred_at, event.created_at, event.updated_at, event.completed_at, event.date)
+      : null;
+    return {
+      key: key || 'current',
+      label: customLabel || catalog?.label || `Current status: ${String(rawStatus || 'Processing')}`,
+      description: typeof event === 'object'
+        ? firstValue(event.description, event.message, event.detail, event.notes) || catalog?.description || 'Atulyash has the latest update for this order.'
+        : catalog?.description || 'Atulyash has the latest update for this order.',
+      timestamp,
+      isCurrent: typeof event === 'object' && (event.is_current === true || event.current === true)
+    };
+  }
+
+  function orderJourneyModel(order) {
+    const status = orderStatus(order);
+    const statusKey = journeyKey(status);
+    const cancelled = statusKey === 'cancelled';
+    const attention = !cancelled && Boolean(
+      order?.delayed
+      || order?.needs_attention
+      || order?.attention_required
+      || /delay|attention|address issue|exception|paused|customer not available|cannot deliver/.test(status.toLowerCase())
+    );
+    const events = trackingEventsForOrder(order)
+      .map(normalizeJourneyEvent)
+      .filter((event) => event.label)
+      .sort((a, b) => {
+        const aTime = dateValue(a.timestamp)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const bTime = dateValue(b.timestamp)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      });
+    const uniqueEvents = [];
+    const eventKeys = new Set();
+    events.forEach((event) => {
+      const timestamp = event.timestamp ? String(event.timestamp) : '';
+      const signature = `${event.key}|${event.label}|${timestamp}`;
+      if (event.key === 'placed' && uniqueEvents.some((existing) => existing.key === 'placed')) return;
+      if (eventKeys.has(signature)) return;
+      eventKeys.add(signature);
+      uniqueEvents.push(event);
+    });
+    events.splice(0, events.length, ...uniqueEvents);
+    let steps = events;
+    let detailed = events.length > 0;
+
+    if (detailed && !steps.some((step) => step.isCurrent)) {
+      steps[steps.length - 1].isCurrent = true;
+    }
+
+    if (detailed && !steps.some((step) => step.key === 'placed')) {
+      steps = [
+        { ...journeyCatalogStep('placed'), timestamp: orderDate(order), isCurrent: false },
+        ...steps
+      ];
+    }
+    if (detailed && cancelled && !steps.some((step) => step.key === 'cancelled')) {
+      steps.push({ key: 'cancelled', label: 'Order cancelled', description: `The order status is ${status}.`, timestamp: null, isCurrent: true });
+    }
+    if (!detailed) {
+      const known = journeyCatalogStep(statusKey);
+      steps = [{ ...journeyCatalogStep('placed'), timestamp: orderDate(order), isCurrent: statusKey === 'placed' }];
+      if (cancelled) {
+        steps.push({ key: 'cancelled', label: 'Order cancelled', description: `The order status is ${status}.`, timestamp: null, isCurrent: true });
+      } else if (statusKey && statusKey !== 'placed') {
+        steps.push({ ...(known || {}), key: known?.key || 'current', label: known?.label || `Current status: ${status}`, description: known?.description || `The latest status from Atulyash is ${status}.`, timestamp: null, isCurrent: true });
+      } else if (!statusKey && status.toLowerCase() !== 'processing') {
+        steps.push({ key: 'current', label: `Current status: ${status}`, description: `The latest status from Atulyash is ${status}.`, timestamp: null, isCurrent: true });
+      }
+    }
+
+    let current = steps.findIndex((step) => step.isCurrent);
+    if (current < 0 && statusKey) current = steps.map((step) => step.key).lastIndexOf(statusKey);
+    if (current < 0) current = Math.max(0, steps.length - 1);
+    return { steps, current, cancelled, attention, detailed, status };
+  }
+
+  function orderJourneyDate(order) {
+    return firstValue(
+      order.requested_delivery_date,
+      order.order_delivery_date,
+      order.delivery_date,
+      order.expected_delivery_date
+    );
+  }
+
+  function orderJourneyProductImage(order) {
+    const image = firstValue(
+      order.product_image,
+      order.image,
+      order.product?.image,
+      order.product_detail?.image,
+      order.product_pack?.image,
+      order.items?.[0]?.image,
+      order.order_items?.[0]?.image
+    );
+    return safeUrl(image) || 'images/atta-packet-2026.webp';
+  }
+
+  function renderOrderJourney(order, refresh) {
+    const progress = orderJourneyModel(order);
+    const wrapper = create('section', 'order-journey', 'Order journey');
+    wrapper.setAttribute('aria-live', 'polite');
+    wrapper.setAttribute('aria-atomic', 'false');
+    wrapper.dataset.current = progress.steps[progress.current]?.key || 'current';
+    const head = create('div', 'order-journey-head');
+    const copy = create('div');
+    copy.append(
+      create('p', 'section-label', 'Every batch, remembered'),
+      create('h3', '', progress.cancelled || progress.attention ? 'This order needs attention.' : 'Your fresh batch journey')
+    );
+    const status = statusPill(progress.cancelled ? `Order ${orderStatus(order)}` : orderStatus(order));
+    status.classList.add('order-journey-status');
+    head.append(copy, status);
+    wrapper.append(head);
+
+    const product = create('div', 'order-journey-product');
+    const productImage = create('img');
+    productImage.src = orderJourneyProductImage(order);
+    productImage.alt = '';
+    productImage.width = 160;
+    productImage.height = 220;
+    const productCopy = create('div');
+    productCopy.append(
+      create('strong', '', orderTitle(order)),
+      create('span', '', `${orderNumber(order)} · ${orderAmountText(order)}`)
+    );
+    const delivery = orderJourneyDate(order);
+    if (delivery) productCopy.append(create('small', '', `Expected delivery · ${formatDate(delivery)}`));
+    product.append(productImage, productCopy);
+    wrapper.append(product);
+
+    const timeline = create('ol', 'order-journey-timeline');
+    timeline.dataset.detailed = String(progress.detailed);
+    timeline.style.setProperty('--journey-progress', `${progress.steps.length > 1 ? (progress.current / (progress.steps.length - 1)) * 100 : 0}%`);
+    progress.steps.forEach((step, index) => {
+      const item = create('li', 'order-journey-step');
+      const complete = !progress.cancelled && index < progress.current;
+      const current = !progress.cancelled && index === progress.current;
+      const cancelled = progress.cancelled && step.key === 'cancelled';
+      const attention = progress.attention && current;
+      const stepState = cancelled ? 'cancelled' : attention ? 'attention' : complete ? 'complete' : current ? 'current' : 'upcoming';
+      item.dataset.state = stepState;
+      item.dataset.key = step.key;
+      const marker = create('span', 'order-journey-marker', cancelled ? '!' : complete || step.key === 'delivered' && current ? '✓' : String(index + 1).padStart(2, '0'));
+      marker.setAttribute('aria-hidden', 'true');
+      const text = create('div', 'order-journey-step-copy');
+      const label = create('div', 'order-journey-step-title');
+      label.append(create('strong', '', stepState === 'cancelled' ? 'Order cancelled' : step.label));
+      if (current) label.append(create('span', 'order-journey-now', 'Current'));
+      if (complete) label.append(create('span', 'order-journey-done', 'Complete'));
+      text.append(label, create('p', '', stepState === 'cancelled' ? `The order status is ${progress.status}.` : step.description));
+      if (step.timestamp) text.append(create('small', '', formatDate(step.timestamp, true)));
+      item.append(marker, text);
+      timeline.append(item);
+    });
+    wrapper.append(timeline);
+
+    if (progress.steps[progress.current]?.key === 'delivered') {
+      const welcome = create('div', 'order-journey-welcome');
+      const veer = create('img');
+      veer.src = 'images/veer-mascot-2026.webp';
+      veer.alt = 'Veer welcoming your fresh batch home';
+      veer.width = 120;
+      veer.height = 160;
+      welcome.append(veer, create('p', '', 'Veer welcomes this batch home.'));
+      wrapper.append(welcome);
+    }
+
+    const footer = create('div', 'order-journey-footer');
+    const note = create('p', '', progress.cancelled || progress.attention
+      ? 'Please contact Atulyash care if you need help with this order.'
+      : progress.detailed
+        ? 'Status and dates update from the Atulyash service as your batch moves forward.'
+        : 'Only the status currently confirmed by Atulyash is shown. More journey events appear as the service updates your order.');
+    const refreshButton = button('Refresh status', 'card-action', refresh);
+    refreshButton.classList.add('order-journey-refresh');
+    footer.append(note, refreshButton);
+    wrapper.append(footer);
+    return wrapper;
+  }
+
+  async function loadOrderTracking(orderIdValue, detail) {
+    let listedDeliveries = [];
+    let subscriptionOrders = [];
+    try {
+      const [deliveriesResult, subscriptionResult] = await Promise.allSettled([
+        apiCall('orders', ['deliveries', 'listDeliveries', 'getOrderDeliveries'], {
+          id: orderIdValue,
+          orderId: orderIdValue
+        }, {
+          path: `/orders/order/${orderIdValue}/deliveries/`,
+          method: 'GET'
+        }),
+        apiCall('orders', ['subscriptionDeliveries', 'subscriptionOrders', 'getSubscriptionDeliveries'], {
+          id: orderIdValue,
+          orderId: orderIdValue
+        }, {
+          path: `/orders/order/${orderIdValue}/subscription-orders/`,
+          method: 'GET'
+        })
+      ]);
+      const unauthorized = [deliveriesResult, subscriptionResult]
+        .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
+      if (unauthorized) throw unauthorized.reason;
+      if (deliveriesResult.status === 'fulfilled') listedDeliveries = responseList(deliveriesResult.value);
+      if (subscriptionResult.status === 'fulfilled') subscriptionOrders = responseList(subscriptionResult.value);
+    } catch (error) {
+      if (isUnauthorized(error)) throw error;
+    }
+
+    const sourceDeliveries = listedDeliveries.length
+      ? listedDeliveries
+      : Array.isArray(detail?.deliveries) ? detail.deliveries : [];
+    if (!sourceDeliveries.length) return { ...detail, subscription_orders: subscriptionOrders };
+
+    const enrichedResults = await Promise.all(sourceDeliveries.map(async (delivery) => {
+      const id = deliveryId(delivery);
+      if (!id) return { ...delivery, history: deliveryHistoryFor(delivery) };
+
+      const [detailResult, historyResult] = await Promise.allSettled([
+        apiCall('orders', ['deliveryDetail', 'getDeliveryDetails'], { id, deliveryId: id }, {
+          path: `/orders/order-delivery/${id}/`,
+          method: 'GET'
+        }),
+        apiCall('orders', ['deliveryHistory', 'getDeliveryHistory'], { id, deliveryId: id }, {
+          path: `/orders/order-delivery/${id}/history/`,
+          method: 'GET'
+        })
+      ]);
+      const unauthorized = [detailResult, historyResult]
+        .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
+      if (unauthorized) throw unauthorized.reason;
+
+      const details = detailResult.status === 'fulfilled'
+        ? responseData(detailResult.value)
+        : {};
+      const history = historyResult.status === 'fulfilled'
+        ? responseList(historyResult.value)
+        : deliveryHistoryFor(delivery);
+      return {
+        ...delivery,
+        ...(details && typeof details === 'object' ? details : {}),
+        history,
+        delivery_history: history,
+        tracking_events: history
+      };
+    }));
+
+    const directEvents = [
+      detail?.tracking_events,
+      detail?.status_history,
+      detail?.tracking_history,
+      detail?.delivery_history
+    ].find((candidate) => Array.isArray(candidate)) || [];
+    const historyEvents = enrichedResults.flatMap((delivery) => deliveryHistoryFor(delivery));
+    return {
+      ...detail,
+      deliveries: enrichedResults,
+      subscription_orders: subscriptionOrders,
+      tracking_events: [...directEvents, ...historyEvents]
+    };
+  }
+
+  function renderDeliverySchedule(deliveries, order) {
+    if (!Array.isArray(deliveries) || !deliveries.length) return null;
+    const section = create('section', 'order-deliveries');
+    section.append(create('p', 'section-label', 'Fresh-batch deliveries'));
+    section.append(create('h4', '', deliveries.length === 1 ? 'Your delivery' : 'Your delivery schedule'));
+    const list = create('div', 'order-delivery-list');
+    deliveries.forEach((delivery, index) => {
+      const card = create('article', 'order-delivery-card');
+      const heading = create('div', 'order-delivery-card-head');
+      const title = create('div');
+      title.append(
+        create('strong', '', deliveryNumber(delivery)),
+        create('span', '', deliveryDate(delivery) ? formatDate(deliveryDate(delivery)) : `Delivery ${index + 1}`)
+      );
+      heading.append(title, statusPill(deliveryStatus(delivery)));
+      card.append(heading);
+      const meta = [];
+      const rider = firstValue(delivery.rider_name, delivery.rider?.name);
+      if (rider) meta.push(`Rider · ${rider}`);
+      const invoice = firstValue(delivery.invoice_number, delivery.invoice?.number);
+      if (invoice) meta.push(`Invoice · ${invoice}`);
+      if (meta.length) card.append(create('p', 'order-delivery-card-meta', meta.join(' · ')));
+      card.append(button('View delivery details', 'card-action', () => openDeliveryDetail(delivery, order)));
+      list.append(card);
+    });
+    section.append(list);
+    return section;
+  }
+
+  function renderSubscriptionSchedule(subscriptionOrders) {
+    if (!Array.isArray(subscriptionOrders) || !subscriptionOrders.length) return null;
+    const section = create('section', 'order-deliveries order-subscription-schedule');
+    section.append(create('p', 'section-label', 'Weekly plan ledger'));
+    section.append(create('h4', '', 'Scheduled weekly orders'));
+    const list = create('div', 'order-delivery-list');
+    subscriptionOrders.forEach((subscriptionOrder, index) => {
+      const card = create('article', 'order-delivery-card');
+      const heading = create('div', 'order-delivery-card-head');
+      const title = create('div');
+      title.append(
+        create('strong', '', firstValue(subscriptionOrder.week_label, subscriptionOrder.number, `Week ${index + 1}`)),
+        create('span', '', firstValue(subscriptionOrder.order_delivery_date, subscriptionOrder.next_delivery_date)
+          ? formatDate(firstValue(subscriptionOrder.order_delivery_date, subscriptionOrder.next_delivery_date))
+          : 'Date to be confirmed')
+      );
+      heading.append(title, statusPill(firstValue(subscriptionOrder.order_status, subscriptionOrder.status, 'Pending')));
+      card.append(heading);
+      const amount = orderPaymentValue(subscriptionOrder, 'net_payable');
+      const parent = firstValue(subscriptionOrder.parent, subscriptionOrder.parent_order_id);
+      const meta = [
+        parent ? `Parent order · ${parent}` : null,
+        amount !== null ? `Per delivery · ${formatMoney(amount)}` : null
+      ].filter(Boolean);
+      if (meta.length) card.append(create('p', 'order-delivery-card-meta', meta.join(' · ')));
+      list.append(card);
+    });
+    section.append(list);
+    return section;
+  }
+
+  async function openDeliveryDetail(delivery, order) {
+    const id = deliveryId(delivery);
+    openDialog('Delivery detail', deliveryNumber(delivery), makeState('loading', 'Loading delivery.', 'Bringing the latest delivery update into view…'));
+    try {
+      let detail = delivery || {};
+      let history = deliveryHistoryFor(detail);
+      if (id) {
+        const [detailResult, historyResult] = await Promise.allSettled([
+          apiCall('orders', ['deliveryDetail', 'getDeliveryDetails'], { id, deliveryId: id }, {
+            path: `/orders/order-delivery/${id}/`,
+            method: 'GET'
+          }),
+          apiCall('orders', ['deliveryHistory', 'getDeliveryHistory'], { id, deliveryId: id }, {
+            path: `/orders/order-delivery/${id}/history/`,
+            method: 'GET'
+          })
+        ]);
+        const unauthorized = [detailResult, historyResult]
+          .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
+        if (unauthorized) throw unauthorized.reason;
+        if (detailResult.status === 'fulfilled') {
+          const payload = responseData(detailResult.value);
+          if (payload && typeof payload === 'object') detail = { ...detail, ...payload };
+        }
+        if (historyResult.status === 'fulfilled') history = responseList(historyResult.value);
+      }
+      const body = create('div', 'delivery-detail');
+      const hero = create('div', 'delivery-detail-hero');
+      hero.append(
+        create('div', 'delivery-detail-hero-copy', `${deliveryNumber(detail)} · ${deliveryStatus(detail)}`),
+        statusPill(deliveryStatus(detail))
+      );
+      body.append(hero);
+
+      const summary = create('div', 'dialog-summary');
+      const summaryRows = [
+        ['Delivery date', deliveryDate(detail) ? formatDate(deliveryDate(detail)) : 'Date to be confirmed'],
+        ['Placed on', detail.placed_at ? formatDate(detail.placed_at, true) : 'Date to be confirmed']
+      ];
+      const riderName = firstValue(detail.rider_name, detail.rider?.name);
+      if (riderName) summaryRows.push(['Delivery partner', riderName]);
+      const riderPhone = firstValue(detail.rider_phone, detail.rider?.phone);
+      if (riderPhone) summaryRows.push(['Partner contact', riderPhone]);
+      const itemsTotal = orderPaymentValue(detail, 'items_total');
+      const deliveryCharge = orderPaymentValue(detail, 'delivery_charge');
+      const couponDiscount = orderPaymentValue(detail, 'coupon_discount');
+      const netPayable = orderPaymentValue(detail, 'net_payable');
+      if (itemsTotal !== null) summaryRows.push(['Items total', formatMoney(itemsTotal)]);
+      if (deliveryCharge !== null) summaryRows.push(['Delivery charge', deliveryCharge === 0 ? 'Free' : formatMoney(deliveryCharge)]);
+      if (couponDiscount !== null && couponDiscount > 0) summaryRows.push(['Coupon saving', `−${formatMoney(couponDiscount)}`]);
+      if (netPayable !== null) summaryRows.push(['Net payable', formatMoney(netPayable)]);
+      summaryRows.forEach(([label, value]) => {
+        const row = create('div', 'dialog-summary-row');
+        row.append(create('span', '', label), create('strong', '', value));
+        summary.append(row);
+      });
+      body.append(summary);
+
+      const address = firstValue(detail.address_of_customer, detail.delivery_address, detail.address, order?.address);
+      if (address) {
+        body.append(create('p', 'section-label', 'Delivery address'));
+        body.append(create('p', 'dialog-copy', addressText(address)));
+      }
+
+      const historyPanel = create('section', 'delivery-history');
+      historyPanel.append(create('p', 'section-label', 'Delivery history'));
+      historyPanel.append(create('h4', '', 'Every update, in order'));
+      if (!history.length) {
+        historyPanel.append(makeState('empty', 'No event history yet.', 'The service will add delivery updates as this batch moves.'));
+      } else {
+        const historyList = create('ol', 'delivery-history-list');
+        history
+          .map(normalizeJourneyEvent)
+          .filter((event) => event.label)
+          .sort((a, b) => (dateValue(a.timestamp)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (dateValue(b.timestamp)?.getTime() ?? Number.MAX_SAFE_INTEGER))
+          .forEach((event, index) => {
+            const item = create('li', 'delivery-history-item');
+            const marker = create('span', 'delivery-history-marker', String(index + 1).padStart(2, '0'));
+            const copy = create('div');
+            copy.append(create('strong', '', event.label), create('p', '', event.description));
+            if (event.timestamp) copy.append(create('small', '', formatDate(event.timestamp, true)));
+            item.append(marker, copy);
+            historyList.append(item);
+          });
+        historyPanel.append(historyList);
+      }
+      body.append(historyPanel);
+
+      const invoiceNumber = firstValue(detail.invoice_number, detail.invoice?.number);
+      if (invoiceNumber || detail.has_invoice) {
+        body.append(create('p', 'dialog-note', detail.invoice_downloadable || detail.invoice?.downloadable
+          ? `Invoice ${invoiceNumber || ''} is available for download when the service supplies the invoice link.`
+          : 'The invoice will appear here once it is generated for this delivery.'));
+      }
+
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Back to order journey', 'secondary-button', () => openOrderDetail(order || { id: firstValue(detail.parent, detail.order_id) })));
+      const invoiceUrl = orderInvoiceUrl(detail);
+      if (invoiceUrl) {
+        const invoice = create('a', 'primary-button', 'Download invoice');
+        invoice.href = invoiceUrl;
+        invoice.target = '_blank';
+        invoice.rel = 'noopener noreferrer';
+        actions.append(invoice);
+      }
+      body.append(actions);
+      elements.dialogBody.replaceChildren(body);
+    } catch (error) {
+      elements.dialogBody.replaceChildren(orderJourneyErrorState(error, () => openDeliveryDetail(delivery, order)));
+    }
+  }
+
+  function orderJourneyErrorState(error, retry) {
+    if (isUnauthorized(error)) {
+      const panel = makeState('error', 'Your session has expired.', 'Sign in again to securely view this order journey.');
+      const signIn = create('a', 'secondary-button', 'Sign in again');
+      signIn.href = 'account.html#login';
+      signIn.addEventListener('click', () => {
+        closeDialog();
+        enterAuth('Your session has ended. Please sign in again.');
+      });
+      panel.querySelector('.state-inner')?.append(signIn);
+      return panel;
+    }
+    return makeState('error', 'Tracking is temporarily unavailable.', 'We could not load the latest order update. Your order record is safe; try again in a moment.', retry);
+  }
+
   async function openOrderDetail(order) {
     const id = orderId(order);
-    openDialog('Order details', orderNumber(order), makeState('loading', 'Loading order.', 'Bringing the complete order into view…'));
+    openDialog('Order journey', orderNumber(order), makeState('loading', 'Loading order.', 'Bringing the complete order into view…'));
     try {
       const result = await apiCall('orders', ['detail', 'getOrderDetails'], { id, orderId: id }, {
         path: `/orders/order/${id}/`,
         method: 'GET'
       });
-      const detail = responseData(result);
+      const detail = await loadOrderTracking(id, responseData(result));
       const body = create('div');
+      const layout = create('div', 'order-detail-layout');
+      const journeyColumn = create('div', 'order-detail-primary');
+      const detailColumn = create('aside', 'order-detail-aside');
+      journeyColumn.append(renderOrderJourney(detail, () => openOrderDetail(detail)));
+      layout.append(journeyColumn, detailColumn);
       const summary = create('div', 'dialog-summary');
+      const paymentThrough = firstValue(detail.payment_method_display, detail.payment_method, detail.payment_through, detail.payment_status);
+      const paymentLabel = /wallet/i.test(String(paymentThrough || '')) ? 'Atulyash Wallet' : String(paymentThrough || 'Recorded');
       const summaryRows = [
         ['Status', orderStatus(detail)],
         ['Placed on', formatDate(orderDate(detail))],
-        ['Payment', String(firstValue(detail.payment_method_display, detail.payment_method, detail.payment_status, 'Recorded'))],
+        ['Payment', paymentLabel],
         ['Delivery', formatDate(firstValue(
           detail.requested_delivery_date,
           detail.order_delivery_date,
@@ -2130,6 +2721,12 @@
         ))],
         ['Order total', orderAmountText(detail)]
       ];
+      const purchaseType = firstValue(detail.purchase_type, detail.order_type, detail.fulfilment_type);
+      const weeklyQuantity = firstValue(detail.weekly_quantity, detail.weekly_kg, detail.quantity_per_week);
+      const deliveryDay = firstValue(detail.delivery_day, detail.preferred_delivery_day);
+      if (purchaseType) summaryRows.splice(1, 0, ['Order type', /week|subscr/i.test(String(purchaseType)) ? 'Weekly freshness' : 'One-time order']);
+      if (weeklyQuantity) summaryRows.splice(2, 0, ['Weekly quantity', `${weeklyQuantity}${/kg/i.test(String(weeklyQuantity)) ? '' : ' kg'} per week`]);
+      if (deliveryDay) summaryRows.splice(3, 0, ['Preferred day', String(deliveryDay)]);
       const itemsTotal = orderPaymentValue(detail, 'items_total');
       const deliveryCharge = orderPaymentValue(detail, 'delivery_charge');
       const couponDiscount = orderPaymentValue(detail, 'coupon_discount', 'applied_coupon_discount');
@@ -2143,17 +2740,24 @@
         row.append(create('span', '', label), create('strong', '', value));
         summary.append(row);
       });
-      body.append(summary);
+      detailColumn.append(summary);
 
-      const address = firstValue(detail.delivery_address, detail.address, detail.customer_address);
+      const deliverySchedule = renderDeliverySchedule(detail.deliveries, detail);
+      if (deliverySchedule) detailColumn.append(deliverySchedule);
+      const subscriptionSchedule = renderSubscriptionSchedule(detail.subscription_orders);
+      if (subscriptionSchedule && (!Array.isArray(detail.deliveries) || detail.deliveries.length !== detail.subscription_orders.length)) {
+        detailColumn.append(subscriptionSchedule);
+      }
+
+      const address = firstValue(detail.address_of_customer, detail.delivery_address, detail.address, detail.customer_address);
       if (address) {
-        body.append(create('p', 'section-label', 'Delivery address'));
-        body.append(create('p', 'dialog-copy', addressText(address)));
+        detailColumn.append(create('p', 'section-label', 'Delivery address'));
+        detailColumn.append(create('p', 'dialog-copy', addressText(address)));
       }
 
       const items = orderItems(detail);
       if (items.length) {
-        body.append(create('p', 'section-label', 'Items in this batch'));
+        detailColumn.append(create('p', 'section-label', 'Items in this batch'));
         const itemsSummary = create('div', 'dialog-summary');
         items.forEach((item) => {
           const row = create('div', 'dialog-summary-row');
@@ -2163,7 +2767,7 @@
           row.append(create('span', '', `${orderTitle(temporaryOrder)} × ${quantity}`), create('strong', '', formatMoney(itemTotal)));
           itemsSummary.append(row);
         });
-        body.append(itemsSummary);
+        detailColumn.append(itemsSummary);
       }
 
       const actions = create('div', 'dialog-actions');
@@ -2179,10 +2783,11 @@
       }
       actions.append(button('Order again', 'primary-button', () => confirmReorder(detail)));
       if (isCompleted(detail)) actions.append(button('Write a review', 'secondary-button', () => openReview(detail)));
-      body.append(actions);
+      detailColumn.append(actions);
+      body.append(layout);
       elements.dialogBody.replaceChildren(body);
     } catch (error) {
-      elements.dialogBody.replaceChildren(makeState('error', 'Order details are unavailable.', friendlyError(error), () => openOrderDetail(order)));
+      elements.dialogBody.replaceChildren(orderJourneyErrorState(error, () => openOrderDetail(order)));
     }
   }
 

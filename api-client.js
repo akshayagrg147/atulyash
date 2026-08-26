@@ -1104,6 +1104,27 @@
         options
       );
     },
+    deliveries: function orderDeliveries(orderId, params, options) {
+      return getRequest(
+        '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/deliveries/',
+        params,
+        options
+      );
+    },
+    deliveryDetail: function deliveryDetails(deliveryId, options) {
+      return getRequest(
+        '/orders/order-delivery/' + idPathSegment(deliveryId, '', 'Delivery ID') + '/',
+        null,
+        options
+      );
+    },
+    deliveryHistory: function deliveryHistory(deliveryId, params, options) {
+      return getRequest(
+        '/orders/order-delivery/' + idPathSegment(deliveryId, '', 'Delivery ID') + '/history/',
+        params,
+        options
+      );
+    },
     detail: function orderDetail(orderId, options) {
       return getRequest(
         '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/',
@@ -1127,6 +1148,10 @@
   };
   orders.get = orders.detail;
   orders.subscriptionOrders = orders.subscriptionDeliveries;
+  orders.listDeliveries = orders.deliveries;
+  orders.getOrderDeliveries = orders.deliveries;
+  orders.getDeliveryDetails = orders.deliveryDetail;
+  orders.getDeliveryHistory = orders.deliveryHistory;
 
   var products = {
     list: function listProducts(params, options) {

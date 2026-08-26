@@ -1357,3 +1357,74 @@ body.checkout-page.checkout-handoff-open {
     display: none;
   }
 }
+
+/* The animation is an invitation, never a gate. */
+.checkout-success-skip {
+  display: block;
+  margin: -20px auto 22px;
+  padding: 7px 12px;
+  border: 1px solid rgba(17, 55, 46, .22);
+  border-radius: 999px;
+  color: var(--forest-800);
+  background: rgba(255, 253, 248, .76);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  cursor: pointer;
+}
+
+.checkout-success-skip:hover {
+  border-color: var(--forest-700);
+  background: var(--cream-50);
+}
+
+.checkout-success-skip:focus-visible {
+  outline: 3px solid rgba(184, 79, 49, .32);
+  outline-offset: 3px;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-orbit {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-stone {
+  opacity: .55;
+  transform: translate(-50%, -50%) rotate(24deg) scale(1);
+  animation: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-flour,
+.checkout-success-celebration.is-skipped .checkout-success-grains {
+  display: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-pack {
+  opacity: 1;
+  transform: translateY(0) rotate(0) scale(1);
+  animation: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-veer {
+  opacity: 1;
+  transform: translate(0, 0) rotate(0);
+  animation: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-mark {
+  opacity: 1;
+  transform: scale(1) rotate(0);
+  animation: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-mark svg path {
+  stroke-dashoffset: 0;
+  animation: none;
+}
+
+.checkout-success-celebration.is-skipped .checkout-success-ribbon {
+  opacity: 1;
+  transform: translateY(0);
+  animation: none;
+}

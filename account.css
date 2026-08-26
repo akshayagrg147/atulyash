@@ -1320,6 +1320,11 @@ select {
   background: rgba(184, 79, 49, .09);
 }
 
+.status-pill.is-attention {
+  color: var(--rust-500);
+  background: rgba(184, 79, 49, .1);
+}
+
 .card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -8230,5 +8235,567 @@ body.account-bag-open {
   .mobile-account-nav-hamburger b {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Customer order journey: a calm, scannable timeline for the order detail view. */
+.order-journey {
+  margin-bottom: 22px;
+  padding: 20px;
+  color: var(--forest-950);
+  background:
+    radial-gradient(circle at 100% 0, rgba(222, 197, 143, .22), transparent 11rem),
+    linear-gradient(135deg, rgba(239, 247, 241, .85), rgba(255, 253, 248, .98));
+  border: 1px solid rgba(40, 100, 84, .18);
+  border-left: 4px solid var(--wheat-400);
+}
+
+.order-journey-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(17, 55, 46, .12);
+}
+
+.order-journey-head .section-label {
+  margin-bottom: 5px;
+}
+
+.order-journey-head h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(1.7rem, 4vw, 2.45rem);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.order-journey-status {
+  flex: 0 0 auto;
+}
+
+.order-journey-product {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(17, 55, 46, .12);
+}
+
+.order-journey-product img {
+  width: 64px;
+  height: 80px;
+  object-fit: contain;
+  padding: 7px;
+  background: rgba(222, 197, 143, .16);
+  border-radius: 4px;
+}
+
+.order-journey-product strong,
+.order-journey-product span,
+.order-journey-product small {
+  display: block;
+}
+
+.order-journey-product strong {
+  color: var(--forest-900);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.order-journey-product span,
+.order-journey-product small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .63rem;
+  line-height: 1.45;
+}
+
+.order-journey-timeline {
+  position: relative;
+  display: grid;
+  gap: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order-journey-timeline::before {
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  left: 17px;
+  width: 1px;
+  background: rgba(17, 55, 46, .15);
+  content: "";
+}
+
+.order-journey-timeline::after {
+  position: absolute;
+  top: 20px;
+  left: 17px;
+  width: 1px;
+  height: var(--journey-progress, 0%);
+  max-height: calc(100% - 40px);
+  background: var(--forest-700);
+  content: "";
+  transition: height .7s cubic-bezier(.2, .75, .25, 1);
+}
+
+.order-journey-step {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 73px;
+}
+
+.order-journey-marker {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  margin-top: 1px;
+  border: 1px solid rgba(17, 55, 46, .2);
+  border-radius: 50%;
+  color: var(--muted);
+  background: var(--cream-50);
+  font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+
+.order-journey-step-copy {
+  padding: 0 0 20px;
+}
+
+.order-journey-step-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-height: 22px;
+}
+
+.order-journey-step-title strong {
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.order-journey-step-copy p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: .65rem;
+  line-height: 1.5;
+}
+
+.order-journey-step-copy small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: .59rem;
+}
+
+.order-journey-step[data-state="complete"] .order-journey-marker {
+  color: #fffdf8;
+  background: var(--forest-700);
+  border-color: var(--forest-700);
+}
+
+.order-journey-step[data-state="complete"] .order-journey-step-title strong,
+.order-journey-step[data-state="current"] .order-journey-step-title strong {
+  color: var(--forest-950);
+}
+
+.order-journey-step[data-state="current"] .order-journey-marker {
+  color: var(--forest-950);
+  background: var(--wheat-300);
+  border-color: var(--wheat-400);
+  box-shadow: 0 0 0 5px rgba(222, 197, 143, .2);
+  animation: order-journey-pulse 2.8s ease-in-out infinite;
+}
+
+.order-journey-step[data-key="preparing"][data-state="current"] .order-journey-marker::after {
+  width: 15px;
+  height: 15px;
+  border: 1px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  content: "";
+  animation: order-journey-spin 2.6s linear infinite;
+}
+
+.order-journey[data-current="out"] .order-journey-product img {
+  animation: order-journey-packet-drift 3.8s ease-in-out infinite;
+}
+
+.order-journey-step[data-key="out"][data-state="current"] .order-journey-step-copy::after {
+  display: block;
+  width: 48px;
+  height: 1px;
+  margin-top: 9px;
+  background: linear-gradient(90deg, var(--wheat-400), transparent);
+  content: "";
+  transform-origin: left center;
+  animation: order-journey-route 1.8s ease-in-out infinite;
+}
+
+.order-journey-step[data-state="cancelled"] .order-journey-marker {
+  color: #fffdf8;
+  background: var(--rust-500);
+  border-color: var(--rust-500);
+}
+
+.order-journey-step[data-state="attention"] .order-journey-marker {
+  color: #fffdf8;
+  background: var(--rust-500);
+  border-color: var(--rust-500);
+  box-shadow: 0 0 0 5px rgba(184, 79, 49, .12);
+}
+
+.order-journey-step[data-state="attention"] .order-journey-step-title strong {
+  color: var(--rust-500);
+}
+
+.order-journey-step[data-state="upcoming"] .order-journey-step-copy p {
+  color: rgba(100, 113, 109, .72);
+}
+
+.order-journey-now,
+.order-journey-done {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: .53rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.order-journey-now {
+  color: var(--forest-900);
+  background: rgba(222, 197, 143, .7);
+}
+
+.order-journey-done {
+  color: var(--green-600, #276f58);
+  background: rgba(39, 111, 88, .1);
+}
+
+.order-journey-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(17, 55, 46, .12);
+}
+
+.order-journey-welcome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -2px 0 15px 50px;
+  padding: 7px 10px;
+  border: 1px solid rgba(222, 197, 143, .45);
+  border-radius: 8px;
+  background: rgba(222, 197, 143, .14);
+}
+
+.order-journey-welcome img {
+  width: 42px;
+  height: 56px;
+  object-fit: contain;
+  object-position: bottom;
+  animation: order-journey-veer-wave 3.2s ease-in-out infinite;
+}
+
+.order-journey-welcome p {
+  margin: 0;
+  color: var(--forest-900);
+  font-family: var(--serif);
+  font-size: .9rem;
+}
+
+.order-journey-footer p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .61rem;
+  line-height: 1.5;
+}
+
+.order-journey-refresh {
+  flex: 0 0 auto;
+}
+
+.order-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(250px, .82fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.order-detail-primary,
+.order-detail-aside {
+  min-width: 0;
+}
+
+.order-detail-aside {
+  padding: 18px;
+  border: 1px solid rgba(17, 55, 46, .12);
+  background: rgba(255, 253, 248, .7);
+}
+
+.order-detail-aside > .section-label {
+  margin-top: 22px;
+}
+
+.order-detail-aside .dialog-summary {
+  margin: 0;
+}
+
+.order-detail-aside .dialog-actions {
+  margin-top: 20px;
+}
+
+@keyframes order-journey-pulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(222, 197, 143, .2); }
+  50% { box-shadow: 0 0 0 9px rgba(222, 197, 143, .07); }
+}
+
+@keyframes order-journey-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes order-journey-packet-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes order-journey-route {
+  0%, 100% { opacity: .35; transform: scaleX(.4); }
+  50% { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes order-journey-veer-wave {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  45% { transform: translateY(-2px) rotate(-2deg); }
+  70% { transform: translateY(0) rotate(2deg); }
+}
+
+@media (max-width: 560px) {
+  .order-detail-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .order-detail-aside {
+    padding: 15px;
+  }
+
+  .order-journey {
+    padding: 16px;
+  }
+
+  .order-journey-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .order-journey-status {
+    align-self: flex-start;
+  }
+
+  .order-journey-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .order-journey-refresh {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-journey-timeline::after {
+    transition: none;
+  }
+
+  .order-journey-step[data-state="current"] .order-journey-marker,
+  .order-journey-step[data-key="preparing"][data-state="current"] .order-journey-marker::after,
+  .order-journey[data-current="out"] .order-journey-product img,
+  .order-journey-step[data-key="out"][data-state="current"] .order-journey-step-copy::after,
+  .order-journey-welcome img {
+    animation: none;
+  }
+}
+
+/* Delivery-level data from the tracking APIs stays compact and scannable in the
+   order-detail aside, with a separate history view for the selected batch. */
+.order-deliveries {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(17, 55, 46, .12);
+}
+
+.order-deliveries h4,
+.delivery-history h4 {
+  margin: 0 0 11px;
+  color: var(--forest-950);
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.order-delivery-list {
+  display: grid;
+  gap: 9px;
+}
+
+.order-delivery-card {
+  padding: 12px;
+  border: 1px solid rgba(17, 55, 46, .14);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, .82);
+}
+
+.order-delivery-card-head,
+.delivery-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.order-delivery-card-head strong,
+.order-delivery-card-head span {
+  display: block;
+}
+
+.order-delivery-card-head strong {
+  color: var(--forest-900);
+  font-size: .72rem;
+  letter-spacing: .03em;
+}
+
+.order-delivery-card-head span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .61rem;
+}
+
+.order-delivery-card-meta {
+  margin: 9px 0 10px;
+  color: var(--muted);
+  font-size: .59rem;
+  line-height: 1.45;
+}
+
+.order-delivery-card .card-action {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.delivery-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.delivery-detail-hero {
+  align-items: center;
+  padding: 13px 15px;
+  border: 1px solid rgba(222, 197, 143, .52);
+  border-radius: 7px;
+  background: rgba(222, 197, 143, .16);
+}
+
+.delivery-detail-hero-copy {
+  color: var(--forest-900);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+
+.delivery-history {
+  padding-top: 18px;
+  border-top: 1px solid rgba(17, 55, 46, .12);
+}
+
+.delivery-history-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delivery-history-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 11px;
+  min-height: 58px;
+}
+
+.delivery-history-item:not(:last-child)::after {
+  position: absolute;
+  top: 27px;
+  bottom: 0;
+  left: 14px;
+  width: 1px;
+  background: rgba(17, 55, 46, .16);
+  content: "";
+}
+
+.delivery-history-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(17, 55, 46, .18);
+  border-radius: 50%;
+  color: var(--forest-900);
+  background: var(--cream-50);
+  font-size: .53rem;
+  font-weight: 800;
+}
+
+.delivery-history-item strong {
+  display: block;
+  color: var(--forest-900);
+  font-size: .7rem;
+  line-height: 1.3;
+}
+
+.delivery-history-item p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: .62rem;
+  line-height: 1.45;
+}
+
+.delivery-history-item small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .57rem;
+}
+
+@media (max-width: 560px) {
+  .order-delivery-card-head,
+  .delivery-detail-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .order-delivery-card .status-pill,
+  .delivery-detail-hero .status-pill {
+    align-self: flex-start;
   }
 }

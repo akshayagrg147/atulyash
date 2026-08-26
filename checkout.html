@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260811-1">
   <link rel="stylesheet" href="ecommerce.css?v=20260825-2">
-  <link rel="stylesheet" href="checkout-page.css?v=20260802-5">
+  <link rel="stylesheet" href="checkout-page.css?v=20260826-6">
 </head>
 <body class="checkout-page checkout-handoff-open" data-commerce-page="checkout">
   <a class="skip-link" href="#checkoutTitle">Skip to checkout</a>
@@ -366,6 +366,7 @@
                 </div>
                 <span class="checkout-success-ribbon">Fresh batch confirmed</span>
               </div>
+              <button class="checkout-success-skip" id="checkoutSuccessSkipAnimation" type="button" hidden>Skip animation</button>
               <p class="checkout-kicker">Order confirmed</p>
               <h2 id="checkoutSuccessTitle" tabindex="-1">Your fresh batch is on its way.</h2>
               <p id="checkoutSuccessMessage">Order <strong id="checkoutReference">ATU-000000</strong> has been placed successfully.</p>
@@ -374,7 +375,7 @@
                 <div><dt>Payment</dt><dd id="checkoutSuccessPaymentStatus">Confirmed</dd></div>
               </dl>
               <div class="checkout-success-actions">
-                <a class="button button-dark" id="checkoutViewOrderLink" href="account.html#orders">View my order <span aria-hidden="true">→</span></a>
+                <a class="button button-dark" id="checkoutViewOrderLink" href="account.html#orders">Track this order <span aria-hidden="true">→</span></a>
                 <button class="checkout-back" id="successCloseButton" type="button">Return to Atulyash</button>
               </div>
               <p class="checkout-success-support">Need help with this order? <a id="whatsappOrderLink" href="https://wa.me/919818588996" target="_blank" rel="noopener noreferrer">Chat with Atulyash on WhatsApp <span aria-hidden="true">↗</span></a></p>
@@ -413,8 +414,8 @@
 
   <div class="commerce-toast" id="commerceToast" role="status" aria-live="polite" aria-atomic="true"></div>
   <noscript><p class="checkout-noscript">JavaScript is required for secure checkout. <a href="index.html#shop">Return to your bag</a>.</p></noscript>
-  <script src="api-client.js?v=20260812-1"></script>
+  <script src="api-client.js?v=20260826-2"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="ecommerce.js?v=20260826-2"></script>
+  <script src="ecommerce.js?v=20260826-3"></script>
 </body>
 </html>

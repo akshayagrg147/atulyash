@@ -204,8 +204,10 @@
     checkoutPlaceOrderStatusLabel: document.getElementById('checkoutPlaceOrderStatusLabel'),
     checkoutSuccess: document.getElementById('checkoutSuccess'),
     checkoutSuccessCelebration: document.getElementById('checkoutSuccessCelebration'),
+    checkoutSuccessSkipAnimation: document.getElementById('checkoutSuccessSkipAnimation'),
     checkoutReference: document.getElementById('checkoutReference'),
     checkoutSuccessMessage: document.getElementById('checkoutSuccessMessage'),
+    checkoutSuccessDetails: document.getElementById('checkoutSuccessDetails'),
     checkoutSuccessDeliveryDate: document.getElementById('checkoutSuccessDeliveryDate'),
     checkoutSuccessPaymentStatus: document.getElementById('checkoutSuccessPaymentStatus'),
     checkoutViewOrderLink: document.getElementById('checkoutViewOrderLink'),
@@ -2956,6 +2958,8 @@
   function resetCheckout() {
     elements.checkoutSuccess.hidden = true;
     elements.checkoutForm.hidden = false;
+    elements.checkoutSuccessSkipAnimation?.setAttribute('hidden', '');
+    elements.checkoutSuccessCelebration?.classList.remove('is-celebrating', 'is-skipped');
     elements.checkoutConsent.checked = false;
     if (elements.checkoutConsentError) elements.checkoutConsentError.textContent = '';
     elements.checkoutModal?.setAttribute('aria-labelledby', 'checkoutTitle');
@@ -4833,12 +4837,130 @@
     }
   }
 
+  function confirmedOrderId(payload) {
+    const value = firstResponseValue(payload, ['order_id', 'id', 'pk', 'uuid']);
+    if (value && typeof value === 'object') return firstResponseValue(value, ['id', 'pk', 'uuid']);
+    return value == null || value === '' ? '' : String(value);
+  }
+
+  function confirmedDateText(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return new Intl.DateTimeFormat('en-IN', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC'
+    }).format(parsed);
+  }
+
+  function confirmedAddressText(address) {
+    if (!address) return '';
+    if (typeof address === 'string') return address;
+    return [
+      address.house_name || address.house_number || address.flat_number || address.address_line_1,
+      address.tower_wing || address.building || address.address_line_2,
+      address.landmark,
+      address.area || address.locality,
+      address.city,
+      address.state,
+      address.pincode?.pincode || address.pincode?.code || address.pincode || address.postal_code
+    ].filter(Boolean).join(', ');
+  }
+
+  function renderCheckoutSuccessDetails(payload, reference) {
+    const details = elements.checkoutSuccessDetails;
+    if (!details) return;
+
+    const date = firstResponseValue(payload, [
+      'confirmed_delivery_date',
+      'delivery_date',
+      'order_delivery_date',
+      'expected_delivery_date'
+    ]);
+    const paymentStatus = firstResponseValue(payload, [
+      'payment_status_display',
+      'payment_status',
+      'wallet_payment_status'
+    ]);
+    const productName = firstResponseValue(payload, [
+      'product_name',
+      'product_title',
+      'item_name'
+    ]);
+    const packSize = firstResponseValue(payload, ['pack_size', 'weight_kg', 'weight', 'quantity_kg']);
+    const quantity = firstResponseValue(payload, ['quantity', 'item_quantity']);
+    const purchaseType = firstResponseValue(payload, ['purchase_type', 'order_type', 'fulfilment_type']);
+    const weeklyQuantity = firstResponseValue(payload, ['weekly_quantity', 'weekly_kg', 'quantity_per_week']);
+    const deliveryDay = firstResponseValue(payload, ['delivery_day', 'preferred_delivery_day']);
+    const amount = firstResponseValue(payload, [
+      'net_payable',
+      'wallet_debit',
+      'final_amount',
+      'total_amount',
+      'grand_total',
+      'order_total',
+      'amount_payable'
+    ]);
+    const coupon = firstResponseValue(payload, [
+      'coupon_discount',
+      'applied_coupon_discount',
+      'discount_amount'
+    ]);
+    const deliveryCharge = firstResponseValue(payload, ['delivery_charge', 'delivery_fee']);
+    const walletDebit = firstResponseValue(payload, ['wallet_debit', 'wallet_amount_debited']);
+    const address = firstResponseValue(payload, ['delivery_address', 'address', 'customer_address']);
+    const rows = [
+      ['Order', reference],
+      productName ? ['Product', String(productName)] : null,
+      packSize ? ['Pack', `${packSize}${/kg/i.test(String(packSize)) ? '' : ' kg'}${quantity ? ` × ${quantity}` : ''}`] : null,
+      purchaseType ? ['Order type', /week|subscr/i.test(String(purchaseType)) ? 'Weekly freshness' : 'One-time order'] : null,
+      amount != null ? ['Confirmed amount', formatPrice(numericValue(amount, 0))] : null,
+      coupon != null && numericValue(coupon, 0) > 0 ? ['Coupon saving', `−${formatPrice(numericValue(coupon, 0))}`] : null,
+      deliveryCharge != null ? ['Delivery charge', numericValue(deliveryCharge, 0) === 0 ? 'Free' : formatPrice(numericValue(deliveryCharge, 0))] : null,
+      walletDebit != null ? ['Wallet debited', formatPrice(numericValue(walletDebit, 0))] : null,
+      date ? ['Expected delivery', confirmedDateText(date)] : null,
+      address ? ['Delivery address', confirmedAddressText(address)] : null,
+      weeklyQuantity ? ['Weekly quantity', `${weeklyQuantity}${/kg/i.test(String(weeklyQuantity)) ? '' : ' kg'} per week`] : null,
+      deliveryDay ? ['Preferred delivery day', String(deliveryDay)] : null,
+      ['Payment', String(paymentStatus || 'Wallet payment recorded')]
+    ].filter(Boolean);
+    details.replaceChildren(...rows.map(([label, value]) => {
+      const row = document.createElement('div');
+      const term = document.createElement('dt');
+      const description = document.createElement('dd');
+      term.textContent = label;
+      description.textContent = value;
+      row.append(term, description);
+      return row;
+    }));
+  }
+
+  function skipSuccessAnimation({ focus = true } = {}) {
+    const celebration = elements.checkoutSuccessCelebration;
+    if (!celebration) return;
+    celebration.classList.add('is-skipped', 'is-celebrating');
+    if (elements.checkoutSuccessSkipAnimation) {
+      elements.checkoutSuccessSkipAnimation.hidden = true;
+    }
+    if (focus) elements.checkoutViewOrderLink?.focus({ preventScroll: true });
+  }
+
   function showOrderSuccess(orderPayload, paymentMethod, verificationPayload = null) {
-    clearPendingOrder();
     const finalPayload = verificationPayload || orderPayload;
+    const finalOrderId = confirmedOrderId(finalPayload) || confirmedOrderId(orderPayload);
+    if (!finalOrderId) {
+      const message = 'Your payment was received, but the order number is still being confirmed. Check My Atulyash before trying again.';
+      if (elements.checkoutPaymentStatus) elements.checkoutPaymentStatus.textContent = message;
+      announce(message);
+      return false;
+    }
+    clearPendingOrder();
     const reference = orderReference(finalPayload, { includeGenericId: false })
       || orderReference(orderPayload)
-      || 'Confirmed';
+      || `#${finalOrderId}`;
     lastOrderResponse = finalPayload;
     if (elements.checkoutReference) elements.checkoutReference.textContent = reference;
     if (elements.checkoutSuccessMessage) {
@@ -4849,13 +4971,24 @@
       );
     }
     if (elements.checkoutSuccessDeliveryDate) {
-      elements.checkoutSuccessDeliveryDate.textContent = selectedDeliveryDate || 'Confirmed in your account';
+      const confirmedDate = firstResponseValue(finalPayload, [
+        'confirmed_delivery_date',
+        'delivery_date',
+        'order_delivery_date',
+        'expected_delivery_date'
+      ]);
+      elements.checkoutSuccessDeliveryDate.textContent = confirmedDate ? confirmedDateText(confirmedDate) : 'Confirmed in your account';
     }
-    if (elements.checkoutSuccessPaymentStatus) elements.checkoutSuccessPaymentStatus.textContent = 'Paid from Atulyash Wallet';
-    const orderId = firstResponseValue(finalPayload, ['order_id'])
-      || firstResponseValue(orderPayload, ['order_id', 'id']);
-    if (elements.checkoutViewOrderLink && orderId) {
-      elements.checkoutViewOrderLink.href = `account.html#orders/${encodeURIComponent(orderId)}`;
+    if (elements.checkoutSuccessPaymentStatus) {
+      elements.checkoutSuccessPaymentStatus.textContent = firstResponseValue(finalPayload, [
+        'payment_status_display',
+        'payment_status',
+        'wallet_payment_status'
+      ]) || 'Wallet payment recorded';
+    }
+    renderCheckoutSuccessDetails(finalPayload, reference);
+    if (elements.checkoutViewOrderLink) {
+      elements.checkoutViewOrderLink.href = `account.html#orders/${encodeURIComponent(finalOrderId)}`;
     }
     if (elements.whatsappOrderLink) {
       const message = `Hello Atulyash team, I need help with order ${reference}.`;
@@ -4865,8 +4998,9 @@
     elements.checkoutForm.hidden = true;
     elements.checkoutSuccess.hidden = false;
     document.body.classList.add('checkout-complete');
+    elements.checkoutSuccessSkipAnimation?.removeAttribute('hidden');
     if (elements.checkoutSuccessCelebration) {
-      elements.checkoutSuccessCelebration.classList.remove('is-celebrating');
+      elements.checkoutSuccessCelebration.classList.remove('is-celebrating', 'is-skipped');
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => elements.checkoutSuccessCelebration.classList.add('is-celebrating'));
       });
@@ -4882,6 +5016,7 @@
     appliedCouponOverride = null;
     saveSessionRecord(COUPON_CONTEXT_KEY, null);
     renderCart();
+    return true;
   }
 
   async function completeOrderRequest() {
@@ -4993,6 +5128,9 @@
         const status = Number(error?.status);
         if ([400, 401, 403, 404, 405, 422].includes(status)) clearPendingOrder();
         throw error;
+      }
+      if (!confirmedOrderId(orderPayload)) {
+        throw new Error('Your order was accepted, but the service did not return an order number yet. Check My Atulyash before trying again.');
       }
       const orderRecord = {
         stage: 'created',
@@ -5448,6 +5586,7 @@
   });
   elements.placeOrderButton?.addEventListener('click', completeOrderRequest);
   elements.successCloseButton?.addEventListener('click', closeCheckout);
+  elements.checkoutSuccessSkipAnimation?.addEventListener('click', () => skipSuccessAnimation());
   elements.backdrop?.addEventListener('click', closeActiveLayer);
 
   elements.emptyCartShopButton?.addEventListener('click', () => {

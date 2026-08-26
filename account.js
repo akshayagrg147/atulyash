@@ -2754,6 +2754,70 @@
     );
   }
 
+  // Keep vacation date changes visible immediately, even while the live
+  // subscription schedule is being refreshed. A weekly delivery that falls
+  // inside a pause window moves to the first weekly cycle after the end date.
+  function calendarDate(value) {
+    const raw = String(value || '').trim();
+    const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const parsed = dateValue(raw);
+    if (!parsed) return '';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function addCalendarDays(value, days) {
+    const key = calendarDate(value);
+    if (!key) return '';
+    const [year, month, day] = key.split('-').map(Number);
+    const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+    date.setDate(date.getDate() + Number(days || 0));
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+  }
+
+  function nextDateAfterVacation(nextDate, vacation) {
+    let next = calendarDate(nextDate);
+    const start = calendarDate(firstValue(vacation?.start_date, vacation?.pause_from));
+    const end = calendarDate(firstValue(vacation?.end_date, vacation?.resume_at));
+    if (!next || !start || !end || end < start) return next;
+    if (next >= start && next <= end) {
+      do {
+        next = addCalendarDays(next, 7);
+      } while (next && next <= end);
+    }
+    return next;
+  }
+
+  function vacationAppliesToSubscription(vacation, subscription) {
+    const relation = firstValue(
+      vacation?.subscription,
+      vacation?.subscription_id,
+      vacation?.subscription_plan,
+      vacation?.subscription_plan_id,
+      vacation?.plan_id
+    );
+    if (relation === undefined || relation === null || relation === '') return true;
+    return String(idOf(relation)) === String(subscriptionId(subscription));
+  }
+
+  function subscriptionNextDateWithVacation(subscription, extraVacation = null) {
+    let next = calendarDate(subscriptionNextDate(subscription));
+    if (!next) return '';
+    const vacations = [
+      ...(Array.isArray(state.vacations) ? state.vacations : []),
+      ...(extraVacation ? [extraVacation] : [])
+    ]
+      .filter((vacation) => vacation && vacation.is_active !== false && vacationAppliesToSubscription(vacation, subscription))
+      .sort((a, b) => calendarDate(firstValue(a.start_date, a.pause_from)).localeCompare(calendarDate(firstValue(b.start_date, b.pause_from))));
+    vacations.forEach((vacation) => {
+      next = nextDateAfterVacation(next, vacation);
+    });
+    return next;
+  }
+
   function subscriptionStatus(subscription) {
     return String(firstValue(subscription.status_display, subscription.plan_status, subscription.status, subscription.is_active === false ? 'Cancelled' : 'Active'));
   }
@@ -2781,14 +2845,27 @@
     });
 
     const next = create('div', 'subscription-next');
-    const nextDate = dateValue(subscriptionNextDate(subscription));
+    const scheduledNextDate = subscriptionNextDate(subscription);
+    const displayedNextDate = subscriptionNextDateWithVacation(subscription);
+    const nextDate = dateValue(displayedNextDate);
+    const vacationShifted = calendarDate(scheduledNextDate) && calendarDate(scheduledNextDate) !== displayedNextDate;
     const tile = create('div', 'date-tile');
     tile.append(
       create('span', '', nextDate ? new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(nextDate) : 'Next'),
       create('strong', '', nextDate ? new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(nextDate) : '—')
     );
     const nextCopy = create('p');
-    nextCopy.append(create('strong', '', 'Next fresh batch'), document.createElement('br'), document.createTextNode(formatDate(subscriptionNextDate(subscription))));
+    nextCopy.append(
+      create('strong', '', vacationShifted ? 'Next fresh batch after vacation' : 'Next fresh batch'),
+      document.createElement('br'),
+      document.createTextNode(formatDate(displayedNextDate))
+    );
+    if (vacationShifted) {
+      nextCopy.append(
+        document.createElement('br'),
+        create('span', 'subscription-next-note', `The scheduled ${formatDate(scheduledNextDate)} delivery falls during your pause.`)
+      );
+    }
     next.append(tile, nextCopy);
 
     const actions = create('div', 'subscription-actions');
@@ -2877,6 +2954,20 @@
       document.createElement('br'),
       document.createTextNode(`${formatDate(firstValue(active.start_date, active.pause_from))} to ${formatDate(firstValue(active.end_date, active.resume_at))}`)
     );
+    const affected = state.subscriptions
+      .map((subscription) => ({
+        subscription,
+        scheduled: subscriptionNextDate(subscription),
+        next: subscriptionNextDateWithVacation(subscription)
+      }))
+      .filter(({ scheduled, next }) => calendarDate(scheduled) && next && calendarDate(scheduled) !== next);
+    if (affected.length) {
+      const next = affected[0].next;
+      copy.append(
+        document.createElement('br'),
+        create('span', 'vacation-next-note', `Next batch moves to ${formatDate(next)}.`)
+      );
+    }
     left.append(copy);
     const actions = create('div', 'card-actions');
     actions.append(
@@ -3133,7 +3224,7 @@
       return;
     }
     const form = create('form', 'dialog-form');
-    form.append(create('p', 'dialog-copy', 'All scheduled deliveries within these dates will be paused. Choose dates carefully.'));
+    form.append(create('p', 'dialog-copy', 'Any scheduled delivery within these dates will move to the next weekly cycle after your vacation ends. Choose dates carefully.'));
 
     let subscriptionSelect;
     if (!vacation) {
@@ -3170,15 +3261,48 @@
     start.addEventListener('change', () => {
       end.min = start.value || start.min;
       if (end.value && end.value < end.min) end.value = end.min;
+      updateVacationPreview();
     });
+    end.addEventListener('change', updateVacationPreview);
     dates.append(startLabel, endLabel);
+
+    const vacationPreview = create('p', 'vacation-preview');
+    const previewSubscription = () => {
+      if (subscription) return subscription;
+      const relation = firstValue(
+        vacation?.subscription,
+        vacation?.subscription_id,
+        vacation?.subscription_plan,
+        vacation?.subscription_plan_id,
+        vacation?.plan_id
+      );
+      return state.subscriptions.find((item) => relation != null && String(idOf(relation)) === String(subscriptionId(item))) || state.subscriptions[0];
+    };
+    function updateVacationPreview() {
+      const selected = previewSubscription();
+      if (!start.value || !end.value || !selected) {
+        vacationPreview.textContent = 'Your next delivery will be confirmed after the pause is saved.';
+        return;
+      }
+      const scheduled = subscriptionNextDate(selected);
+      const shifted = nextDateAfterVacation(scheduled, { start_date: start.value, end_date: end.value });
+      if (!scheduled) {
+        vacationPreview.textContent = 'Your next delivery will be confirmed after the pause is saved.';
+      } else if (calendarDate(scheduled) !== shifted) {
+        vacationPreview.textContent = `The ${formatDate(scheduled)} delivery falls during this pause and will move to ${formatDate(shifted)}.`;
+      } else {
+        vacationPreview.textContent = `Your next delivery on ${formatDate(scheduled)} is outside this pause and will stay scheduled.`;
+      }
+    }
+    subscriptionSelect?.addEventListener('change', updateVacationPreview);
+    updateVacationPreview();
 
     const actions = create('div', 'dialog-actions');
     actions.append(button('Cancel', 'secondary-button', closeDialog));
     const submit = create('button', 'primary-button', vacation ? 'Update vacation →' : 'Pause these dates →');
     submit.type = 'submit';
     actions.append(submit);
-    form.append(dates, actions);
+    form.append(dates, vacationPreview, actions);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (end.value < start.value) return showToast('The end date must be after the start date.', 'error');
@@ -3427,7 +3551,7 @@
       ['house_name', 'House / flat number', 'text', firstValue(address?.house_name, address?.house_number, address?.flat_number, '')],
       ['tower_wing', 'Building / tower / wing', 'text', firstValue(address?.tower_wing, address?.building, address?.address_line_1, '')],
       ['landmark', 'Landmark', 'text', firstValue(address?.landmark, '')],
-      ['city', 'City', 'text', firstValue(address?.city, address?.locality, '')],
+      ['city', 'City (from PIN code)', 'text', firstValue(address?.city, address?.locality, '')],
       ['state', 'State', 'text', firstValue(address?.state, '')],
       ['pincode', 'Pincode', 'text', firstValue(address?.pincode?.pincode, address?.pincode?.code, address?.pincode, address?.postal_code, '')]
     ];
@@ -3454,6 +3578,11 @@
       if (name === 'tower_wing') input.maxLength = 50;
       if (['house_name', 'landmark'].includes(name)) input.maxLength = 255;
       if (['city', 'state'].includes(name)) input.maxLength = 100;
+      if (name === 'city') {
+        input.readOnly = true;
+        input.setAttribute('aria-readonly', 'true');
+        input.title = 'City is filled automatically from your PIN code';
+      }
       label.append(input);
       fields.append(label);
     });
@@ -3689,7 +3818,7 @@
       areaSelect.value = selected;
       areaLabel.hidden = false;
       areaLabel.inert = false;
-      if (result?.city && cityInput && !cityInput.value.trim()) cityInput.value = result.city;
+      if (result?.city && cityInput) cityInput.value = result.city;
       if (result?.state && stateInput && !stateInput.value.trim()) stateInput.value = result.state;
       return selected;
     };
@@ -3720,7 +3849,7 @@
         return null;
       }
       verifiedPincode = `${pincode}|${area}`;
-      if (data.city && cityInput && !cityInput.value.trim()) cityInput.value = data.city;
+      if (data.city && cityInput) cityInput.value = data.city;
       if (data.state && stateInput && !stateInput.value.trim()) stateInput.value = data.state;
       showAreaLookupNotice(
         'Fresh-batch delivery is available',
@@ -3793,6 +3922,8 @@
     }
     pincodeInput?.addEventListener('input', () => {
       clearServiceabilityError();
+      // A city from the previous PIN must never be submitted with this one.
+      if (cityInput) cityInput.value = '';
       void lookupAreaFromPincode();
     });
 
@@ -4489,7 +4620,9 @@
       renderEmpty(elements.upcomingDelivery, 'No delivery planned yet.', 'Choose a weekly rhythm whenever your home is ready.');
     } else {
       const upcoming = create('div', 'upcoming-delivery');
-      const date = dateValue(subscriptionNextDate(upcomingSubscription));
+      const scheduledDate = subscriptionNextDate(upcomingSubscription);
+      const displayedDate = subscriptionNextDateWithVacation(upcomingSubscription);
+      const date = dateValue(displayedDate);
       const tile = create('div', 'upcoming-date');
       tile.append(
         create('span', '', date ? new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(date) : 'Next'),
@@ -4500,7 +4633,10 @@
         create('h3', '', subscriptionName(upcomingSubscription)),
         create('p', '', `${subscriptionWeight(upcomingSubscription)} · ${firstValue(upcomingSubscription.delivery_day, 'Scheduled delivery')}`)
       );
-      upcoming.append(tile, copy, create('strong', '', formatDate(subscriptionNextDate(upcomingSubscription))));
+      upcoming.append(tile, copy, create('strong', '', formatDate(displayedDate)));
+      if (calendarDate(scheduledDate) && calendarDate(scheduledDate) !== displayedDate) {
+        upcoming.append(create('small', 'upcoming-delivery-note', `Vacation pause moves the ${formatDate(scheduledDate)} batch.`));
+      }
       elements.upcomingDelivery.replaceChildren(upcoming);
     }
 

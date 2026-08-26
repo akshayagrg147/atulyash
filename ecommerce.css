@@ -1531,6 +1531,12 @@ button {
   outline-offset: 2px;
 }
 
+.checkout-field input[readonly] {
+  color: var(--muted);
+  background: rgba(40, 100, 84, 0.06);
+  cursor: not-allowed;
+}
+
 .checkout-field.has-error input,
 .checkout-field.has-error textarea,
 .checkout-field.has-error select {

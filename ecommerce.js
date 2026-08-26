@@ -18,7 +18,6 @@
   const DELIVERY_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const ROTI_ATTA_GRAMS = 30;
   const MIN_DAILY_ROTIS = 8;
-  const GUEST_EXPERIENCE_CREDIT = 100;
   const CART_STORAGE_KEY = 'atulyash-cart-v1';
   const CART_SYNC_STORAGE_KEY = 'atulyash-cart-sync-v1';
   const PENDING_ORDER_STORAGE_KEY = 'atulyash-pending-order-v1';
@@ -1945,16 +1944,11 @@
   }
 
   function experienceCredit() {
-    if (serverCartActive) {
-      return Number.isFinite(serverCartSummary?.discount) ? serverCartSummary.discount : 0;
-    }
-    // A signed-in customer's credit is owned by the live cart response. Do
-    // not display a promotional fallback while a saved bag is still syncing.
-    if (isApiAuthenticated()) return 0;
-    const firstDeliveryWeight = cart.reduce((total, item) => (
-      total + (itemDescriptor(item).weightKg * item.quantity)
-    ), 0);
-    return firstDeliveryWeight >= 2 ? Math.min(GUEST_EXPERIENCE_CREDIT, cartSubtotal()) : 0;
+    // Welcome savings are server-authoritative. Never invent a promotional
+    // credit while the cart is a guest draft or while the live cart is syncing.
+    return serverCartActive && Number.isFinite(serverCartSummary?.discount)
+      ? Math.max(0, serverCartSummary.discount)
+      : 0;
   }
 
   function orderTotal() {
@@ -2518,7 +2512,7 @@
     }
     [elements.cartDiscountLabel, elements.checkoutDiscountLabel].forEach((label) => {
       if (!label) return;
-      label.textContent = currentCoupon ? `Coupon ${currentCoupon.code}` : 'Your first Atulyash experience';
+      label.textContent = currentCoupon ? `Coupon ${currentCoupon.code}` : 'Welcome saving';
     });
     elements.couponList.replaceChildren();
 
@@ -3608,7 +3602,9 @@
     const state = String(result?.state || '').trim();
     const cityField = document.getElementById('checkoutCity');
     const stateField = document.getElementById('checkoutState');
-    if (city && cityField && !cityField.value.trim()) cityField.value = city;
+    // City is server-derived from the PIN code. Keep it synchronized even
+    // when the customer changes the PIN after a previous lookup.
+    if (city && cityField) cityField.value = city;
     if (state && stateField && !stateField.value.trim()) {
       const option = [...stateField.options].find((entry) => entry.value.localeCompare(state, 'en', { sensitivity: 'accent' }) === 0);
       if (option) stateField.value = option.value;
@@ -5345,6 +5341,9 @@
   });
   elements.checkoutPincode?.addEventListener('input', (event) => {
     event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
+    // Never carry the previous PIN's city into a new address lookup.
+    const cityField = document.getElementById('checkoutCity');
+    if (cityField) cityField.value = '';
     if (event.target.value !== checkedServiceabilityPincode) resetPincodeServiceability();
     void lookupCheckoutArea(event.target.value);
     event.target.removeAttribute('aria-invalid');

@@ -1387,6 +1387,22 @@ select {
   font-size: .75rem;
 }
 
+.vacation-next-note {
+  color: var(--forest-800);
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.vacation-preview {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  color: var(--forest-800);
+  background: rgba(203, 166, 93, .13);
+  border-left: 3px solid var(--wheat-500);
+  font-size: .7rem;
+  line-height: 1.45;
+}
+
 .vacation-banner strong {
   color: var(--forest-950);
   font-family: var(--serif);
@@ -1485,6 +1501,11 @@ select {
 
 .subscription-next p strong {
   color: var(--cream-50);
+}
+
+.subscription-next-note {
+  color: rgba(255, 253, 248, .56);
+  font-size: .62rem;
 }
 
 .subscription-actions {
@@ -2267,6 +2288,12 @@ select {
   background: var(--cream-100);
 }
 
+.dialog-form input[readonly] {
+  color: var(--muted);
+  background: var(--cream-100);
+  cursor: not-allowed;
+}
+
 .field-group small {
   margin-top: 5px;
   color: var(--muted);
@@ -2598,6 +2625,13 @@ select {
   font-family: var(--serif);
   font-size: 1.35rem;
   font-weight: 500;
+}
+
+.upcoming-delivery-note {
+  grid-column: 2 / -1;
+  margin-top: -10px;
+  color: var(--rust-600);
+  font-size: .66rem;
 }
 
 /* Dialog */

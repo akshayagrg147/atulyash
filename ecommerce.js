@@ -4569,14 +4569,18 @@
         policy.minimumRechargeAmount = preview.amount;
       }
       const bonus = numericValue(firstResponseValue(payload, [
-        'bonus', 'bonus_amount', 'extra_credit', 'cashback'
+        'bonus_amount',
+        'prepaid_advantage_amount',
+        'bonus',
+        'extra_credit',
+        'cashback'
       ]), 0);
       const tax = numericValue(firstResponseValue(payload, ['tax', 'tax_amount', 'gst']), 0);
       const payable = numericValue(firstResponseValue(payload, [
-        'payable_amount', 'amount_to_pay', 'total'
+        'payable_amount', 'amount_to_pay', 'payment_amount', 'total'
       ]), amount);
       const credited = numericValue(firstResponseValue(payload, [
-        'credit_amount', 'wallet_credit'
+        'total_credit', 'credited_amount', 'credit_amount', 'wallet_credit'
       ]), amount + bonus);
       walletRechargePreview = { amount, bonus, tax, payable, credited };
       if (elements.checkoutWalletTopupTitle) {

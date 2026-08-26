@@ -4102,9 +4102,20 @@
       if (options.length) {
         elements.rechargeOptions.replaceChildren();
         options.slice(0, 5).forEach((option) => {
-          const amount = firstValue(option.amount, option.recharge_amount, option.value);
+          const amount = firstValue(option.recharge_amount, option.amount, option.value);
           if (!amount) return;
-          const label = firstValue(option.label, option.display_text, formatMoney(amount));
+          const bonus = numberFrom(firstValue(
+            option.bonus_amount,
+            option.prepaid_advantage_amount,
+            option.bonus,
+            option.extra_credit,
+            option.cashback
+          ));
+          const label = firstValue(
+            option.label,
+            option.display_text,
+            `${formatMoney(amount)}${bonus > 0 ? ` · +${formatMoney(bonus)} credit` : ''}`
+          );
           const chip = button(label, '', () => {
             elements.rechargeAmount.value = String(amount);
             resetRechargePreview();
@@ -4129,14 +4140,39 @@
 
   function renderRechargePreview(preview, amount) {
     const data = responseData(preview);
-    const bonus = firstValue(data.bonus, data.bonus_amount, data.extra_credit, data.cashback, 0);
+    const rechargeValue = firstValue(data.recharge_amount, data.amount, amount);
+    const bonus = firstValue(
+      data.bonus_amount,
+      data.prepaid_advantage_amount,
+      data.bonus,
+      data.extra_credit,
+      data.cashback,
+      0
+    );
     const tax = firstValue(data.tax, data.tax_amount, data.gst, 0);
-    const payable = firstValue(data.payable_amount, data.amount_to_pay, data.total, amount);
-    const credited = firstValue(data.credit_amount, data.wallet_credit, numberFrom(amount) + numberFrom(bonus));
+    const payable = firstValue(
+      data.payable_amount,
+      data.amount_to_pay,
+      data.payment_amount,
+      data.total,
+      rechargeValue
+    );
+    const credited = firstValue(
+      data.total_credit,
+      data.credited_amount,
+      data.credit_amount,
+      data.wallet_credit,
+      numberFrom(rechargeValue) + numberFrom(bonus)
+    );
+    const bonusSlabText = typeof data.bonus_slab === 'object'
+      ? firstValue(data.bonus_slab.display_text, data.bonus_slab.name)
+      : null;
     const list = create('dl');
     [
-      ['Recharge value', formatMoney(amount)],
-      ['Extra wallet credit', numberFrom(bonus) ? `+${formatMoney(bonus)}` : 'No extra credit'],
+      ['Recharge value', formatMoney(rechargeValue)],
+      ['Extra wallet credit', numberFrom(bonus)
+        ? `+${formatMoney(bonus)}${bonusSlabText ? ` · ${bonusSlabText}` : ''}`
+        : 'No extra credit'],
       ['Tax / charges', formatMoney(tax)],
       ['Amount payable', formatMoney(payable)],
       ['Wallet receives', formatMoney(credited)]

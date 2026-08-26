@@ -3643,6 +3643,20 @@
       });
       let result = serviceability?.data && typeof serviceability.data === 'object' ? serviceability.data : serviceability;
       if (request !== checkoutAreaLookupRequest || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return null;
+      const responsePincode = String(result?.pincode || '').replace(/\D/g, '').slice(0, 6);
+      if (responsePincode && responsePincode !== normalizedPincode) {
+        throw new Error(`The PIN lookup returned ${responsePincode} instead of ${normalizedPincode}. Please try again.`);
+      }
+      // Never reuse areas from a previous lookup when the current PIN is not
+      // serviceable. Stop before querying the optional area-list endpoint.
+      if (result?.serviceable === false) {
+        resetCheckoutAreaOptions('Delivery is not available for this PIN');
+        renderPincodeServiceability('error', {
+          title: 'We do not deliver here yet',
+          message: `PIN ${normalizedPincode} is not currently serviceable. Please use another delivery address.`
+        });
+        return null;
+      }
       const returnedAreas = result?.areas || result?.available_areas || result?.serviceable_areas || result?.area_options;
       if (!Array.isArray(returnedAreas) || !returnedAreas.length) {
         try {
@@ -3746,6 +3760,7 @@
         });
         return true;
       }
+      resetCheckoutAreaOptions('Delivery is not available for this PIN');
       renderPincodeServiceability('error', {
         title: 'We do not deliver here yet',
         message: `PIN ${pincode} is not currently serviceable. Please use another delivery address.`
@@ -5344,6 +5359,8 @@
     // Never carry the previous PIN's city into a new address lookup.
     const cityField = document.getElementById('checkoutCity');
     if (cityField) cityField.value = '';
+    // Clear areas returned for the previous PIN before the new lookup starts.
+    resetCheckoutAreaOptions();
     if (event.target.value !== checkedServiceabilityPincode) resetPincodeServiceability();
     void lookupCheckoutArea(event.target.value);
     event.target.removeAttribute('aria-invalid');

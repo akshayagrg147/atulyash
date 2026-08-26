@@ -3841,6 +3841,7 @@
       const data = responseData(result);
       if (data.serviceable !== true) {
         verifiedPincode = '';
+        resetAreaOptions('Delivery is not available for this PIN');
         showAreaLookupNotice(
           'This PIN code is not serviceable yet',
           `Atulyash does not currently deliver to ${pincode}. Please use another delivery address.`
@@ -3924,6 +3925,8 @@
       clearServiceabilityError();
       // A city from the previous PIN must never be submitted with this one.
       if (cityInput) cityInput.value = '';
+      // Clear areas returned for the previous PIN before starting a new lookup.
+      resetAreaOptions();
       void lookupAreaFromPincode();
     });
 

@@ -1860,6 +1860,28 @@
       : String(productName);
   }
 
+  function orderCadence(order) {
+    const subscription = [order.subscription, order.subscription_plan].find((value) => {
+      if (!value) return false;
+      if (typeof value !== 'object') return true;
+      return Boolean(firstValue(value.id, value.pk, value.uuid, value.plan_id, value.subscription_id));
+    });
+    const mode = String(firstValue(
+      order.order_type,
+      order.order_mode,
+      order.type,
+      order.kind,
+      ''
+    ));
+    const recurring = Boolean(subscription)
+      || order.is_subscription === true
+      || order.is_weekly === true
+      || /subscription|weekly|freshness/i.test(mode);
+    return recurring
+      ? 'Weekly freshness'
+      : 'One-time order';
+  }
+
   function finiteMoney(...values) {
     for (const value of values) {
       if (value == null || value === '') continue;
@@ -1972,7 +1994,7 @@
   function statusPill(status) {
     const normalized = String(status).toLowerCase();
     const pill = create('span', 'status-pill', status);
-    if (/deliver|complete|fulfilled/.test(normalized)) pill.classList.add('is-complete');
+    if (/deliver|complete|fulfilled|paid|received|success|captur/.test(normalized)) pill.classList.add('is-complete');
     if (/cancel|failed|refund/.test(normalized)) pill.classList.add('is-cancelled');
     if (/paused|not available|cannot deliver|attention|delay|exception/.test(normalized)) pill.classList.add('is-attention');
     return pill;
@@ -1980,6 +2002,10 @@
 
   function makeOrderCard(order, { compact = false } = {}) {
     const card = create('article', 'order-card');
+    const normalizedStatus = orderStatus(order).toLowerCase();
+    if (/cancel|failed|refund/.test(normalizedStatus)) card.classList.add('is-cancelled');
+    else if (/deliver|complete|fulfilled|paid|received|success|captur/.test(normalizedStatus)) card.classList.add('is-complete');
+    else if (/paused|not available|cannot deliver|attention|delay|exception/.test(normalizedStatus)) card.classList.add('is-attention');
     const imageBox = create('div', 'order-product-image');
     const image = create('img');
     image.src = 'images/sack5g.webp';
@@ -1989,7 +2015,11 @@
     imageBox.append(image);
 
     const title = create('div', 'order-title');
-    title.append(create('h3', '', orderTitle(order)), create('p', '', `Order ${orderNumber(order)}`));
+    title.append(
+      create('span', 'order-cadence', orderCadence(order)),
+      create('h3', '', orderTitle(order)),
+      create('p', '', `Order ${orderNumber(order)}`)
+    );
 
     const meta = create('div', 'order-meta');
     meta.append(create('strong', '', formatDate(orderDate(order))), create('span', '', 'Order placed'));

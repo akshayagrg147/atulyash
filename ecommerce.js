@@ -1954,10 +1954,20 @@
   }
 
   function orderTotal() {
+    const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
+    // A weekly plan is funded in the wallet for the minimum number of
+    // deliveries.  Coupon discounts apply to the order/catalogue price only;
+    // they must not reduce the server-authoritative wallet requirement.
+    const minimumWalletRequired = hasWeekly
+      ? numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
+      : NaN;
+    if (Number.isFinite(minimumWalletRequired) && minimumWalletRequired >= 0) {
+      return minimumWalletRequired;
+    }
     const delivery = deliveryChargeQuote();
     if (
       serverCartActive
-      && !cart.some((item) => item.purchaseType === 'weekly')
+      && !hasWeekly
       && Number.isFinite(serverCartSummary?.total)
     ) {
       return Math.max(0, serverCartSummary.total);
@@ -4416,7 +4426,11 @@
       } else {
         checkoutWalletBalanceAmount = balance;
       }
-      renderWalletPaymentState();
+      // The server policy can differ from the couponed cart total (for
+      // example, ₹960 wallet cover versus an ₹860 discounted order total).
+      // Rerender the full checkout summary now that the authoritative policy
+      // is available so both wallet labels show the same requirement.
+      renderCart();
       return checkoutWalletBalanceAmount;
     } catch (error) {
       if (requestGeneration !== checkoutWalletBalanceGeneration) return checkoutWalletBalanceAmount;

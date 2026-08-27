@@ -1142,6 +1142,16 @@
         })
       );
     },
+    modifyPreview: function previewOrderModification(orderId, payload, options) {
+      return request(
+        '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/modify-preview/',
+        mergeObjects({}, options, {
+          method: 'POST',
+          body: payload || {},
+          form: false
+        })
+      );
+    },
     reorder: function reorderOrder(orderId, options) {
       return cart.reorder(orderId, options);
     }
@@ -1152,6 +1162,7 @@
   orders.getOrderDeliveries = orders.deliveries;
   orders.getDeliveryDetails = orders.deliveryDetail;
   orders.getDeliveryHistory = orders.deliveryHistory;
+  orders.previewModification = orders.modifyPreview;
 
   var products = {
     list: function listProducts(params, options) {
@@ -1490,18 +1501,26 @@
       );
     },
     rechargePreview: function walletRechargePreview(amount, options) {
+      /*
+       * The wallet policy is evaluated against the authenticated cart. Keep
+       * the original numeric-amount signature for existing callers, while
+       * allowing checkout to send the cart and subscription context the
+       * server uses to resolve the active coupon.
+       */
+      var payload = isPlainObject(amount) ? amount : valuePayload(amount, 'amount');
       return formRequest(
         'POST',
         '/customers/customer-wallet/recharge/preview/',
-        valuePayload(amount, 'amount'),
+        payload,
         options
       );
     },
     rechargeInitiate: function walletRechargeInitiate(amount, options) {
+      var payload = isPlainObject(amount) ? amount : valuePayload(amount, 'amount');
       return formRequest(
         'POST',
         '/customers/customer-wallet/recharge/initiate/',
-        valuePayload(amount, 'amount'),
+        payload,
         options
       );
     },

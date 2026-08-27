@@ -290,7 +290,7 @@
           : withoutKeys(value, ['id', 'orderId', 'deliveryId'])];
       }
       if (/^reorder$/.test(methodName)) return [identifier];
-      if (/^modify$|modifyOrder/.test(methodName)) {
+      if (/^modify$|modifyOrder|modifyPreview|previewModification/.test(methodName)) {
         return [identifier, withoutKeys(value, ['id', 'orderId'])];
       }
       return [value];
@@ -1894,6 +1894,46 @@
     return null;
   }
 
+  function modificationPreviewMoney(preview, keys) {
+    if (!preview || typeof preview !== 'object') return null;
+    const sources = [
+      preview,
+      preview.totals,
+      preview.summary,
+      preview.payment_breakdown,
+      preview.wallet_impact,
+      preview.revised,
+      preview.updated,
+      preview.current,
+      preview.original
+    ].filter((source) => source && typeof source === 'object');
+    for (const source of sources) {
+      const value = finiteMoney(...keys.map((key) => source[key]));
+      if (value !== null) return value;
+    }
+    return null;
+  }
+
+  function modificationPreviewAmount(preview, type) {
+    const keySets = {
+      original: [
+        'original_total', 'current_total', 'old_total', 'previous_total', 'existing_total',
+        'original_amount', 'current_order_total', 'current_net_payable'
+      ],
+      revised: [
+        'recalculated_total', 'revised_total', 'new_total', 'updated_total', 'final_total',
+        'total_amount', 'net_payable', 'order_total', 'amount_payable', 'amount_due'
+      ],
+      difference: [
+        'difference', 'amount_difference', 'total_difference', 'price_difference',
+        'payable_difference', 'additional_amount', 'amount_due_difference'
+      ],
+      delivery: ['delivery_charge', 'delivery_fee', 'delivery_amount'],
+      discount: ['discount', 'discount_amount', 'coupon_discount']
+    };
+    return modificationPreviewMoney(preview, keySets[type] || []);
+  }
+
   function orderAmount(order) {
     const amountKeys = [
       'net_payable', 'net_order_amount', 'wallet_debit', 'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
@@ -1968,7 +2008,8 @@
       order?.payment_summary,
       order
     ].filter((source) => source && typeof source === 'object');
-    const successfulStatus = paymentSources.some((source) => /paid|success|captured|received|complete/i.test(String(firstValue(
+    const successfulStatus = /paid|success|captured|received|complete/i.test(orderStatus(order))
+      || paymentSources.some((source) => /paid|success|captured|received|complete/i.test(String(firstValue(
       source.payment_status,
       source.status_display,
       source.status,
@@ -1988,7 +2029,7 @@
     );
     return !subscription
       && !orderHasSuccessfulPayment(order)
-      && !/deliver|complete|fulfilled|cancel|fail|refund/.test(status);
+      && !/deliver|complete|fulfilled|cancel|fail|refund|paid|payment|received|success|captur/.test(status);
   }
 
   function statusPill(status) {
@@ -2957,31 +2998,170 @@
       detailsGrid.append(addressLabel, dateLabel);
       form.append(detailsGrid, ...itemControls.map((entry) => entry.wrapper));
 
+      const previewPanel = create('section', 'modification-preview');
+      previewPanel.setAttribute('aria-live', 'polite');
+      previewPanel.setAttribute('aria-label', 'Revised order total');
+
+      const modificationPayload = () => ({
+        address_id: Number(addressSelect.value),
+        delivery_date: deliveryDate.value,
+        items: itemControls.map((entry) => ({
+          order_item_id: entry.itemId,
+          quantity: Number(entry.quantity.value),
+          product_pack_id: Number(entry.pack.value)
+        }))
+      });
+
+      const validModificationPayload = (payload) => Boolean(
+        payload.address_id
+        && /^\d{4}-\d{2}-\d{2}$/.test(payload.delivery_date)
+        && payload.items.length
+        && payload.items.every((item) => (
+          Number.isInteger(item.quantity)
+          && item.quantity > 0
+          && Number.isFinite(item.product_pack_id)
+          && item.product_pack_id > 0
+        ))
+      );
+
+      const renderModificationPreview = (preview, state = 'idle', message = '') => {
+        previewPanel.replaceChildren();
+        const header = create('div', 'modification-preview-header');
+        header.append(
+          create('div', 'modification-preview-eyebrow', 'Live pricing preview'),
+          create('strong', '', state === 'loading' ? 'Recalculating your order…' : 'Review the amount before saving')
+        );
+        previewPanel.append(header);
+
+        if (state === 'loading') {
+          previewPanel.append(create('p', 'modification-preview-message', 'Checking pack, quantity and delivery-charge changes with Atulyash.'));
+          return;
+        }
+        if (state === 'error') {
+          previewPanel.classList.add('is-error');
+          previewPanel.append(
+            create('p', 'modification-preview-message', message || 'We could not calculate the revised amount yet.'),
+            create('small', '', 'The live service will recheck the total when you save. If it cannot safely recalculate the change, no update will be applied.')
+          );
+          return;
+        }
+
+        previewPanel.classList.remove('is-error');
+        const original = modificationPreviewAmount(preview, 'original');
+        const revised = modificationPreviewAmount(preview, 'revised');
+        const difference = modificationPreviewAmount(preview, 'difference');
+        const deliveryCharge = modificationPreviewAmount(preview, 'delivery');
+        const discount = modificationPreviewAmount(preview, 'discount');
+        const fallbackOriginal = orderAmount(detail);
+        const resolvedOriginal = original === null ? fallbackOriginal : original;
+        const resolvedDifference = difference === null && revised !== null && resolvedOriginal !== null
+          ? revised - resolvedOriginal
+          : difference;
+
+        if (revised === null) {
+          previewPanel.append(
+            create('p', 'modification-preview-message', 'Make a change to see the amount that will be due.'),
+            create('small', '', 'The live service recalculates pack price, quantity, discounts and delivery charges before anything is saved.')
+          );
+          return;
+        }
+
+        const figures = create('div', 'modification-preview-figures');
+        const addFigure = (label, value, className = '') => {
+          if (value === null) return;
+          const figure = create('div', `modification-preview-figure${className ? ` ${className}` : ''}`);
+          figure.append(create('span', '', label), create('strong', '', formatMoney(value)));
+          figures.append(figure);
+        };
+        addFigure('Current amount due', resolvedOriginal);
+        addFigure('Revised amount due', revised, 'is-primary');
+        addFigure('Delivery charge', deliveryCharge);
+        if (discount !== null && discount > 0) addFigure('Discount', -Math.abs(discount), 'is-discount');
+        if (resolvedDifference !== null && Math.abs(resolvedDifference) >= 0.005) {
+          addFigure(
+            resolvedDifference > 0 ? 'Additional amount due' : 'Amount reduced',
+            Math.abs(resolvedDifference),
+            resolvedDifference > 0 ? 'is-due' : 'is-reduced'
+          );
+        }
+        previewPanel.append(figures);
+
+        let guidance = 'Saving updates the order only; no wallet debit happens while you edit.';
+        if (resolvedDifference !== null && resolvedDifference > 0.005) {
+          guidance = `₹${formatMoney(resolvedDifference).replace(/^₹/, '')} more will be due when this unpaid order is paid.`;
+        } else if (resolvedDifference !== null && resolvedDifference < -0.005) {
+          guidance = `Your amount due will be reduced by ₹${formatMoney(Math.abs(resolvedDifference)).replace(/^₹/, '')}.`;
+        }
+        previewPanel.append(
+          create('p', 'modification-preview-message', guidance),
+          create('small', '', 'No money is taken in this editing step. The revised total must be reviewed and paid through the Atulyash Wallet after the order is confirmed.')
+        );
+      };
+
+      let previewTimer = null;
+      let previewRequestId = 0;
+      let latestPreview = null;
+      const requestModificationPreview = async ({ silent = false } = {}) => {
+        const payload = modificationPayload();
+        if (!validModificationPayload(payload)) return false;
+        const requestId = ++previewRequestId;
+        renderModificationPreview(null, 'loading');
+        try {
+          const result = await apiCall('orders', ['modifyPreview', 'previewModification'], {
+            id,
+            orderId: id,
+            ...payload
+          }, {
+            path: `/orders/order/${id}/modify-preview/`,
+            method: 'POST',
+            body: payload
+          });
+          if (requestId !== previewRequestId) return false;
+          latestPreview = responseData(result);
+          renderModificationPreview(latestPreview);
+          return true;
+        } catch (error) {
+          if (requestId !== previewRequestId) return false;
+          latestPreview = null;
+          renderModificationPreview(null, 'error', friendlyError(error, 'The live service could not calculate this change.'));
+          if (!silent) showToast(friendlyError(error, 'The revised amount could not be calculated.'), 'error');
+          return false;
+        }
+      };
+
+      const scheduleModificationPreview = () => {
+        window.clearTimeout(previewTimer);
+        previewTimer = window.setTimeout(() => { void requestModificationPreview({ silent: true }); }, 350);
+      };
+      addressSelect.addEventListener('change', scheduleModificationPreview);
+      deliveryDate.addEventListener('change', scheduleModificationPreview);
+      itemControls.forEach((entry) => {
+        entry.pack.addEventListener('change', scheduleModificationPreview);
+        entry.quantity.addEventListener('input', scheduleModificationPreview);
+        entry.quantity.addEventListener('change', scheduleModificationPreview);
+      });
+
       const policy = create('div', 'confirmation-panel');
       policy.append(
-        create('strong', '', 'No payment is taken in this step'),
-        create('p', '', 'Only unpaid, open one-time orders can be modified. Delivery charges and the final total are recalculated by Atulyash after you confirm.')
+        create('strong', '', 'Payment is due after this edit'),
+        create('p', '', 'This is an unpaid, open one-time order. Changing the pack or quantity recalculates the amount due and delivery charge. Saving here does not debit your wallet; review the revised total above, then complete payment through your Atulyash Wallet.')
       );
       const actions = create('div', 'dialog-actions');
       actions.append(button('Cancel', 'secondary-button', closeDialog));
-      const submit = create('button', 'primary-button', 'Save order changes →');
+      const submit = create('button', 'primary-button', 'Review & save changes →');
       submit.type = 'submit';
       actions.append(submit);
-      form.append(policy, actions);
+      form.append(previewPanel, policy, actions);
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const payload = {
-          address_id: Number(addressSelect.value),
-          delivery_date: deliveryDate.value,
-          items: itemControls.map((entry) => ({
-            order_item_id: entry.itemId,
-            quantity: Number(entry.quantity.value),
-            product_pack_id: Number(entry.pack.value)
-          }))
-        };
-        setButtonBusy(submit, true, 'Saving…');
+        window.clearTimeout(previewTimer);
+        const payload = modificationPayload();
+        setButtonBusy(submit, true, 'Checking total…');
         try {
+          const previewReady = await requestModificationPreview();
+          if (!previewReady) showToast('Preview is unavailable; the live service will validate the final amount while saving.', 'error');
+          setButtonBusy(submit, true, 'Saving…');
           const result = await apiCall('orders', ['modify', 'modifyOrder'], {
             id,
             orderId: id,
@@ -2997,17 +3177,24 @@
             if (String(key).startsWith('orders:')) state.loaded.delete(key);
           });
           await renderOrders({ page: 1, force: true });
-          const updatedTotal = finiteMoney(data.total_amount);
+          const updatedTotal = finiteMoney(
+            data.total_amount,
+            data.recalculated_total,
+            data.final_total,
+            modificationPreviewAmount(latestPreview, 'revised')
+          );
           showToast(updatedTotal !== null
-            ? `Order updated. New total: ${formatMoney(updatedTotal)}.`
-            : String(firstValue(data.message, 'Your order has been updated.'))
+            ? `Order updated. ${formatMoney(updatedTotal)} is now due at payment.`
+            : String(firstValue(data.message, 'Order updated. Review the revised amount before paying.'))
           );
         } catch (error) {
           showToast(friendlyError(error, 'The order could not be modified. No changes were saved.'), 'error');
           setButtonBusy(submit, false);
         }
       });
+      renderModificationPreview(null);
       body.replaceChildren(form);
+      void requestModificationPreview({ silent: true });
     } catch (error) {
       body.replaceChildren(makeState(
         'error',

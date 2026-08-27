@@ -2397,13 +2397,14 @@
       const monthlyCharge = weeklyItems.reduce((total, item) => (
         total + (itemDescriptor(item).monthlyPrice * item.quantity)
       ), 0);
+      const walletCopy = weeklyWalletRequirementCopy(monthlyCharge);
       title = 'Fresh weekly plan';
-      description = `${formatWeight(monthlyKg)} kg across 4 scheduled deliveries. Keep at least ${formatPrice(monthlyCharge)} in your wallet; each delivery is charged when it is processed.`;
+      description = `${formatWeight(monthlyKg)} kg across 4 scheduled deliveries. ${walletCopy.detail} Each delivery is charged when it is processed.`;
       deliveryTitle = 'Choose your weekly rhythm.';
       deliveryIntro = 'Select an address, your preferred weekly delivery day and an available starting date.';
       consent = 'I confirm this 1-month weekly plan, its 4-delivery schedule, address and minimum wallet-balance requirement.';
       walletPolicyTitle = 'Four-delivery wallet requirement';
-      walletPolicyDescription = `Keep at least ${formatPrice(monthlyCharge)} in your Atulyash Wallet to begin this plan. The wallet is charged delivery by delivery, not for the entire month at once.`;
+      walletPolicyDescription = `${walletCopy.detail} The wallet is charged delivery by delivery, not for the entire month at once.`;
     } else if (hasWeekly && hasOneTime) {
       title = 'One-time + weekly items';
       description = 'One-time packs are charged once. Each weekly plan needs enough wallet balance for four scheduled deliveries and is charged delivery by delivery.';
@@ -4205,40 +4206,29 @@
     return null;
   }
 
-  function minimumRechargeAmountFromError(error) {
-    const message = String(error?.message || '');
-    const match = message.match(/minimum\s+recharge[\s\S]*?(?:₹|INR|Rs\.?)[\s]*([\d,]+(?:\.\d+)?)/i);
-    if (!match) return NaN;
-    const amount = Number(String(match[1]).replace(/,/g, ''));
-    return Number.isFinite(amount) ? Math.ceil(amount) : NaN;
+  function walletFundingRequestPayload(amount) {
+    const payload = { amount: Math.max(1, Math.ceil(numericValue(amount, 0))) };
+    const cartId = serverCartId || sessionIdentifier('cartId');
+    if (cartId != null && cartId !== '') payload.cart_id = cartId;
+
+    const weeklyItem = cart.find((item) => item.purchaseType === 'weekly');
+    const plan = weeklyItem ? WEEKLY_PLAN_BY_ID.get(weeklyItem.planId) : null;
+    const subscriptionPlanId = weeklyItem?.apiPlanId ?? plan?.apiId;
+    if (subscriptionPlanId != null && subscriptionPlanId !== '') {
+      payload.subscription_plan_id = subscriptionPlanId;
+    }
+    return payload;
   }
 
   async function requestWalletFundingPreview(amount) {
-    const initialAmount = Math.max(1, Math.ceil(numericValue(amount, 0)));
-    const requestPreview = (previewAmount) => invokeApi('wallet', 'rechargePreview', [previewAmount], {
-      path: '/customers/customer-wallet/recharge/preview/',
-      options: { method: 'POST', auth: true, body: { amount: previewAmount }, form: true }
-    });
-
-    try {
-      return {
-        amount: initialAmount,
-        payload: await requestPreview(initialAmount)
-      };
-    } catch (error) {
-      /*
-       * Weekly funding preview is server-authoritative. When the cart total
-       * is below the subscription's minimum recharge, the API returns that
-       * minimum in the error. Retry once with that server-provided amount;
-       * never invent a client-side policy value.
-       */
-      const requiredAmount = minimumRechargeAmountFromError(error);
-      if (!Number.isFinite(requiredAmount) || requiredAmount <= initialAmount) throw error;
-      return {
-        amount: requiredAmount,
-        payload: await requestPreview(requiredAmount)
-      };
-    }
+    const payload = walletFundingRequestPayload(amount);
+    return {
+      amount: payload.amount,
+      payload: await invokeApi('wallet', 'rechargePreview', [payload], {
+        path: '/customers/customer-wallet/recharge/preview/',
+        options: { method: 'POST', auth: true, body: payload, form: true }
+      })
+    };
   }
 
   function walletShortfall() {
@@ -4259,8 +4249,32 @@
       : orderTotal();
   }
 
+  function weeklyWalletRequirementCopy(grossAmount) {
+    const required = numericValue(walletFundingPolicy?.minimumWalletRequired, NaN);
+    if (!Number.isFinite(required)) {
+      return {
+        required: null,
+        text: 'the live wallet requirement',
+        detail: `The four-delivery cover is ${formatPrice(grossAmount)}. We will confirm the effective wallet requirement from the live service before payment.`
+      };
+    }
+    const serverGross = numericValue(walletFundingPolicy?.grossWalletRequired, NaN);
+    const resolvedGross = Number.isFinite(serverGross) ? serverGross : grossAmount;
+    const couponDiscount = numericValue(walletFundingPolicy?.couponDiscount, NaN);
+    const hasCouponSaving = Number.isFinite(couponDiscount) && couponDiscount > 0;
+    return {
+      required,
+      text: formatPrice(required),
+      detail: hasCouponSaving
+        ? `The four-delivery cover is ${formatPrice(resolvedGross)}. Your ${formatPrice(couponDiscount)} coupon reduces the minimum wallet balance to ${formatPrice(required)}.`
+        : `Keep at least ${formatPrice(required)} in your wallet for the first four scheduled deliveries.`
+    };
+  }
+
   function applyWalletFundingPolicy(payload) {
     const minimumWalletRequired = numericValue(firstResponseValue(payload, ['minimum_wallet_required']), NaN);
+    const grossWalletRequired = numericValue(firstResponseValue(payload, ['gross_wallet_required']), NaN);
+    const couponDiscount = numericValue(firstResponseValue(payload, ['coupon_discount']), NaN);
     const minimumDeliveriesRequired = numericValue(firstResponseValue(payload, ['minimum_deliveries_required']), NaN);
     const pricePerDelivery = numericValue(firstResponseValue(payload, ['price_per_delivery']), NaN);
     const shortfall = numericValue(firstResponseValue(payload, ['shortfall']), NaN);
@@ -4274,6 +4288,8 @@
     if (!Number.isFinite(minimumWalletRequired)) return null;
     walletFundingPolicy = {
       minimumWalletRequired,
+      grossWalletRequired: Number.isFinite(grossWalletRequired) ? Math.max(0, grossWalletRequired) : null,
+      couponDiscount: Number.isFinite(couponDiscount) ? Math.max(0, couponDiscount) : 0,
       minimumDeliveriesRequired: Number.isFinite(minimumDeliveriesRequired)
         ? minimumDeliveriesRequired
         : 4,
@@ -4307,8 +4323,8 @@
 
   function renderWalletPaymentState({ loading = false, error = '' } = {}) {
     if (!elements.checkoutWalletCard) return;
-    const total = orderTotal();
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
+    const total = hasWeekly ? walletRequiredBalance() : orderTotal();
     const balance = checkoutWalletBalanceAmount;
     const shortfall = walletShortfall();
     if (elements.checkoutWalletOrderLabel) {
@@ -4345,11 +4361,10 @@
       elements.checkoutWalletExplanation.textContent = error || 'Your live wallet balance could not be confirmed.';
       elements.checkoutPaymentStatus.textContent = 'Refresh the balance before placing your order. No order payment will be taken directly.';
     } else if (shortfall > 0) {
-      const minimumRechargeAmount = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
-      const rechargeAmount = Math.max(
-        Math.ceil(shortfall),
-        Number.isFinite(minimumRechargeAmount) ? Math.ceil(minimumRechargeAmount) : 0
-      );
+      // The server returns the net shortfall after any applicable coupon.
+      // This is the amount the customer needs to add; never replace it with
+      // the gross four-delivery cover.
+      const rechargeAmount = Math.ceil(shortfall);
       elements.checkoutWalletCard.dataset.state = 'low';
       elements.checkoutWalletState.textContent = walletRechargeVerificationPending ? 'Confirming' : 'Add money';
       elements.checkoutWalletBalance.textContent = formatPrice(balance);
@@ -4412,13 +4427,17 @@
       }
       walletFundingPolicy = null;
       if (cart.some((item) => item.purchaseType === 'weekly')) {
-        const preview = await requestWalletFundingPreview(orderTotal());
+        // Seed the server-authoritative policy with the coupon-adjusted
+        // estimate when the live cart has already confirmed a discount.
+        // The backend still resolves eligibility and returns the final
+        // minimum/shortfall; this only keeps the requested recharge amount
+        // aligned with the net amount (₹860 rather than the ₹960 gross cover
+        // for the ATULYASH100 example).
+        const provisionalRequirement = Math.max(1, Math.ceil(orderTotal() - experienceCredit()));
+        const preview = await requestWalletFundingPreview(provisionalRequirement);
         const policy = applyWalletFundingPolicy(preview.payload);
         if (!policy) {
           throw new Error('The live service did not return the four-delivery wallet requirement.');
-        }
-        if (!Number.isFinite(policy.minimumRechargeAmount)) {
-          policy.minimumRechargeAmount = preview.amount;
         }
         checkoutWalletBalanceAmount = Number.isFinite(policy.availableBalance)
           ? policy.availableBalance
@@ -4567,11 +4586,7 @@
           || 'Your live wallet balance must be available before money can be added.'
         );
       }
-      const minimumRechargeAmount = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
-      const amount = Math.max(
-        Math.ceil(walletShortfall()),
-        Number.isFinite(minimumRechargeAmount) ? Math.ceil(minimumRechargeAmount) : 0
-      );
+      const amount = Math.max(0, Math.ceil(walletShortfall()));
       if (amount <= 0) {
         resetWalletRechargePreview();
         announce(cart.some((item) => item.purchaseType === 'weekly')
@@ -4582,10 +4597,7 @@
       setAsyncButton(elements.checkoutWalletAddButton, true, 'Preparing…', `Add ${formatPrice(amount)} to wallet`);
       const preview = await requestWalletFundingPreview(amount);
       const payload = preview.payload;
-      const policy = applyWalletFundingPolicy(payload);
-      if (policy && !Number.isFinite(policy.minimumRechargeAmount)) {
-        policy.minimumRechargeAmount = preview.amount;
-      }
+      applyWalletFundingPolicy(payload);
       const bonus = numericValue(firstResponseValue(payload, [
         'bonus_amount',
         'prepaid_advantage_amount',
@@ -4795,9 +4807,10 @@
     if (elements.checkoutWalletTopupCancel) elements.checkoutWalletTopupCancel.disabled = true;
     if (elements.checkoutWalletRefreshButton) elements.checkoutWalletRefreshButton.disabled = true;
     try {
-      const payload = await invokeApi('wallet', 'rechargeInitiate', [amount], {
+      const requestPayload = walletFundingRequestPayload(amount);
+      const payload = await invokeApi('wallet', 'rechargeInitiate', [requestPayload], {
         path: '/customers/customer-wallet/recharge/initiate/',
-        options: { method: 'POST', auth: true, body: { amount }, form: true }
+        options: { method: 'POST', auth: true, body: requestPayload, form: true }
       });
       const payment = await openWalletRecharge(payload, amount);
       paymentCompleted = true;

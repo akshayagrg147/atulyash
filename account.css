@@ -2981,6 +2981,96 @@ select {
   font-size: .78rem;
 }
 
+.modification-preview {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(31, 112, 84, .28);
+  border-left: 4px solid var(--forest-700);
+  background: linear-gradient(135deg, rgba(31, 112, 84, .08), rgba(244, 237, 222, .55));
+}
+
+.modification-preview.is-error {
+  border-color: rgba(175, 67, 44, .34);
+  border-left-color: var(--rust-500);
+  background: rgba(175, 67, 44, .06);
+}
+
+.modification-preview-header {
+  display: grid;
+  gap: 5px;
+}
+
+.modification-preview-eyebrow {
+  color: var(--forest-700);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.modification-preview-header strong {
+  color: var(--forest-950);
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.modification-preview-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.modification-preview-figure {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(31, 112, 84, .15);
+  background: rgba(255, 253, 248, .72);
+}
+
+.modification-preview-figure span {
+  color: var(--muted);
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.modification-preview-figure strong {
+  color: var(--forest-950);
+  font-size: 1.1rem;
+}
+
+.modification-preview-figure.is-primary {
+  border-color: rgba(31, 112, 84, .38);
+  background: rgba(31, 112, 84, .11);
+}
+
+.modification-preview-figure.is-due strong,
+.modification-preview-figure.is-discount strong {
+  color: var(--rust-500);
+}
+
+.modification-preview-figure.is-reduced strong {
+  color: var(--forest-700);
+}
+
+.modification-preview-message {
+  margin: 0;
+  color: var(--forest-900);
+  font-size: .76rem;
+  line-height: 1.55;
+}
+
+.modification-preview small {
+  color: var(--muted);
+  font-size: .66rem;
+  line-height: 1.5;
+}
+
 .dialog-summary {
   display: grid;
   gap: 1px;
@@ -9123,5 +9213,19 @@ body.account-bag-open {
 
   .account-shell #ordersList .card-action {
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .modification-preview {
+    padding: 16px;
+  }
+
+  .modification-preview-figures {
+    grid-template-columns: 1fr;
+  }
+
+  .modification-preview-header strong {
+    font-size: 1.15rem;
   }
 }

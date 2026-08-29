@@ -9020,6 +9020,14 @@ body.account-bag-open {
   letter-spacing: .02em;
 }
 
+.account-shell #ordersList .order-title .order-quantity {
+  margin-top: 6px;
+  color: var(--forest-800);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .025em;
+}
+
 .account-shell #ordersList .order-meta,
 .account-shell #ordersList .order-status,
 .account-shell #ordersList .order-total {
@@ -9154,6 +9162,11 @@ body.account-bag-open {
 
   .account-shell #ordersList .order-title p {
     font-size: .6rem;
+  }
+
+  .account-shell #ordersList .order-title .order-quantity {
+    margin-top: 5px;
+    font-size: .56rem;
   }
 
   .account-shell #ordersList .order-meta,

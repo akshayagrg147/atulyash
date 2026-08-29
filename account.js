@@ -1847,6 +1847,111 @@
     return Array.isArray(candidates) ? candidates : responseList(candidates);
   }
 
+  function quantityKg(...values) {
+    for (const value of values) {
+      const direct = firstFinite(value);
+      if (direct !== null && direct > 0) return direct;
+      const labelled = weightFromLabel(value);
+      if (labelled !== null && labelled > 0) return labelled;
+    }
+    return null;
+  }
+
+  function quantityCycleFrom(...values) {
+    const candidate = values.find((value) => Array.isArray(value) && value.length);
+    if (!candidate) return [];
+    return candidate
+      .map((value) => quantityKg(value))
+      .filter((value) => value !== null);
+  }
+
+  function orderQuantityText(order) {
+    const items = orderItems(order);
+    const weekly = orderCadence(order) === 'Weekly freshness';
+    if (weekly) {
+      const deliveries = Array.isArray(order.deliveries) ? order.deliveries : [];
+      const nextDelivery = deliveries.find((delivery) => delivery?.is_active !== false) || deliveries[0];
+      const nextQuantity = quantityKg(
+        order.delivery_quantity,
+        order.next_delivery_quantity,
+        nextDelivery?.delivery_quantity,
+        nextDelivery?.quantity_kg,
+        ...items.map((item) => item.delivery_quantity)
+      );
+      if (nextQuantity !== null) return `${bagWeightLabel(nextQuantity)} kg for the next delivery`;
+
+      const cycle = quantityCycleFrom(
+        order.weekly_quantity_cycle,
+        order.delivery_quantity_cycle,
+        order.subscription_pack_weekly_quantity_cycle,
+        ...items.map((item) => item.subscription_pack_weekly_quantity_cycle || item.weekly_quantity_cycle)
+      );
+      if (cycle.length === 4) {
+        if (cycle.every((value) => value === cycle[0])) return `${bagWeightLabel(cycle[0])} kg per delivery`;
+        return `${cycle.map((value) => `${bagWeightLabel(value)} kg`).join(' · ')} across 4 deliveries`;
+      }
+
+      const weeklyQuantity = quantityKg(
+        order.weekly_quantity,
+        order.weekly_kg,
+        order.quantity_per_week,
+        order.subscription_pack_weekly_quantity,
+        ...items.map((item) => item.weekly_quantity),
+        ...items.map((item) => item.subscription_pack_weekly_quantity)
+      );
+      if (weeklyQuantity !== null) return `${bagWeightLabel(weeklyQuantity)} kg per delivery`;
+
+      const monthlyQuantity = quantityKg(
+        order.monthly_quantity,
+        order.monthly_kg,
+        order.subscription_pack_monthly_quantity,
+        ...items.map((item) => item.monthly_quantity),
+        ...items.map((item) => item.subscription_pack_monthly_quantity)
+      );
+      if (monthlyQuantity !== null) return `${bagWeightLabel(monthlyQuantity)} kg across 4 deliveries`;
+      return 'Quantity available in order details';
+    }
+
+    const lineQuantities = items.map((item) => {
+      const product = [item.product_detail, item.product_pack, item.pack, item.product]
+        .find((candidate) => candidate && typeof candidate === 'object') || {};
+      const quantity = Math.max(1, Math.round(firstFinite(item.quantity, item.qty, item.count) || 1));
+      const weight = quantityKg(
+        item.weight,
+        item.weight_kg,
+        item.pack_size,
+        item.quantity_kg,
+        item.product_pack_weight,
+        item.product_pack_name,
+        product.weight,
+        product.weight_kg,
+        product.pack_size,
+        product.name,
+        product.title
+      );
+      return { quantity, weight };
+    });
+    const knownLines = lineQuantities.filter((line) => line.weight !== null);
+    if (knownLines.length === 1 && lineQuantities.length === 1) {
+      const line = knownLines[0];
+      return `${line.quantity} × ${bagWeightLabel(line.weight)} kg`;
+    }
+    if (knownLines.length) {
+      return knownLines
+        .map((line) => `${line.quantity} × ${bagWeightLabel(line.weight)} kg`)
+        .join(' · ');
+    }
+
+    const totalQuantity = firstFinite(order.quantity, order.qty, order.total_quantity_count, order.item_count);
+    const totalWeight = quantityKg(order.total_weight, order.total_quantity, order.weight, order.weight_kg);
+    if (totalQuantity !== null && totalWeight !== null) {
+      return `${Math.max(1, Math.round(totalQuantity))} × ${bagWeightLabel(totalWeight / Math.max(1, Math.round(totalQuantity)))} kg`;
+    }
+    if (totalQuantity !== null) return `${Math.max(1, Math.round(totalQuantity))} ${totalQuantity === 1 ? 'pack' : 'packs'}`;
+    if (totalWeight !== null) return `${bagWeightLabel(totalWeight)} kg total`;
+    return 'Quantity available in order details';
+  }
+
   function orderTitle(order) {
     const items = orderItems(order);
     const item = items[0] || {};
@@ -2078,7 +2183,8 @@
     title.append(
       create('span', 'order-cadence', orderCadence(order)),
       create('h3', '', orderTitle(order)),
-      create('p', '', `Order ${orderNumber(order)}`)
+      create('p', '', `Order ${orderNumber(order)}`),
+      create('p', 'order-quantity', `Delivering: ${orderQuantityText(order)}`)
     );
 
     const meta = create('div', 'order-meta');

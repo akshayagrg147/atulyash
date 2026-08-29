@@ -2124,6 +2124,21 @@
     return firstValue(order.created_at, order.placed_at, order.order_date, order.created, order.delivery_date);
   }
 
+  function orderDeliveryDate(order) {
+    const direct = firstValue(
+      order.next_delivery_date,
+      order.order_delivery_date,
+      order.requested_delivery_date,
+      order.delivery_date,
+      order.expected_delivery_date,
+      order.delivery?.delivery_date
+    );
+    if (direct) return direct;
+    const deliveries = Array.isArray(order.deliveries) ? order.deliveries : [];
+    const nextDelivery = deliveries.find((delivery) => delivery?.is_active !== false) || deliveries[0];
+    return deliveryDate(nextDelivery);
+  }
+
   function isCompleted(order) {
     return /deliver|complete|fulfilled/i.test(orderStatus(order));
   }
@@ -2192,7 +2207,15 @@
     );
 
     const meta = create('div', 'order-meta');
-    meta.append(create('strong', '', formatDate(orderDate(order))), create('span', '', 'Order placed'));
+    const deliveryDateValue = orderDeliveryDate(order);
+    const delivery = create('div', 'order-delivery-highlight');
+    delivery.append(
+      create('strong', '', deliveryDateValue ? formatDate(deliveryDateValue) : 'Not scheduled'),
+      create('span', '', 'Delivery date')
+    );
+    const placed = create('div', 'order-placed-date');
+    placed.append(create('strong', '', formatDate(orderDate(order))), create('span', '', 'Order placed'));
+    meta.append(delivery, placed);
 
     const status = create('div', 'order-status');
     status.append(statusPill(orderStatus(order)));

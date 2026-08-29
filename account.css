@@ -9036,9 +9036,62 @@ body.account-bag-open {
   border-left: 1px solid rgba(17, 55, 46, .12);
 }
 
+.account-shell #ordersList .order-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 9px;
+}
+
+.account-shell #ordersList .order-delivery-highlight {
+  display: inline-flex;
+  min-width: 118px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px 8px;
+  border: 1px solid rgba(203, 166, 93, .42);
+  border-radius: 10px;
+  background: rgba(222, 197, 143, .17);
+}
+
+.account-shell #ordersList .order-delivery-highlight strong {
+  color: var(--forest-950);
+  font-size: .86rem;
+  line-height: 1.15;
+}
+
+.account-shell #ordersList .order-delivery-highlight span,
+.account-shell #ordersList .order-placed-date span {
+  display: block;
+  margin-top: 0;
+  color: var(--muted);
+  font-size: .5rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.account-shell #ordersList .order-placed-date {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.account-shell #ordersList .order-placed-date strong {
+  color: var(--muted);
+  font-size: .66rem;
+  font-weight: 600;
+}
+
 .account-shell #ordersList .order-meta strong {
   font-size: .83rem;
   line-height: 1.2;
+}
+
+.account-shell #ordersList .order-meta .order-delivery-highlight strong {
+  font-size: .86rem;
 }
 
 .account-shell #ordersList .order-meta span,
@@ -9179,8 +9232,29 @@ body.account-bag-open {
 
   .account-shell #ordersList .order-meta {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .account-shell #ordersList .order-delivery-highlight {
+    min-width: 114px;
+    padding: 6px 9px 7px;
+  }
+
+  .account-shell #ordersList .order-delivery-highlight strong {
+    font-size: .76rem;
+  }
+
+  .account-shell #ordersList .order-delivery-highlight span,
+  .account-shell #ordersList .order-placed-date span {
+    display: block;
+    margin-top: 0;
+    font-size: .49rem;
+  }
+
+  .account-shell #ordersList .order-placed-date {
+    gap: 5px;
   }
 
   .account-shell #ordersList .order-meta span,
@@ -9192,6 +9266,14 @@ body.account-bag-open {
 
   .account-shell #ordersList .order-meta strong {
     font-size: .72rem;
+  }
+
+  .account-shell #ordersList .order-meta .order-delivery-highlight strong {
+    font-size: .76rem;
+  }
+
+  .account-shell #ordersList .order-placed-date strong {
+    font-size: .62rem;
   }
 
   .account-shell #ordersList .order-status {

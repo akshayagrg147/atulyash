@@ -277,6 +277,9 @@
   let savedAddresses = [];
   let selectedAddressId = null;
   let selectedDeliveryDate = '';
+  // Keep the complete availability response so changing the preferred
+  // weekday can filter the date selector without another network request.
+  let availableDeliveryDates = [];
   let lastOrderResponse = null;
   let pendingOrder = loadSessionRecord(PENDING_ORDER_STORAGE_KEY, null);
   let catalogReadiness = { products: false, subscriptions: false };
@@ -2978,6 +2981,7 @@
     if (!restoreAuthenticatedCheckout()) resetOtpState({ preserveSession: true });
     selectedAddressId = null;
     selectedDeliveryDate = '';
+    availableDeliveryDates = [];
     savedAddresses = [];
     checkoutWalletBalanceGeneration += 1;
     checkoutWalletBalanceAmount = null;
@@ -3547,6 +3551,14 @@
     if (requireDate && !fields.deliveryDate.value) {
       errors.push([fields.deliveryDate, 'Please choose an available delivery date.']);
     }
+    if (
+      hasWeekly
+      && fields.deliveryDay.value
+      && fields.deliveryDate.value
+      && deliveryDateWeekday(fields.deliveryDate.value) !== fields.deliveryDay.value
+    ) {
+      errors.push([fields.deliveryDate, `Choose a ${fields.deliveryDay.value} delivery date.`]);
+    }
 
     return showCheckoutValidationErrors(errors);
   }
@@ -3994,12 +4006,55 @@
     return [];
   }
 
-  function renderAvailableDeliveryDates(dates) {
+  function deliveryDateWeekday(dateValue) {
+    const normalized = String(dateValue || '').slice(0, 10);
+    const date = new Date(`${normalized}T12:00:00Z`);
+    if (!normalized || Number.isNaN(date.getTime())) return '';
+    return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getUTCDay()];
+  }
+
+  function filteredDeliveryDates(dates = availableDeliveryDates) {
+    const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
+    const selectedDay = elements.checkoutDeliveryDay?.value || '';
+    const normalizedDates = dates
+      .map((dateValue) => String(dateValue || '').slice(0, 10))
+      .filter((dateValue, index, values) => dateValue && values.indexOf(dateValue) === index);
+    return normalizedDates.filter((dateValue) => {
+      const weekday = deliveryDateWeekday(dateValue);
+      // Monday is not an eligible delivery day in the live schedule.
+      if (!weekday || weekday === 'Monday') return false;
+      return !hasWeekly || !selectedDay || weekday === selectedDay;
+    });
+  }
+
+  function updateDeliveryAvailabilityStatus() {
+    if (!elements.checkoutDeliveryAvailabilityStatus) return;
+    const dates = filteredDeliveryDates();
+    const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
+    const selectedDay = elements.checkoutDeliveryDay?.value || '';
+    if (!availableDeliveryDates.length) {
+      elements.checkoutDeliveryAvailabilityStatus.textContent = selectedAddressId
+        ? 'No delivery date is currently available for this address.'
+        : 'Choose an address to see available delivery dates.';
+      return;
+    }
+    if (hasWeekly && selectedDay && !dates.length) {
+      elements.checkoutDeliveryAvailabilityStatus.textContent = `No ${selectedDay} delivery dates are currently available for this address. Choose another weekday or check dates again.`;
+      return;
+    }
+    const dayLabel = hasWeekly && selectedDay ? ` for ${selectedDay}` : '';
+    elements.checkoutDeliveryAvailabilityStatus.textContent = `${dates.length} fresh-batch ${dates.length === 1 ? 'date is' : 'dates are'} available${dayLabel} for this address.`;
+  }
+
+  function renderAvailableDeliveryDates(dates, { preserveSelection = false } = {}) {
     if (!elements.checkoutDeliveryDate) return;
+    availableDeliveryDates = Array.isArray(dates) ? dates : [];
+    const visibleDates = filteredDeliveryDates();
+    const previous = preserveSelection ? selectedDeliveryDate || elements.checkoutDeliveryDate.value : '';
     const fragment = document.createDocumentFragment();
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = dates.length ? 'Choose a delivery date' : 'No dates currently available';
+    placeholder.textContent = visibleDates.length ? 'Choose a delivery date' : 'No dates currently available';
     fragment.append(placeholder);
     const formatter = new Intl.DateTimeFormat('en-IN', {
       weekday: 'short',
@@ -4008,16 +4063,22 @@
       year: 'numeric',
       timeZone: 'UTC'
     });
-    dates.forEach((dateValue) => {
-      const date = new Date(`${String(dateValue).slice(0, 10)}T12:00:00Z`);
-      if (Number.isNaN(date.getTime()) || date.getUTCDay() === 1) return;
+    visibleDates.forEach((dateValue) => {
+      const date = new Date(`${dateValue}T12:00:00Z`);
       const option = document.createElement('option');
-      option.value = String(dateValue).slice(0, 10);
+      option.value = dateValue;
       option.textContent = formatter.format(date);
       fragment.append(option);
     });
     elements.checkoutDeliveryDate.replaceChildren(fragment);
-    selectedDeliveryDate = '';
+    if (previous && visibleDates.includes(previous)) {
+      elements.checkoutDeliveryDate.value = previous;
+      selectedDeliveryDate = previous;
+    } else {
+      elements.checkoutDeliveryDate.value = '';
+      selectedDeliveryDate = '';
+    }
+    elements.checkoutDeliveryDate.disabled = visibleDates.length === 0;
   }
 
   async function loadDeliveryAvailability() {
@@ -4046,11 +4107,7 @@
       ) return;
       const dates = collectDeliveryDates(payload);
       renderAvailableDeliveryDates(dates);
-      if (elements.checkoutDeliveryAvailabilityStatus) {
-        elements.checkoutDeliveryAvailabilityStatus.textContent = dates.length
-          ? `${dates.length} fresh-batch ${dates.length === 1 ? 'date is' : 'dates are'} available for this address.`
-          : 'No delivery date is currently available for this address.';
-      }
+      updateDeliveryAvailabilityStatus();
     } catch (error) {
       if (
         requestGeneration !== deliveryAvailabilityGeneration
@@ -5554,6 +5611,18 @@
     } catch (error) {
       showCheckoutError(error?.message || 'Delivery dates could not be checked for this address.');
     }
+  });
+  elements.checkoutDeliveryDay?.addEventListener('change', (event) => {
+    const selectedDay = event.target.value;
+    if (selectedDay && !DELIVERY_DAYS.includes(selectedDay)) return;
+    updateWeeklyCartDeliveryDay(selectedDay);
+    // The API returns all serviceable dates. Keep that response and show only
+    // dates that fall on the weekday the customer selected.
+    renderAvailableDeliveryDates(availableDeliveryDates, { preserveSelection: true });
+    updateDeliveryAvailabilityStatus();
+    event.target.removeAttribute('aria-invalid');
+    const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
+    if (error) error.textContent = '';
   });
   elements.checkoutDeliveryDate?.addEventListener('change', (event) => {
     selectedDeliveryDate = event.target.value;

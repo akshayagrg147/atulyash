@@ -5619,7 +5619,14 @@
 
   function renderRechargePreview(preview, amount) {
     const data = responseData(preview);
-    const rechargeValue = firstValue(data.minimum_recharge_amount, data.recharge_amount, data.amount, amount);
+    const positiveValue = (...values) => values.find((value) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && numeric > 0;
+    });
+    // Some wallet responses include zero placeholders for optional amount
+    // fields. Never render those placeholders as the amount due when the
+    // customer requested a positive recharge.
+    const rechargeValue = positiveValue(data.minimum_recharge_amount, data.recharge_amount, data.amount, amount) || amount;
     const bonus = firstValue(
       data.bonus_amount,
       data.prepaid_advantage_amount,
@@ -5629,20 +5636,20 @@
       0
     );
     const tax = firstValue(data.tax, data.tax_amount, data.gst, 0);
-    const payable = firstValue(
+    const payable = positiveValue(
       data.payable_amount,
       data.amount_to_pay,
       data.payment_amount,
       data.total,
       rechargeValue
-    );
-    const credited = firstValue(
+    ) || rechargeValue;
+    const credited = positiveValue(
       data.total_credit,
       data.credited_amount,
       data.credit_amount,
       data.wallet_credit,
       numberFrom(rechargeValue) + numberFrom(bonus)
-    );
+    ) || numberFrom(rechargeValue) + numberFrom(bonus);
     const bonusSlabText = typeof data.bonus_slab === 'object'
       ? firstValue(data.bonus_slab.display_text, data.bonus_slab.name)
       : null;

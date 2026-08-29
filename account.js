@@ -3937,6 +3937,15 @@
         return shortfall !== null && shortfall <= 0.005;
       };
 
+      const planChangeErrorMessage = (error, fallback = 'The live plan preview could not be loaded.') => {
+        const payload = error?.data || error?.response?.data || error?.body || error?.details;
+        const rawMessage = firstValue(readableErrorValue(payload), error?.message, '');
+        if (/unsupported operand|nonetype.*int|typeerror/i.test(String(rawMessage))) {
+          return 'The server could not calculate this plan change yet. Please try again later or contact Atulyash care.';
+        }
+        return friendlyError(error, fallback);
+      };
+
       const previewPlan = (plan) => {
         const source = plan && typeof plan === 'object' ? plan : {};
         const quantity = firstValue(
@@ -4090,8 +4099,9 @@
           if (requestId !== previewRequestId) return false;
           latestPreview = null;
           latestPreviewPackId = '';
-          renderPackChangePreview(null, 'error', friendlyError(error, 'The live plan preview could not be loaded.'));
-          if (!silent) showToast(friendlyError(error, 'The plan preview could not be loaded.'), 'error');
+          const message = planChangeErrorMessage(error);
+          renderPackChangePreview(null, 'error', message);
+          if (!silent) showToast(message, 'error');
           return false;
         }
       };
@@ -4145,12 +4155,13 @@
           showToast('Your weekly plan has been updated.');
           await renderSubscriptions(true);
         } catch (error) {
-          showToast(friendlyError(error), 'error');
+          const message = planChangeErrorMessage(error, 'The plan change could not be completed.');
+          showToast(message, 'error');
           const errorData = responseData(error?.data || error?.response?.data || error?.body);
           if (errorData && typeof errorData === 'object' && (errorData.code || errorData.shortfall != null)) {
             latestPreview = { ...latestPreview, ...errorData };
             latestPreviewPackId = String(new_pack_id);
-            renderPackChangePreview(latestPreview, 'error', friendlyError(error));
+            renderPackChangePreview(latestPreview, 'error', message);
           }
           submitBusy = false;
           setButtonBusy(submit, false);

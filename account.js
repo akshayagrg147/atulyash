@@ -4610,7 +4610,15 @@
     const end = create('input');
     end.type = 'date';
     end.required = true;
-    end.min = start.value || start.min;
+    const savedEndDate = String(savedEnd || '').slice(0, 10);
+    const savedEndIsValid = /^\d{4}-\d{2}-\d{2}$/.test(savedEndDate);
+    // Once a vacation has started, moving its end earlier could require the
+    // service to reverse already-postponed deliveries. The API intentionally
+    // rejects that, so constrain the editor to safe extensions only.
+    const endDateFloor = vacationStarted && savedEndIsValid
+      ? savedEndDate
+      : (start.value || start.min);
+    end.min = endDateFloor;
     end.value = savedEnd ? String(savedEnd).slice(0, 10) : '';
     endLabel.append(end);
     start.addEventListener('change', () => {
@@ -4624,7 +4632,7 @@
     const vacationPreview = create('p', 'vacation-preview');
     if (vacationStarted) {
       vacationPreview.id = 'vacation-start-lock-note';
-      vacationPreview.textContent = 'This vacation has already started. Its start date is locked; only the end date can be changed.';
+      vacationPreview.textContent = `This vacation has already started. Its start date is locked; you can extend the end date from ${formatDate(savedEndDate)} onward.`;
     }
     const previewSubscription = () => {
       if (subscription) return subscription;
@@ -4639,7 +4647,7 @@
     };
     function updateVacationPreview() {
       if (vacationStarted) {
-        vacationPreview.textContent = 'This vacation has already started. Its start date is locked; only the end date can be changed.';
+        vacationPreview.textContent = `This vacation has already started. Its start date is locked; you can extend the end date from ${formatDate(savedEndDate)} onward.`;
         return;
       }
       const selected = previewSubscription();
@@ -4662,7 +4670,12 @@
       event.preventDefault();
       if (end.value < start.value) return showToast('The end date must be after the start date.', 'error');
       if (vacationStarted && start.value !== savedStartDate) {
-        showToast('This vacation has already started, so its start date cannot be moved. You can still change the end date.', 'error');
+        showToast('This vacation has already started, so its start date cannot be moved.', 'error');
+        setButtonBusy(submit, false);
+        return;
+      }
+      if (vacationStarted && savedEndIsValid && end.value < savedEndDate) {
+        showToast(`This vacation has already started. The end date can only be extended beyond ${formatDate(savedEndDate)}.`, 'error');
         setButtonBusy(submit, false);
         return;
       }

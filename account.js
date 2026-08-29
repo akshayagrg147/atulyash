@@ -1851,6 +1851,10 @@
     return typeof status === 'object' ? String(firstValue(status.name, status.label, status.status, 'Processing')) : String(status);
   }
 
+  function orderIsCancelled(order) {
+    return /cancel|canceled|cancelled|failed|refund/i.test(orderStatus(order));
+  }
+
   function orderItems(order) {
     const candidates = firstValue(order.order_items, order.items, order.cart_items, order.products, order.line_items, []);
     return Array.isArray(candidates) ? candidates : responseList(candidates);
@@ -1918,6 +1922,7 @@
         ...items.map((item) => item.subscription_pack_monthly_quantity)
       );
       if (monthlyQuantity !== null) return `${bagWeightLabel(monthlyQuantity)} kg across 4 deliveries`;
+      if (orderIsCancelled(order)) return '';
       return 'Quantity available in order details';
     }
 
@@ -1958,6 +1963,7 @@
     }
     if (totalQuantity !== null) return `${Math.max(1, Math.round(totalQuantity))} ${totalQuantity === 1 ? 'pack' : 'packs'}`;
     if (totalWeight !== null) return `${bagWeightLabel(totalWeight)} kg total`;
+    if (orderIsCancelled(order)) return '';
     return 'Quantity available in order details';
   }
 
@@ -2002,6 +2008,8 @@
       const cycleQuantity = cycle[Math.max(0, Math.min(cycle.length - 1, Math.round(weekNumber || 1) - 1))];
       if (cycleQuantity !== undefined) return `${bagWeightLabel(cycleQuantity)} kg`;
     }
+
+    if (orderIsCancelled(parentOrder) || /cancel|canceled|cancelled|failed|refund/i.test(deliveryStatus(delivery))) return '';
 
     const items = orderItems(parentOrder);
     if (items.length || order) {
@@ -2262,9 +2270,10 @@
     title.append(
       create('span', 'order-cadence', orderCadence(order)),
       create('h3', '', orderTitle(order)),
-      create('p', '', `Order ${orderNumber(order)}`),
-      create('p', 'order-quantity', `Delivering: ${orderQuantityText(order)}`)
+      create('p', '', `Order ${orderNumber(order)}`)
     );
+    const quantityText = orderQuantityText(order);
+    if (quantityText) title.append(create('p', 'order-quantity', `Delivering: ${quantityText}`));
 
     const meta = create('div', 'order-meta');
     const deliveryDateValue = orderDeliveryDate(order);
@@ -2805,7 +2814,8 @@
       );
       heading.append(title, statusPill(deliveryStatus(delivery)));
       card.append(heading);
-      card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${deliveryQuantityText(delivery, order, index)}`));
+      const quantityText = deliveryQuantityText(delivery, order, index);
+      if (quantityText) card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${quantityText}`));
       const meta = [];
       const rider = firstValue(delivery.rider_name, delivery.rider?.name);
       if (rider) meta.push(`Rider · ${rider}`);
@@ -2837,7 +2847,8 @@
       );
       heading.append(title, statusPill(firstValue(subscriptionOrder.order_status, subscriptionOrder.status, 'Pending')));
       card.append(heading);
-      card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${deliveryQuantityText(subscriptionOrder, order, index)}`));
+      const quantityText = deliveryQuantityText(subscriptionOrder, order, index);
+      if (quantityText) card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${quantityText}`));
       const amount = orderPaymentValue(subscriptionOrder, 'net_payable');
       const parent = firstValue(subscriptionOrder.parent, subscriptionOrder.parent_order_id);
       const meta = [
@@ -2888,9 +2899,10 @@
       const summary = create('div', 'dialog-summary');
       const summaryRows = [
         ['Delivery date', deliveryDate(detail) ? formatDate(deliveryDate(detail)) : 'Date to be confirmed'],
-        ['Quantity to deliver', deliveryQuantityText(detail, order)],
         ['Placed on', detail.placed_at ? formatDate(detail.placed_at, true) : 'Date to be confirmed']
       ];
+      const quantityText = deliveryQuantityText(detail, order);
+      if (quantityText) summaryRows.splice(1, 0, ['Quantity to deliver', quantityText]);
       const riderName = firstValue(detail.rider_name, detail.rider?.name);
       if (riderName) summaryRows.push(['Delivery partner', riderName]);
       const riderPhone = firstValue(detail.rider_phone, detail.rider?.phone);

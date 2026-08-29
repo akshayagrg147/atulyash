@@ -3763,6 +3763,11 @@
     return String(firstValue(subscription.status_display, subscription.plan_status, subscription.status, subscription.is_active === false ? 'Cancelled' : 'Active'));
   }
 
+  function subscriptionAllowsDeliveryChanges(subscription) {
+    const continuous = subscription?.is_continuous;
+    return continuous !== false && String(continuous).toLowerCase() !== 'false';
+  }
+
   function makeSubscriptionCard(subscription) {
     const card = create('article', 'subscription-card');
     const head = create('div', 'subscription-card-head');
@@ -3812,10 +3817,19 @@
     const actions = create('div', 'subscription-actions');
     actions.append(
       button('Change plan', 'card-action', () => openChangeSubscriptionPlan(subscription)),
-      button('Manage deliveries', 'card-action', () => openManageDeliveries(subscription)),
       button('Vacation', 'card-action', () => openVacationForm(subscription)),
       button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
     );
+    if (subscriptionAllowsDeliveryChanges(subscription)) {
+      actions.insertBefore(
+        button('Manage deliveries', 'card-action', () => openManageDeliveries(subscription)),
+        actions.children[1]
+      );
+    } else {
+      const note = create('small', 'subscription-action-note', 'Delivery skips are available for continuous plans.');
+      note.title = 'This plan contains a fixed four-delivery cycle, so its delivery dates cannot be skipped.';
+      actions.append(note);
+    }
     card.append(head, body, next, actions);
     return card;
   }
@@ -3947,6 +3961,18 @@
   }
 
   async function openManageDeliveries(subscription) {
+    if (!subscriptionAllowsDeliveryChanges(subscription)) {
+      openDialog(
+        'Weekly plan',
+        'Manage deliveries',
+        makeState(
+          'empty',
+          'This plan has a fixed delivery cycle.',
+          'Skipping deliveries is available only for continuous weekly plans. You can change the plan or contact Atulyash care if you need help.'
+        )
+      );
+      return;
+    }
     const id = subscriptionId(subscription);
     const loading = makeState('loading', 'Checking your schedule.', 'Finding the dates that can still be changed…');
     openDialog('Weekly plan', 'Manage deliveries', loading);

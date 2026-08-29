@@ -1765,7 +1765,11 @@
     const query = {
       page_size: 15,
       page,
-      is_active: true,
+      // Order history is an audit trail, so include cancelled/inactive orders.
+      // `null` overrides api-client's active-only default and is omitted from
+      // the query string, allowing the API to return the customer's full
+      // history while the shop/catalogue requests remain active-only.
+      is_active: null,
       customer__id: state.customerId,
       pending_order: false
     };
@@ -2255,7 +2259,9 @@
       const query = {
         page_size: 100,
         page,
-        is_active: true,
+        // Statements should match the order-history view and retain cancelled
+        // subscriptions/orders instead of silently dropping them.
+        is_active: null,
         customer__id: state.customerId,
         pending_order: false
       };

@@ -459,6 +459,10 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function firstValue(...values) {
+    return values.find((value) => value !== undefined && value !== null && value !== '');
+  }
+
   function extractWeight(value) {
     const match = String(value || '').match(/(\d+(?:\.\d+)?)\s*kg/i);
     return match ? numericValue(match[1]) : 0;

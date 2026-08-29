@@ -304,7 +304,8 @@
         }];
       }
       if (/previewChange|updatePack/.test(methodName)) {
-        return [identifier, { subscription_pack_id: value.subscription_pack_id }];
+        const newPackId = firstValue(value.new_pack_id, value.subscription_pack_id);
+        return [identifier, { new_pack_id: newPackId }];
       }
       if (/skippableDeliveries|getSkippableDeliveries|skipSummary|getSkipSummary/.test(methodName)) {
         return [identifier];
@@ -3753,11 +3754,11 @@
         event.preventDefault();
         setButtonBusy(submit, true, 'Updating…');
         try {
-          const subscription_pack_id = select.value;
-          await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, subscription_pack_id }, {
+          const new_pack_id = select.value;
+          await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
             path: `/subscription/subscription_plan/${id}/update-pack/`,
             method: 'POST',
-            form: { subscription_pack_id }
+            form: { new_pack_id }
           });
           closeDialog();
           state.loaded.delete('subscriptions');

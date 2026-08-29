@@ -8835,6 +8835,14 @@ body.account-bag-open {
   line-height: 1.45;
 }
 
+.order-delivery-card-quantity {
+  margin: 10px 0 0;
+  color: var(--forest-900);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
 .order-delivery-card .card-action {
   width: 100%;
   justify-content: center;

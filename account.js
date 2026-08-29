@@ -1961,6 +1961,61 @@
     return 'Quantity available in order details';
   }
 
+  function deliveryQuantityText(delivery, order, index = 0) {
+    const parentOrder = order || {};
+    const directQuantity = quantityKg(
+      delivery?.delivery_quantity,
+      delivery?.delivery_quantity_kg,
+      delivery?.quantity_kg,
+      delivery?.data?.delivery_quantity,
+      delivery?.data?.delivery_quantity_kg
+    );
+    if (directQuantity !== null) return `${bagWeightLabel(directQuantity)} kg`;
+
+    const deliveryItems = orderItems(delivery);
+    const itemQuantities = deliveryItems
+      .map((item) => quantityKg(
+        item?.delivery_quantity,
+        item?.delivery_quantity_kg,
+        item?.quantity_kg
+      ))
+      .filter((value) => value !== null);
+    if (itemQuantities.length) {
+      const unique = [...new Set(itemQuantities.map((value) => String(value)))];
+      return unique.length === 1
+        ? `${bagWeightLabel(itemQuantities[0])} kg`
+        : itemQuantities.map((value) => `${bagWeightLabel(value)} kg`).join(' · ');
+    }
+
+    const cycle = quantityCycleFrom(
+      delivery?.weekly_quantity_cycle,
+      delivery?.delivery_quantity_cycle,
+      delivery?.subscription_pack_weekly_quantity_cycle,
+      ...deliveryItems.map((item) => item?.subscription_pack_weekly_quantity_cycle || item?.weekly_quantity_cycle),
+      order?.weekly_quantity_cycle,
+      order?.delivery_quantity_cycle,
+      order?.subscription_pack_weekly_quantity_cycle,
+      ...orderItems(parentOrder).map((item) => item?.subscription_pack_weekly_quantity_cycle || item?.weekly_quantity_cycle)
+    );
+    if (cycle.length === 4) {
+      const weekNumber = firstFinite(delivery?.week_number, delivery?.week, index + 1);
+      const cycleQuantity = cycle[Math.max(0, Math.min(cycle.length - 1, Math.round(weekNumber || 1) - 1))];
+      if (cycleQuantity !== undefined) return `${bagWeightLabel(cycleQuantity)} kg`;
+    }
+
+    const items = orderItems(parentOrder);
+    if (items.length || order) {
+      const fallback = orderQuantityText(parentOrder);
+      if (fallback && !/available in order details/i.test(fallback)) {
+        return fallback
+          .replace(/ for the next delivery$/i, '')
+          .replace(/ per delivery$/i, '')
+          .replace(/ across 4 deliveries$/i, '');
+      }
+    }
+    return 'Quantity to be confirmed';
+  }
+
   function orderTitle(order) {
     const items = orderItems(order);
     const item = items[0] || {};
@@ -2750,6 +2805,7 @@
       );
       heading.append(title, statusPill(deliveryStatus(delivery)));
       card.append(heading);
+      card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${deliveryQuantityText(delivery, order, index)}`));
       const meta = [];
       const rider = firstValue(delivery.rider_name, delivery.rider?.name);
       if (rider) meta.push(`Rider · ${rider}`);
@@ -2763,7 +2819,7 @@
     return section;
   }
 
-  function renderSubscriptionSchedule(subscriptionOrders) {
+  function renderSubscriptionSchedule(subscriptionOrders, order) {
     if (!Array.isArray(subscriptionOrders) || !subscriptionOrders.length) return null;
     const section = create('section', 'order-deliveries order-subscription-schedule');
     section.append(create('p', 'section-label', 'Weekly plan ledger'));
@@ -2781,6 +2837,7 @@
       );
       heading.append(title, statusPill(firstValue(subscriptionOrder.order_status, subscriptionOrder.status, 'Pending')));
       card.append(heading);
+      card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${deliveryQuantityText(subscriptionOrder, order, index)}`));
       const amount = orderPaymentValue(subscriptionOrder, 'net_payable');
       const parent = firstValue(subscriptionOrder.parent, subscriptionOrder.parent_order_id);
       const meta = [
@@ -2831,6 +2888,7 @@
       const summary = create('div', 'dialog-summary');
       const summaryRows = [
         ['Delivery date', deliveryDate(detail) ? formatDate(deliveryDate(detail)) : 'Date to be confirmed'],
+        ['Quantity to deliver', deliveryQuantityText(detail, order)],
         ['Placed on', detail.placed_at ? formatDate(detail.placed_at, true) : 'Date to be confirmed']
       ];
       const riderName = firstValue(detail.rider_name, detail.rider?.name);
@@ -2974,7 +3032,7 @@
 
       const deliverySchedule = renderDeliverySchedule(detail.deliveries, detail);
       if (deliverySchedule) detailColumn.append(deliverySchedule);
-      const subscriptionSchedule = renderSubscriptionSchedule(detail.subscription_orders);
+      const subscriptionSchedule = renderSubscriptionSchedule(detail.subscription_orders, detail);
       if (subscriptionSchedule && (!Array.isArray(detail.deliveries) || detail.deliveries.length !== detail.subscription_orders.length)) {
         detailColumn.append(subscriptionSchedule);
       }

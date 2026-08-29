@@ -3293,6 +3293,16 @@ select {
   border-left-color: var(--rust-500);
 }
 
+/* Native dialogs render in the browser's top layer. Move the toast into that
+   layer while a dialog is open so errors are never hidden underneath it. */
+.toast.is-dialog-toast {
+  top: 22px;
+  right: 24px;
+  bottom: auto;
+  z-index: 1000;
+  max-width: min(430px, calc(100vw - 48px));
+}
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -3688,6 +3698,13 @@ select {
     right: 15px;
     bottom: 15px;
     max-width: calc(100% - 30px);
+  }
+
+  .toast.is-dialog-toast {
+    top: 14px;
+    right: 15px;
+    bottom: auto;
+    max-width: calc(100vw - 30px);
   }
 }
 

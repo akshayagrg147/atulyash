@@ -1290,13 +1290,31 @@
     });
   }
 
+  function setToastLayer(inDialog) {
+    if (!elements.toast) return;
+    const shouldUseDialogLayer = Boolean(inDialog && elements.dialog?.open);
+    if (shouldUseDialogLayer) {
+      if (elements.toast.parentElement !== elements.dialog) {
+        elements.dialog.append(elements.toast);
+      }
+      elements.toast.classList.add('is-dialog-toast');
+      return;
+    }
+    if (elements.toast.parentElement !== document.body) {
+      document.body.append(elements.toast);
+    }
+    elements.toast.classList.remove('is-dialog-toast');
+  }
+
   function showToast(message, type = 'success') {
     window.clearTimeout(state.toastTimer);
+    setToastLayer(elements.dialog?.open);
     elements.toast.textContent = message;
     elements.toast.classList.toggle('is-error', type === 'error');
     elements.toast.hidden = false;
     state.toastTimer = window.setTimeout(() => {
       elements.toast.hidden = true;
+      setToastLayer(false);
     }, 4400);
   }
 
@@ -6401,6 +6419,7 @@
   });
   elements.dialog.addEventListener('close', () => {
     document.body.classList.remove('dialog-open');
+    setToastLayer(false);
     state.dialogReturnFocus?.focus?.();
     state.dialogReturnFocus = null;
   });

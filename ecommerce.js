@@ -1248,6 +1248,17 @@
     if (isWeekly) {
       const rawPack = item.subscription_pack;
       const packId = rawPack && typeof rawPack === 'object' ? rawPack.id : rawPack;
+      const rawSubscriptionPlan = item.subscription_plan;
+      const subscriptionPlanId = firstValue(
+        rawSubscriptionPlan && typeof rawSubscriptionPlan === 'object'
+          ? rawSubscriptionPlan.id
+          : rawSubscriptionPlan,
+        rawSubscriptionPlan && typeof rawSubscriptionPlan === 'object'
+          ? rawSubscriptionPlan.pk
+          : null,
+        item.subscription_plan_id,
+        item.subscriptionPlanId
+      );
       const plan = findPlanByApiId(packId);
       const rawMonthlyKg = Number(rawPack?.monthly_quantity ?? item.monthly_quantity);
       const rawWeeklyKg = Number(rawPack?.weekly_quantity ?? item.weekly_quantity);
@@ -1264,6 +1275,7 @@
         purchaseType: 'weekly',
         planId: plan?.id || `subscription-${packId}`,
         apiPlanId: packId,
+        subscriptionPlanId,
         weight: weeklyKg || 0,
         weightKg: weeklyKg || 0,
         weeklyKg: weeklyKg || 0,
@@ -1959,8 +1971,9 @@
   function orderTotal() {
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
     // A weekly plan is funded in the wallet for the minimum number of
-    // deliveries.  Coupon discounts apply to the order/catalogue price only;
-    // they must not reduce the server-authoritative wallet requirement.
+    // deliveries. Once returned, the server's coupon-adjusted requirement is
+    // authoritative; before that response, the live cart discount is the best
+    // estimate available to prepare the first policy request.
     const minimumWalletRequired = hasWeekly
       ? numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
       : NaN;
@@ -2564,9 +2577,7 @@
       && String(coupon.id) !== appliedId
       && String(coupon.code).toLowerCase() !== appliedCode
     ));
-    const invalid = couponData.invalid.filter(couponMatchesSearch);
     valid.forEach((coupon) => elements.couponList.append(couponCard(coupon, { valid: true })));
-    invalid.forEach((coupon) => elements.couponList.append(couponCard(coupon, { valid: false })));
 
     if (!elements.couponList.children.length) {
       elements.couponList.append(couponEmptyState(
@@ -2579,12 +2590,18 @@
 
   function couponArrays(payload) {
     const root = payload?.data ?? payload ?? {};
-    const validCandidates = root.valid_coupons ?? root.eligible_coupons ?? root.valid ?? root.coupons;
-    const invalidCandidates = root.invalid_coupons ?? root.ineligible_coupons ?? root.invalid;
+    const validCandidates = root.valid_coupons
+      ?? root.applicable_coupons
+      ?? root.eligible_coupons
+      ?? root.valid
+      ?? root.coupons;
     const generic = Array.isArray(root) ? root : apiResults(root);
     return {
       valid: (Array.isArray(validCandidates) ? validCandidates : generic).map(normalizeCoupon).filter(Boolean),
-      invalid: (Array.isArray(invalidCandidates) ? invalidCandidates : []).map(normalizeCoupon).filter(Boolean)
+      // Invalid/disabled coupons are intentionally never rendered to
+      // customers. The backend now returns only usable offers in the valid or
+      // applicable collections; keep this empty for older responses too.
+      invalid: []
     };
   }
 
@@ -2636,7 +2653,7 @@
 
   async function changeCoupon(action, couponId) {
     if (couponBusy || pendingOrder) return;
-    const candidate = [...couponData.valid, ...couponData.invalid]
+    const candidate = couponData.valid
       .find((coupon) => String(coupon.id) === String(couponId));
     couponBusy = true;
     couponMessage = '';
@@ -3632,7 +3649,7 @@
     // City is server-derived from the PIN code. Keep it synchronized even
     // when the customer changes the PIN after a previous lookup.
     if (city && cityField) cityField.value = city;
-    if (state && stateField && !stateField.value.trim()) {
+    if (state && stateField) {
       const option = [...stateField.options].find((entry) => entry.value.localeCompare(state, 'en', { sensitivity: 'accent' }) === 0);
       if (option) stateField.value = option.value;
     }
@@ -4269,8 +4286,15 @@
     if (cartId != null && cartId !== '') payload.cart_id = cartId;
 
     const weeklyItem = cart.find((item) => item.purchaseType === 'weekly');
-    const plan = weeklyItem ? WEEKLY_PLAN_BY_ID.get(weeklyItem.planId) : null;
-    const subscriptionPlanId = weeklyItem?.apiPlanId ?? plan?.apiId;
+    // `apiPlanId` is the public subscription-pack/catalogue ID and must not be
+    // sent as `subscription_plan_id`. Only forward a real customer-owned
+    // subscription plan ID when the cart API supplies one; for a new plan the
+    // backend resolves the context from cart_id and the field stays optional.
+    const subscriptionPlanId = firstValue(
+      weeklyItem?.subscriptionPlanId,
+      weeklyItem?.subscription_plan_id,
+      weeklyItem?.subscriptionPlan?.id
+    );
     if (subscriptionPlanId != null && subscriptionPlanId !== '') {
       payload.subscription_plan_id = subscriptionPlanId;
     }
@@ -4295,6 +4319,13 @@
       : NaN;
     if (Number.isFinite(backendShortfall)) return Math.max(0, backendShortfall);
     return Math.max(0, walletRequiredBalance() - checkoutWalletBalanceAmount);
+  }
+
+  function walletRechargeAmount() {
+    const minimumRecharge = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
+    if (Number.isFinite(minimumRecharge) && minimumRecharge > 0) return Math.ceil(minimumRecharge);
+    const shortfall = walletShortfall();
+    return Number.isFinite(shortfall) ? Math.max(0, Math.ceil(shortfall)) : 0;
   }
 
   function walletRequiredBalance() {
@@ -4421,7 +4452,7 @@
       // The server returns the net shortfall after any applicable coupon.
       // This is the amount the customer needs to add; never replace it with
       // the gross four-delivery cover.
-      const rechargeAmount = Math.ceil(shortfall);
+      const rechargeAmount = walletRechargeAmount() || Math.ceil(shortfall);
       elements.checkoutWalletCard.dataset.state = 'low';
       elements.checkoutWalletState.textContent = walletRechargeVerificationPending ? 'Confirming' : 'Add money';
       elements.checkoutWalletBalance.textContent = formatPrice(balance);
@@ -4490,7 +4521,10 @@
         // minimum/shortfall; this only keeps the requested recharge amount
         // aligned with the net amount (₹860 rather than the ₹960 gross cover
         // for the ATULYASH100 example).
-        const provisionalRequirement = Math.max(1, Math.ceil(orderTotal() - experienceCredit()));
+        // orderTotal() already includes the live cart coupon discount. Do not
+        // subtract experienceCredit() a second time (₹960 − ₹100 must be
+        // requested as ₹860, not ₹760).
+        const provisionalRequirement = Math.max(1, Math.ceil(orderTotal()));
         const preview = await requestWalletFundingPreview(provisionalRequirement);
         const policy = applyWalletFundingPolicy(preview.payload);
         if (!policy) {
@@ -4643,7 +4677,9 @@
           || 'Your live wallet balance must be available before money can be added.'
         );
       }
-      const amount = Math.max(0, Math.ceil(walletShortfall()));
+      // The server's minimum_recharge_amount is authoritative. The local
+      // shortfall is only a fallback while the policy response is unavailable.
+      const amount = walletRechargeAmount() || Math.max(0, Math.ceil(walletShortfall()));
       if (amount <= 0) {
         resetWalletRechargePreview();
         announce(cart.some((item) => item.purchaseType === 'weekly')
@@ -4655,6 +4691,14 @@
       const preview = await requestWalletFundingPreview(amount);
       const payload = preview.payload;
       applyWalletFundingPolicy(payload);
+      const serverRechargeAmount = numericValue(firstResponseValue(payload, [
+        'minimum_recharge_amount',
+        'recharge_amount',
+        'amount'
+      ]), NaN);
+      const rechargeAmount = Number.isFinite(serverRechargeAmount) && serverRechargeAmount > 0
+        ? Math.ceil(serverRechargeAmount)
+        : amount;
       const bonus = numericValue(firstResponseValue(payload, [
         'bonus_amount',
         'prepaid_advantage_amount',
@@ -4665,13 +4709,13 @@
       const tax = numericValue(firstResponseValue(payload, ['tax', 'tax_amount', 'gst']), 0);
       const payable = numericValue(firstResponseValue(payload, [
         'payable_amount', 'amount_to_pay', 'payment_amount', 'total'
-      ]), amount);
+      ]), rechargeAmount);
       const credited = numericValue(firstResponseValue(payload, [
         'total_credit', 'credited_amount', 'credit_amount', 'wallet_credit'
-      ]), amount + bonus);
-      walletRechargePreview = { amount, bonus, tax, payable, credited };
+      ]), rechargeAmount + bonus);
+      walletRechargePreview = { amount: rechargeAmount, bonus, tax, payable, credited };
       if (elements.checkoutWalletTopupTitle) {
-        elements.checkoutWalletTopupTitle.textContent = `Add ${formatPrice(amount)} to your wallet`;
+        elements.checkoutWalletTopupTitle.textContent = `Add ${formatPrice(rechargeAmount)} to your wallet`;
       }
       renderWalletRechargeSummary(walletRechargePreview);
       elements.checkoutWalletTopup.hidden = false;
@@ -4693,8 +4737,8 @@
         elements.checkoutWalletAddButton,
         false,
         '',
-        Number.isFinite(shortfall) && shortfall > 0
-          ? `Add ${formatPrice(Math.ceil(shortfall))} to wallet`
+        walletRechargeAmount() > 0
+          ? `Add ${formatPrice(walletRechargeAmount())} to wallet`
           : 'Add money to wallet'
       );
       syncWalletOrderAvailability();
@@ -4773,7 +4817,8 @@
       'amount_in_paise', 'amount_paise', 'razorpay_amount', 'razorpayAmount'
     ]), NaN);
     const responseRupees = numericValue(firstRazorpayValue(payload, [
-      'payable_amount', 'amount_to_pay', 'final_amount', 'total_amount'
+      'minimum_recharge_amount', 'recharge_amount', 'payable_amount',
+      'amount_to_pay', 'final_amount', 'total_amount'
     ]), NaN);
     const previewRupees = numericValue(walletRechargePreview?.payable, NaN);
     const requestedRupees = numericValue(requestedAmount, NaN);
@@ -5584,7 +5629,9 @@
     event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
     // Never carry the previous PIN's city into a new address lookup.
     const cityField = document.getElementById('checkoutCity');
+    const stateField = document.getElementById('checkoutState');
     if (cityField) cityField.value = '';
+    if (stateField) stateField.value = '';
     // Clear areas returned for the previous PIN before the new lookup starts.
     resetCheckoutAreaOptions();
     if (event.target.value !== checkedServiceabilityPincode) resetPincodeServiceability();

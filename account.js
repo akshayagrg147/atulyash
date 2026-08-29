@@ -354,7 +354,12 @@
 
     if (group === 'misc') {
       if (/^wallet$|getCustomerWallet/.test(methodName)) return [value.customerId || value.id];
-      if (/rechargePreview|previewRecharge|rechargeInitiate|initiateRecharge/.test(methodName)) return [value.amount];
+      if (/rechargePreview|previewRecharge|rechargeInitiate|initiateRecharge/.test(methodName)) {
+        // The wallet API accepts the full request object so cart and active
+        // subscription context can be validated server-side. The API client
+        // still supports numeric amounts for legacy callers.
+        return [value && typeof value === 'object' ? value : value?.amount];
+      }
       if (/submitReview|postReview/.test(methodName)) {
         return [{
           order: value.order,
@@ -3722,17 +3727,20 @@
   function subscriptionNextDate(subscription) {
     const upcoming = firstValue(subscription.next_delivery, subscription.upcoming_delivery, subscription.next_order);
     return firstValue(
+      subscription.next_delivery_date,
+      subscription.next_available_delivery_date,
+      subscription.next_delivery_date_after_vacation,
+      subscription.after_vacation_next_delivery_date,
       upcoming?.delivery_date,
       upcoming?.date,
-      subscription.next_delivery_date,
       subscription.delivery_date,
       subscription.start_date
     );
   }
 
-  // Keep vacation date changes visible immediately, even while the live
-  // subscription schedule is being refreshed. A weekly delivery that falls
-  // inside a pause window moves to the first weekly cycle after the end date.
+  // Date arithmetic belongs to the subscription service. These helpers only
+  // normalise dates for display/comparison; the UI never invents a new weekly
+  // delivery date locally.
   function calendarDate(value) {
     const raw = String(value || '').trim();
     const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -3745,53 +3753,10 @@
     return `${year}-${month}-${day}`;
   }
 
-  function addCalendarDays(value, days) {
-    const key = calendarDate(value);
-    if (!key) return '';
-    const [year, month, day] = key.split('-').map(Number);
-    const date = new Date(year, month - 1, day, 12, 0, 0, 0);
-    date.setDate(date.getDate() + Number(days || 0));
-    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
-  }
-
-  function nextDateAfterVacation(nextDate, vacation) {
-    let next = calendarDate(nextDate);
-    const start = calendarDate(firstValue(vacation?.start_date, vacation?.pause_from));
-    const end = calendarDate(firstValue(vacation?.end_date, vacation?.resume_at));
-    if (!next || !start || !end || end < start) return next;
-    if (next >= start && next <= end) {
-      do {
-        next = addCalendarDays(next, 7);
-      } while (next && next <= end);
-    }
-    return next;
-  }
-
-  function vacationAppliesToSubscription(vacation, subscription) {
-    const relation = firstValue(
-      vacation?.subscription,
-      vacation?.subscription_id,
-      vacation?.subscription_plan,
-      vacation?.subscription_plan_id,
-      vacation?.plan_id
-    );
-    if (relation === undefined || relation === null || relation === '') return true;
-    return String(idOf(relation)) === String(subscriptionId(subscription));
-  }
-
-  function subscriptionNextDateWithVacation(subscription, extraVacation = null) {
-    let next = calendarDate(subscriptionNextDate(subscription));
-    if (!next) return '';
-    const vacations = [
-      ...(Array.isArray(state.vacations) ? state.vacations : []),
-      ...(extraVacation ? [extraVacation] : [])
-    ]
-      .filter((vacation) => vacation && vacation.is_active !== false && vacationAppliesToSubscription(vacation, subscription))
-      .sort((a, b) => calendarDate(firstValue(a.start_date, a.pause_from)).localeCompare(calendarDate(firstValue(b.start_date, b.pause_from))));
-    vacations.forEach((vacation) => {
-      next = nextDateAfterVacation(next, vacation);
-    });
-    return next;
+  function subscriptionNextDateWithVacation(subscription) {
+    // The refreshed subscription (or the mutation response) contains the
+    // server-authoritative next_delivery_date after skip/vacation changes.
+    return subscriptionNextDate(subscription);
   }
 
   function subscriptionStatus(subscription) {
@@ -4005,6 +3970,13 @@
           ? summary.skipped_deliveries
               .filter((delivery) => delivery.can_unskip !== false)
               .map((delivery) => ({ ...delivery, is_skipped: true }))
+          : []),
+        ...(Array.isArray(summary.skipped_dates)
+          ? summary.skipped_dates.map((entry) => ({
+              ...(entry && typeof entry === 'object' ? entry : { delivery_date: entry }),
+              is_skipped: true,
+              skipped: true
+            }))
           : [])
       ].forEach((delivery) => {
         const date = String(firstValue(delivery.delivery_date, delivery.date, delivery.scheduled_date, ''));
@@ -4176,15 +4148,29 @@
       setButtonBusy(control, true, 'Updating…');
       const payload = { id, subscriptionId: id, subPlanId: id, delivery_date: deliveryDate, deliveryDate };
       try {
-        await apiCall('subscriptions', currentlySkipped ? ['unskip', 'unskipDelivery'] : ['skip', 'skipDelivery'], payload, {
+        const result = await apiCall('subscriptions', currentlySkipped ? ['unskip', 'unskipDelivery'] : ['skip', 'skipDelivery'], payload, {
           path: `/subscription/subscription_plan/${id}/${currentlySkipped ? 'unskip' : 'skip'}/`,
           method: 'POST',
           form: { delivery_date: deliveryDate }
         });
+        const data = responseData(result);
+        const responseSource = [data, data?.subscription, data?.plan]
+          .find((source) => source && typeof source === 'object') || data;
+        const nextDeliveryDate = firstValue(
+          responseSource?.next_delivery_date,
+          responseSource?.next_available_delivery_date,
+          data?.next_delivery_date,
+          data?.next_available_delivery_date
+        );
+        const skippedDates = firstValue(responseSource?.skipped_dates, data?.skipped_dates);
+        if (nextDeliveryDate) subscription.next_delivery_date = nextDeliveryDate;
+        if (Array.isArray(skippedDates)) subscription.skipped_dates = skippedDates;
         closeDialog();
         state.loaded.delete('subscriptions');
-        showToast(currentlySkipped ? 'The delivery is back on your schedule.' : 'That delivery has been skipped.');
-        renderSubscriptions(true);
+        await renderSubscriptions(true);
+        showToast(nextDeliveryDate
+          ? `${currentlySkipped ? 'The delivery is back on your schedule' : 'That delivery has been skipped'}. Next delivery: ${formatDate(nextDeliveryDate)}.`
+          : (currentlySkipped ? 'The delivery is back on your schedule.' : 'That delivery has been skipped.'));
       } catch (error) {
         showToast(friendlyError(error), 'error');
         setButtonBusy(control, false);
@@ -4260,15 +4246,7 @@
         vacationPreview.textContent = 'Your next delivery will be confirmed after the pause is saved.';
         return;
       }
-      const scheduled = subscriptionNextDate(selected);
-      const shifted = nextDateAfterVacation(scheduled, { start_date: start.value, end_date: end.value });
-      if (!scheduled) {
-        vacationPreview.textContent = 'Your next delivery will be confirmed after the pause is saved.';
-      } else if (calendarDate(scheduled) !== shifted) {
-        vacationPreview.textContent = `The ${formatDate(scheduled)} delivery falls during this pause and will move to ${formatDate(shifted)}.`;
-      } else {
-        vacationPreview.textContent = `Your next delivery on ${formatDate(scheduled)} is outside this pause and will stay scheduled.`;
-      }
+      vacationPreview.textContent = 'The live service will recalculate skipped dates and your next delivery after these dates are saved.';
     }
     subscriptionSelect?.addEventListener('change', updateVacationPreview);
     updateVacationPreview();
@@ -4293,7 +4271,7 @@
         end_date: end.value
       };
       try {
-        await apiCall('subscriptions', vacation ? ['updateVacation', 'patchCustomerVacation'] : ['createVacation', 'setCustomerVacation'], payload, {
+        const result = await apiCall('subscriptions', vacation ? ['updateVacation', 'patchCustomerVacation'] : ['createVacation', 'setCustomerVacation'], payload, {
           path: vacation ? `/subscription/vacation/${vacationId}/` : '/subscription/vacation/',
           method: vacation ? 'PATCH' : 'POST',
           form: {
@@ -4302,10 +4280,28 @@
             end_date: payload.end_date
           }
         });
+        const data = responseData(result);
+        const selected = previewSubscription();
+        const responseSource = [data, data?.subscription, data?.plan]
+          .find((source) => source && typeof source === 'object') || data;
+        const nextDeliveryDate = firstValue(
+          responseSource?.next_delivery_date,
+          responseSource?.next_available_delivery_date,
+          data?.next_delivery_date,
+          data?.next_available_delivery_date
+        );
+        const skippedDates = firstValue(
+          responseSource?.skipped_dates,
+          data?.skipped_dates
+        );
+        if (selected && nextDeliveryDate) selected.next_delivery_date = nextDeliveryDate;
+        if (selected && Array.isArray(skippedDates)) selected.skipped_dates = skippedDates;
         closeDialog();
         state.loaded.delete('subscriptions');
-        showToast(vacation ? 'Your vacation dates have been updated.' : 'Vacation mode has been scheduled.');
-        renderSubscriptions(true);
+        await renderSubscriptions(true);
+        showToast(nextDeliveryDate
+          ? `${vacation ? 'Vacation dates updated' : 'Vacation mode scheduled'}. Next delivery: ${formatDate(nextDeliveryDate)}.`
+          : (vacation ? 'Your vacation dates have been updated.' : 'Vacation mode has been scheduled.'));
       } catch (error) {
         showToast(friendlyError(error), 'error');
         setButtonBusy(submit, false);
@@ -4795,7 +4791,7 @@
       areaLabel.hidden = false;
       areaLabel.inert = false;
       if (result?.city && cityInput) cityInput.value = result.city;
-      if (result?.state && stateInput && !stateInput.value.trim()) stateInput.value = result.state;
+      if (result?.state && stateInput) stateInput.value = result.state;
       return selected;
     };
     const clearServiceabilityError = () => {
@@ -4827,7 +4823,7 @@
       }
       verifiedPincode = `${pincode}|${area}`;
       if (data.city && cityInput) cityInput.value = data.city;
-      if (data.state && stateInput && !stateInput.value.trim()) stateInput.value = data.state;
+      if (data.state && stateInput) stateInput.value = data.state;
       showAreaLookupNotice(
         'Fresh-batch delivery is available',
         `${data.city || 'This area'}, ${pincode} is served by Atulyash. Choose the locality below to complete the address.`,
@@ -4901,6 +4897,7 @@
       clearServiceabilityError();
       // A city from the previous PIN must never be submitted with this one.
       if (cityInput) cityInput.value = '';
+      if (stateInput) stateInput.value = '';
       // Clear areas returned for the previous PIN before starting a new lookup.
       resetAreaOptions();
       void lookupAreaFromPincode();
@@ -5149,9 +5146,35 @@
     elements.previewRechargeButton.hidden = false;
   }
 
+  function walletRechargeRequestPayload(amount) {
+    const payload = { amount: Math.max(1, Math.ceil(numberFrom(amount))) };
+    const activeSession = client()?.getSession?.() || {};
+    const cartId = firstValue(activeSession.cartId, activeSession.cart_id);
+    if (cartId != null && cartId !== '') payload.cart_id = cartId;
+    const activeSubscription = state.subscriptions.find((subscription) => (
+      subscription && subscription.is_active !== false
+    ));
+    const subscriptionPlanId = activeSubscription ? subscriptionId(activeSubscription) : null;
+    if (subscriptionPlanId != null && subscriptionPlanId !== '') {
+      payload.subscription_plan_id = subscriptionPlanId;
+    }
+    return payload;
+  }
+
+  function authoritativeRechargeAmount(payload, fallback) {
+    const value = firstValue(
+      payload?.minimum_recharge_amount,
+      payload?.recharge_amount,
+      payload?.amount,
+      fallback
+    );
+    const amount = numberFrom(value);
+    return Number.isFinite(amount) && amount > 0 ? Math.ceil(amount) : Math.max(1, Math.ceil(numberFrom(fallback)));
+  }
+
   function renderRechargePreview(preview, amount) {
     const data = responseData(preview);
-    const rechargeValue = firstValue(data.recharge_amount, data.amount, amount);
+    const rechargeValue = firstValue(data.minimum_recharge_amount, data.recharge_amount, data.amount, amount);
     const bonus = firstValue(
       data.bonus_amount,
       data.prepaid_advantage_amount,
@@ -5202,13 +5225,17 @@
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.previewRechargeButton, true, 'Preparing preview…');
     try {
-      const result = await apiCall('misc', ['rechargePreview', 'previewRecharge'], { amount }, {
+      const request = walletRechargeRequestPayload(amount);
+      const result = await apiCall('misc', ['rechargePreview', 'previewRecharge'], request, {
         path: '/customers/customer-wallet/recharge/preview/',
         method: 'POST',
-        form: { amount }
+        form: request
       });
-      state.walletPreview = responseData(result);
-      renderRechargePreview(result, amount);
+      const payload = responseData(result);
+      const serverAmount = authoritativeRechargeAmount(payload, amount);
+      state.walletPreview = { ...payload, minimum_recharge_amount: serverAmount };
+      if (elements.rechargeAmount) elements.rechargeAmount.value = String(serverAmount);
+      renderRechargePreview(payload, serverAmount);
     } catch (error) {
       showToast(friendlyError(error), 'error');
     } finally {
@@ -5259,7 +5286,8 @@
     ]));
     const orderPaise = numberFrom(order?.amount);
     const responseRupees = Number(firstAccountRazorpayValue(payload, [
-      'payable_amount', 'amount_to_pay', 'final_amount', 'total_amount'
+      'minimum_recharge_amount', 'recharge_amount', 'payable_amount',
+      'amount_to_pay', 'final_amount', 'total_amount'
     ]));
     const previewRupees = Number(firstValue(
       state.walletPreview?.payable_amount,
@@ -5289,14 +5317,15 @@
   }
 
   async function initiateRecharge() {
-    const amount = numberFrom(elements.rechargeAmount.value);
+    const amount = authoritativeRechargeAmount(state.walletPreview, elements.rechargeAmount.value);
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.initiateRechargeButton, true, 'Starting payment…');
     try {
-      const result = await apiCall('misc', ['rechargeInitiate', 'initiateRecharge'], { amount }, {
+      const request = walletRechargeRequestPayload(amount);
+      const result = await apiCall('misc', ['rechargeInitiate', 'initiateRecharge'], request, {
         path: '/customers/customer-wallet/recharge/initiate/',
         method: 'POST',
-        form: { amount }
+        form: request
       });
       const config = accountWalletRechargeConfiguration(result, amount);
 

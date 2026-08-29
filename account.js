@@ -4292,16 +4292,24 @@
     const start = create('input');
     start.type = 'date';
     start.required = true;
-    start.min = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
     const savedStart = firstValue(vacation?.start_date, vacation?.pause_from);
     const savedEnd = firstValue(vacation?.end_date, vacation?.resume_at);
-    start.value = savedStart ? String(savedStart).slice(0, 10) : '';
+    const savedStartDate = String(savedStart || '').slice(0, 10);
+    // An active vacation may have started already. Keep its saved start date
+    // valid while editing so the browser does not silently block the submit
+    // because the value is earlier than today's minimum.
+    start.min = vacation && /^\d{4}-\d{2}-\d{2}$/.test(savedStartDate) && savedStartDate < localToday
+      ? savedStartDate
+      : localToday;
+    start.value = savedStartDate;
     startLabel.append(start);
     const endLabel = create('label', '', 'End date');
     const end = create('input');
     end.type = 'date';
     end.required = true;
-    end.min = start.min;
+    end.min = start.value || start.min;
     end.value = savedEnd ? String(savedEnd).slice(0, 10) : '';
     endLabel.append(end);
     start.addEventListener('change', () => {
@@ -4345,7 +4353,12 @@
       event.preventDefault();
       if (end.value < start.value) return showToast('The end date must be after the start date.', 'error');
       setButtonBusy(submit, true, 'Saving…');
-      const vacationId = firstValue(vacation?.id, vacation?.vacation_id);
+      const vacationId = firstValue(vacation?.id, vacation?.vacation_id, vacation?.pk);
+      if (vacation && vacationId == null) {
+        showToast('This pause could not be identified. Please refresh and try again.', 'error');
+        setButtonBusy(submit, false);
+        return;
+      }
       const payload = {
         id: vacationId,
         vacationId,

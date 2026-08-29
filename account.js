@@ -4063,6 +4063,11 @@
               : 'Your wallet does not currently cover this plan.'),
             create('small', '', 'No plan change will be applied until the required wallet balance is available.')
           );
+          if (shortfall !== null && shortfall > 0.005) {
+            const rechargeActions = create('div', 'dialog-actions');
+            rechargeActions.append(button(`Recharge ${formatMoney(shortfall)} →`, 'primary-button', () => openWalletRecharge(shortfall)));
+            previewPanel.append(rechargeActions);
+          }
         }
         updatePackChangeSubmitState();
       };
@@ -5481,6 +5486,22 @@
     elements.rechargePreview.replaceChildren();
     elements.initiateRechargeButton.hidden = true;
     elements.previewRechargeButton.hidden = false;
+  }
+
+  function openWalletRecharge(amount) {
+    const rechargeAmount = Math.ceil(numberFrom(amount));
+    if (!Number.isFinite(rechargeAmount) || rechargeAmount <= 0) return;
+    closeDialog();
+    showView('wallet');
+    resetRechargePreview();
+    elements.rechargeAmount.value = String(rechargeAmount);
+    window.setTimeout(() => {
+      elements.rechargeAmount.focus({ preventScroll: true });
+      elements.rechargeAmount.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'center'
+      });
+    }, 80);
   }
 
   function walletRechargeRequestPayload(amount) {

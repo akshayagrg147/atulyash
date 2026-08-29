@@ -3905,7 +3905,7 @@
       const currentPack = firstValue(subscription.subscription_pack, subscription.pack, {});
       const currentPackId = firstValue(currentPack?.id, subscription.subscription_pack_id, subscription.pack_id);
       const form = create('form', 'dialog-form');
-      form.append(create('p', 'dialog-copy', 'Choose the amount you want in each weekly fresh batch. Your revised plan is confirmed by the secure subscription service.'));
+      form.append(create('p', 'dialog-copy', 'Choose the amount you want in each weekly fresh batch. Atulyash will recalculate the wallet requirement before you confirm.'));
       const label = create('label', '', 'Weekly quantity');
       const select = create('select');
       select.required = true;
@@ -3916,17 +3916,225 @@
         select.append(option);
       });
       label.append(select);
+      const previewPanel = create('section', 'modification-preview pack-change-preview');
+      previewPanel.setAttribute('aria-live', 'polite');
+      previewPanel.setAttribute('aria-label', 'Weekly plan and wallet preview');
       const actions = create('div', 'dialog-actions');
       actions.append(button('Keep current plan', 'secondary-button', closeDialog));
       const submit = create('button', 'primary-button', 'Update weekly plan →');
       submit.type = 'submit';
       actions.append(submit);
-      form.append(label, actions);
+      form.append(label, previewPanel, actions);
+
+      let latestPreview = null;
+      let latestPreviewPackId = '';
+      let previewRequestId = 0;
+      let submitBusy = false;
+
+      const walletCoverage = (canStartValue, shortfall) => {
+        const hasServerDecision = canStartValue !== undefined && canStartValue !== null && canStartValue !== '';
+        if (hasServerDecision) return canStartValue === true || String(canStartValue).toLowerCase() === 'true';
+        return shortfall !== null && shortfall <= 0.005;
+      };
+
+      const previewPlan = (plan) => {
+        const source = plan && typeof plan === 'object' ? plan : {};
+        const quantity = firstValue(
+          source.quantity_per_week,
+          source.weekly_quantity,
+          source.quantity,
+          source.weekly_kg
+        );
+        const quantityNumber = quantityKg(quantity);
+        const quantityText = quantityNumber !== null
+          ? `${bagWeightLabel(quantityNumber)} kg/week`
+          : quantity ? String(quantity) : 'Quantity not supplied';
+        const price = finiteMoney(source.price_per_month, source.monthly_price, source.price, source.amount);
+        return {
+          quantityText,
+          price,
+          priceText: price === null ? 'Monthly price not supplied' : `${formatMoney(price)} per month`
+        };
+      };
+
+      const renderPackChangePreview = (preview, stateName = 'idle', message = '') => {
+        previewPanel.replaceChildren();
+        previewPanel.classList.toggle('is-error', stateName === 'error');
+        const header = create('div', 'modification-preview-header');
+        header.append(
+          create('div', 'modification-preview-eyebrow', 'Server wallet preview'),
+          create('strong', '', stateName === 'loading' ? 'Recalculating this plan…' : 'Review the wallet requirement')
+        );
+        previewPanel.append(header);
+
+        if (stateName === 'loading') {
+          previewPanel.append(create('p', 'modification-preview-message', 'Checking the selected quantity, four-delivery cover and your current wallet balance.'));
+          updatePackChangeSubmitState();
+          return;
+        }
+        if (stateName === 'error') {
+          previewPanel.append(
+            create('p', 'modification-preview-message', message || 'The live plan preview could not be loaded.'),
+            create('small', '', 'No plan change was made. Try selecting the plan again or contact Atulyash care.')
+          );
+          updatePackChangeSubmitState();
+          return;
+        }
+        if (!preview) {
+          previewPanel.append(
+            create('p', 'modification-preview-message', 'Select a different weekly quantity to see its live price and wallet requirement.'),
+            create('small', '', 'The selected plan is not changed until you confirm after this preview.')
+          );
+          updatePackChangeSubmitState();
+          return;
+        }
+
+        const data = preview && typeof preview === 'object' ? preview : {};
+        const existing = previewPlan(data.existing_plan || data.current_plan || data.previous_plan);
+        const revised = previewPlan(data.new_plan || data.revised_plan || data.next_plan);
+        const funding = data.wallet_funding || data.wallet_impact || data.wallet || {};
+        const available = finiteMoney(funding.available_balance, data.available_balance);
+        const required = finiteMoney(
+          funding.minimum_wallet_required,
+          funding.gross_wallet_required,
+          data.minimum_wallet_required,
+          data.gross_wallet_required
+        );
+        const perDelivery = finiteMoney(funding.price_per_delivery, data.price_per_delivery);
+        const deliveries = firstValue(funding.minimum_deliveries_required, data.minimum_deliveries_required);
+        const shortfall = finiteMoney(funding.shortfall, data.shortfall);
+        const canStartValue = firstValue(funding.can_start_subscription, data.can_start_subscription);
+        const walletCovered = walletCoverage(canStartValue, shortfall);
+
+        const figures = create('div', 'modification-preview-figures');
+        const addFigure = (labelText, value, detailText = '', className = '') => {
+          const figure = create('div', `modification-preview-figure${className ? ` ${className}` : ''}`);
+          figure.append(create('span', '', labelText), create('strong', '', value));
+          if (detailText) figure.append(create('small', '', detailText));
+          figures.append(figure);
+        };
+        addFigure('Current plan', existing.quantityText, existing.priceText);
+        addFigure('New plan', revised.quantityText, revised.priceText, 'is-primary');
+        if (available !== null) addFigure('Wallet available', formatMoney(available));
+        if (required !== null) {
+          const requirementDetail = [
+            deliveries ? `${deliveries} deliveries` : null,
+            perDelivery !== null ? `${formatMoney(perDelivery)} per delivery` : null
+          ].filter(Boolean).join(' · ');
+          addFigure('Wallet required', formatMoney(required), requirementDetail);
+        }
+        if (shortfall !== null && shortfall > 0.005) {
+          addFigure('Additional recharge', formatMoney(shortfall), 'Add this amount before confirming.', 'is-due');
+        }
+        previewPanel.append(figures);
+
+        if (walletCovered) {
+          previewPanel.append(
+            create('p', 'modification-preview-message', 'Your wallet covers this plan. Confirm to apply the new pack to future deliveries.'),
+            create('small', '', 'Already charged or delivered records remain unchanged.')
+          );
+          previewPanel.classList.remove('is-error');
+        } else {
+          previewPanel.classList.add('is-error');
+          previewPanel.append(
+            create('p', 'modification-preview-message', shortfall !== null && shortfall > 0.005
+              ? `Add ${formatMoney(shortfall)} to your wallet before confirming this plan.`
+              : 'Your wallet does not currently cover this plan.'),
+            create('small', '', 'No plan change will be applied until the required wallet balance is available.')
+          );
+        }
+        updatePackChangeSubmitState();
+      };
+
+      function updatePackChangeSubmitState() {
+        const changed = currentPackId == null || String(select.value) !== String(currentPackId);
+        const previewMatchesSelection = latestPreview && latestPreviewPackId === String(select.value);
+        const funding = previewMatchesSelection
+          ? (latestPreview.wallet_funding || latestPreview.wallet_impact || latestPreview.wallet || {})
+          : {};
+        const shortfall = previewMatchesSelection ? finiteMoney(funding.shortfall, latestPreview.shortfall) : null;
+        const canStartValue = previewMatchesSelection
+          ? firstValue(funding.can_start_subscription, latestPreview.can_start_subscription)
+          : null;
+        const walletCovered = walletCoverage(canStartValue, shortfall);
+        submit.disabled = submitBusy || !changed || !previewMatchesSelection || !walletCovered;
+      }
+
+      const requestPackChangePreview = async ({ silent = false } = {}) => {
+        const new_pack_id = select.value;
+        const requestId = ++previewRequestId;
+        latestPreview = null;
+        latestPreviewPackId = '';
+        if (!new_pack_id || String(new_pack_id) === String(currentPackId)) {
+          renderPackChangePreview(null);
+          return true;
+        }
+        renderPackChangePreview(null, 'loading');
+        try {
+          const result = await apiCall('subscriptions', ['previewChange'], {
+            id,
+            subscriptionId: id,
+            subPlanId: id,
+            new_pack_id
+          }, {
+            path: `/subscription/subscription_plan/${id}/preview-pack-change/`,
+            method: 'POST',
+            form: { new_pack_id }
+          });
+          if (requestId !== previewRequestId) return false;
+          latestPreview = responseData(result);
+          latestPreviewPackId = String(new_pack_id);
+          renderPackChangePreview(latestPreview);
+          return true;
+        } catch (error) {
+          if (requestId !== previewRequestId) return false;
+          latestPreview = null;
+          latestPreviewPackId = '';
+          renderPackChangePreview(null, 'error', friendlyError(error, 'The live plan preview could not be loaded.'));
+          if (!silent) showToast(friendlyError(error, 'The plan preview could not be loaded.'), 'error');
+          return false;
+        }
+      };
+
+      select.addEventListener('change', () => {
+        void requestPackChangePreview();
+      });
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        setButtonBusy(submit, true, 'Updating…');
+        const new_pack_id = select.value;
+        if (!new_pack_id || String(new_pack_id) === String(currentPackId)) {
+          showToast('Choose a different weekly plan before updating.', 'error');
+          return;
+        }
+        setButtonBusy(submit, true, 'Checking wallet…');
+        submitBusy = true;
+        updatePackChangeSubmitState();
         try {
-          const new_pack_id = select.value;
+          if (!latestPreview || latestPreviewPackId !== String(new_pack_id)) {
+            const previewReady = await requestPackChangePreview();
+            if (!previewReady || !latestPreview) {
+              showToast('The live plan preview is unavailable. No changes were saved.', 'error');
+              submitBusy = false;
+              setButtonBusy(submit, false);
+              updatePackChangeSubmitState();
+              return;
+            }
+          }
+          const funding = latestPreview.wallet_funding || latestPreview.wallet_impact || latestPreview.wallet || {};
+          const shortfall = finiteMoney(funding.shortfall, latestPreview.shortfall);
+          const canStartValue = firstValue(funding.can_start_subscription, latestPreview.can_start_subscription);
+          const walletCovered = walletCoverage(canStartValue, shortfall);
+          if (!walletCovered || (shortfall !== null && shortfall > 0.005)) {
+            renderPackChangePreview(latestPreview);
+            showToast(shortfall !== null && shortfall > 0.005
+              ? `Add ${formatMoney(shortfall)} to your wallet before confirming.`
+              : 'Your wallet does not cover this plan yet.', 'error');
+            submitBusy = false;
+            setButtonBusy(submit, false);
+            updatePackChangeSubmitState();
+            return;
+          }
+          setButtonBusy(submit, true, 'Updating…');
           await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
             path: `/subscription/subscription_plan/${id}/update-pack/`,
             method: 'POST',
@@ -3935,12 +4143,21 @@
           closeDialog();
           state.loaded.delete('subscriptions');
           showToast('Your weekly plan has been updated.');
-          renderSubscriptions(true);
+          await renderSubscriptions(true);
         } catch (error) {
           showToast(friendlyError(error), 'error');
+          const errorData = responseData(error?.data || error?.response?.data || error?.body);
+          if (errorData && typeof errorData === 'object' && (errorData.code || errorData.shortfall != null)) {
+            latestPreview = { ...latestPreview, ...errorData };
+            latestPreviewPackId = String(new_pack_id);
+            renderPackChangePreview(latestPreview, 'error', friendlyError(error));
+          }
+          submitBusy = false;
           setButtonBusy(submit, false);
+          updatePackChangeSubmitState();
         }
       });
+      renderPackChangePreview(null);
       elements.dialogBody.replaceChildren(form);
     } catch (error) {
       elements.dialogBody.replaceChildren(makeState('error', 'Weekly plans are unavailable.', friendlyError(error), () => openChangeSubscriptionPlan(subscription)));

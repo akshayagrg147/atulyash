@@ -3078,6 +3078,18 @@ select {
   line-height: 1.5;
 }
 
+.pack-change-submit:disabled {
+  color: var(--muted);
+  background: var(--cream-100);
+  border-color: var(--line);
+  opacity: 1;
+}
+
+.pack-change-submit:disabled:hover {
+  background: var(--cream-100);
+  transform: none;
+}
+
 .dialog-summary {
   display: grid;
   gap: 1px;

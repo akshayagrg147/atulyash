@@ -3933,7 +3933,7 @@
       previewPanel.setAttribute('aria-label', 'Weekly plan and wallet preview');
       const actions = create('div', 'dialog-actions');
       actions.append(button('Keep current plan', 'secondary-button', closeDialog));
-      const submit = create('button', 'primary-button', 'Update weekly plan →');
+      const submit = create('button', 'primary-button pack-change-submit', 'Update weekly plan →');
       submit.type = 'submit';
       actions.append(submit);
       form.append(label, previewPanel, actions);

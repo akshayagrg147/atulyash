@@ -1363,6 +1363,9 @@
       if (/unsupported operand type|nonetype.*int|typeerror/i.test(safeMessage)) {
         return 'This change could not be completed right now. Please choose a future delivery date and try again.';
       }
+      if (/cannot reverse postpone|vacation start date is past cutoff/i.test(safeMessage)) {
+        return 'This vacation has already started, so its start date cannot be moved. You can still change the end date.';
+      }
       return safeMessage;
     }
     return fallback;
@@ -4590,6 +4593,7 @@
     const savedStart = firstValue(vacation?.start_date, vacation?.pause_from);
     const savedEnd = firstValue(vacation?.end_date, vacation?.resume_at);
     const savedStartDate = String(savedStart || '').slice(0, 10);
+    const vacationStarted = Boolean(vacation && /^\d{4}-\d{2}-\d{2}$/.test(savedStartDate) && savedStartDate <= localToday);
     // An active vacation may have started already. Keep its saved start date
     // valid while editing so the browser does not silently block the submit
     // because the value is earlier than today's minimum.
@@ -4597,6 +4601,10 @@
       ? savedStartDate
       : localToday;
     start.value = savedStartDate;
+    if (vacationStarted) {
+      start.disabled = true;
+      start.setAttribute('aria-describedby', 'vacation-start-lock-note');
+    }
     startLabel.append(start);
     const endLabel = create('label', '', 'End date');
     const end = create('input');
@@ -4614,6 +4622,10 @@
     dates.append(startLabel, endLabel);
 
     const vacationPreview = create('p', 'vacation-preview');
+    if (vacationStarted) {
+      vacationPreview.id = 'vacation-start-lock-note';
+      vacationPreview.textContent = 'This vacation has already started. Its start date is locked; only the end date can be changed.';
+    }
     const previewSubscription = () => {
       if (subscription) return subscription;
       const relation = firstValue(
@@ -4626,6 +4638,10 @@
       return state.subscriptions.find((item) => relation != null && String(idOf(relation)) === String(subscriptionId(item))) || state.subscriptions[0];
     };
     function updateVacationPreview() {
+      if (vacationStarted) {
+        vacationPreview.textContent = 'This vacation has already started. Its start date is locked; only the end date can be changed.';
+        return;
+      }
       const selected = previewSubscription();
       if (!start.value || !end.value || !selected) {
         vacationPreview.textContent = 'Your next delivery will be confirmed after the pause is saved.';
@@ -4645,6 +4661,11 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (end.value < start.value) return showToast('The end date must be after the start date.', 'error');
+      if (vacationStarted && start.value !== savedStartDate) {
+        showToast('This vacation has already started, so its start date cannot be moved. You can still change the end date.', 'error');
+        setButtonBusy(submit, false);
+        return;
+      }
       setButtonBusy(submit, true, 'Saving…');
       const vacationId = firstValue(vacation?.id, vacation?.vacation_id, vacation?.pk);
       if (vacation && vacationId == null) {

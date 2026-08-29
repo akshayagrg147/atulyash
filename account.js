@@ -3838,6 +3838,26 @@
     return continuous !== false && String(continuous).toLowerCase() !== 'false';
   }
 
+  function vacationCoveringDate(subscription, date) {
+    const targetDate = calendarDate(date);
+    if (!targetDate) return null;
+    const planId = subscriptionId(subscription);
+    return state.vacations.find((vacation) => {
+      const relation = firstValue(
+        vacation?.subscription,
+        vacation?.subscription_id,
+        vacation?.subscription_plan,
+        vacation?.subscription_plan_id,
+        vacation?.plan_id
+      );
+      const relationId = relation && typeof relation === 'object' ? idOf(relation) : relation;
+      if (relationId != null && planId != null && String(relationId) !== String(planId)) return false;
+      const startDate = calendarDate(firstValue(vacation?.start_date, vacation?.pause_from));
+      const endDate = calendarDate(firstValue(vacation?.end_date, vacation?.resume_at));
+      return Boolean(startDate && endDate && targetDate >= startDate && targetDate <= endDate);
+    }) || null;
+  }
+
   function makeSubscriptionCard(subscription) {
     const card = create('article', 'subscription-card');
     const head = create('div', 'subscription-card-head');
@@ -4354,8 +4374,8 @@
       );
       const body = create('div');
       body.append(create('p', 'dialog-copy', remainingSkips === null
-        ? 'Skip or restore an eligible upcoming delivery here. Showing the next four available dates; the live service confirms the effective date before anything changes.'
-        : `Skip or restore an eligible upcoming delivery here. Showing the next ${upcomingSkipLimit} available date${upcomingSkipLimit === 1 ? '' : 's'} based on your remaining skips; the live service confirms the effective date before anything changes.`));
+        ? 'Skip or restore an eligible upcoming delivery here. Showing the next four available dates; dates covered by vacation are managed from your vacation settings.'
+        : `Skip or restore an eligible upcoming delivery here. Showing the next ${upcomingSkipLimit} available date${upcomingSkipLimit === 1 ? '' : 's'} based on your remaining skips; dates covered by vacation are managed from your vacation settings.`));
       if (Object.keys(summary).length) {
         const summaryBox = create('div', 'dialog-summary');
         [
@@ -4379,12 +4399,15 @@
             delivery.skipped,
             /skip/i.test(String(delivery.delivery_status || delivery.status || ''))
           ));
+          const vacation = skipped ? vacationCoveringDate(subscription, date) : null;
           const row = create('div', 'delivery-option');
           const copy = create('div');
-          copy.append(create('p', '', formatDate(date)), create('span', '', skipped ? 'Currently skipped' : 'Scheduled delivery'));
-          const action = button(skipped ? 'Restore delivery' : 'Skip this date', `card-action${skipped ? '' : ' is-rust'}`, () => {
-            confirmDeliveryChange(subscription, date, skipped);
-          });
+          copy.append(create('p', '', formatDate(date)), create('span', '', vacation ? 'Paused by vacation' : skipped ? 'Currently skipped' : 'Scheduled delivery'));
+          const action = vacation
+            ? button('Edit pause dates', 'card-action', () => openVacationForm(null, vacation))
+            : button(skipped ? 'Restore delivery' : 'Skip this date', `card-action${skipped ? '' : ' is-rust'}`, () => {
+                confirmDeliveryChange(subscription, date, skipped);
+              });
           row.append(copy, action);
           list.append(row);
         });

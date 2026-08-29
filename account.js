@@ -3756,7 +3756,7 @@
   }
 
   function subscriptionId(subscription) {
-    return firstValue(subscription.id, subscription.subscription_plan_id, subscription.plan_id, subscription.pk);
+    return firstValue(subscription?.id, subscription?.subscription_plan_id, subscription?.plan_id, subscription?.pk);
   }
 
   function subscriptionCatalogPlan(subscription) {
@@ -4652,11 +4652,28 @@
         setButtonBusy(submit, false);
         return;
       }
+      const selectedSubscription = previewSubscription();
+      const selectedSubscriptionId = subscriptionId(selectedSubscription);
+      const vacationSubscription = vacation
+        ? firstValue(
+            vacation.subscription,
+            vacation.subscription_id,
+            vacation.subscription_plan,
+            vacation.subscription_plan_id,
+            vacation.plan_id,
+            selectedSubscriptionId
+          )
+        : subscriptionSelect?.value;
+      if (!vacationSubscription) {
+        showToast('This pause is not linked to an active weekly plan. Please refresh and try again.', 'error');
+        setButtonBusy(submit, false);
+        return;
+      }
       const payload = {
         id: vacationId,
         vacationId,
-        subscription: vacation ? firstValue(vacation.subscription, subscriptionId(subscription)) : subscriptionSelect.value,
-        subscriptionId: vacation ? firstValue(vacation.subscription, subscriptionId(subscription)) : subscriptionSelect.value,
+        subscription: vacationSubscription,
+        subscriptionId: vacationSubscription,
         start_date: start.value,
         end_date: end.value
       };
@@ -4671,7 +4688,6 @@
           }
         });
         const data = responseData(result);
-        const selected = previewSubscription();
         const responseSource = [data, data?.subscription, data?.plan]
           .find((source) => source && typeof source === 'object') || data;
         const nextDeliveryDate = firstValue(
@@ -4684,8 +4700,8 @@
           responseSource?.skipped_dates,
           data?.skipped_dates
         );
-        if (selected && nextDeliveryDate) selected.next_delivery_date = nextDeliveryDate;
-        if (selected && Array.isArray(skippedDates)) selected.skipped_dates = skippedDates;
+        if (selectedSubscription && nextDeliveryDate) selectedSubscription.next_delivery_date = nextDeliveryDate;
+        if (selectedSubscription && Array.isArray(skippedDates)) selectedSubscription.skipped_dates = skippedDates;
         closeDialog();
         state.loaded.delete('subscriptions');
         await renderSubscriptions(true);

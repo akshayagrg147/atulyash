@@ -3298,6 +3298,7 @@ select {
   right: 24px;
   bottom: 24px;
   max-width: min(390px, calc(100% - 48px));
+  width: max-content;
   padding: 14px 18px;
   border-left: 3px solid var(--wheat-400);
   color: var(--cream-50);
@@ -3305,6 +3306,9 @@ select {
   box-shadow: var(--shadow);
   font-size: .73rem;
   font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
   animation: toast-in 200ms ease both;
 }
 
@@ -3320,6 +3324,7 @@ select {
   bottom: auto;
   z-index: 1000;
   max-width: min(430px, calc(100vw - 48px));
+  width: min(430px, calc(100vw - 48px));
 }
 
 @keyframes toast-in {

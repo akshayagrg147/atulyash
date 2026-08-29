@@ -4292,6 +4292,16 @@
       ]);
       if (deliveriesResult.status === 'rejected') throw deliveriesResult.reason;
       const summary = summaryResult.status === 'fulfilled' ? responseData(summaryResult.value) : {};
+      const remainingSkips = firstFinite(
+        summary.remaining,
+        summary.skips_remaining,
+        summary.remaining_skips,
+        summary.available,
+        summary.skips_available
+      );
+      const upcomingSkipLimit = remainingSkips === null
+        ? 4
+        : Math.max(0, Math.min(4, Math.floor(remainingSkips)));
       const deliveriesByDate = new Map();
       [
         ...responseList(deliveriesResult.value),
@@ -4329,8 +4339,23 @@
           String(firstValue(b.delivery_date, b.date, ''))
         )
       );
+      const skippedDeliveries = deliveries.filter((delivery) => Boolean(firstValue(
+        delivery.is_skipped,
+        delivery.skipped,
+        /skip/i.test(String(delivery.delivery_status || delivery.status || ''))
+      )));
+      const scheduledDeliveries = deliveries
+        .filter((delivery) => !skippedDeliveries.includes(delivery))
+        .slice(0, upcomingSkipLimit);
+      const visibleDeliveries = [...skippedDeliveries, ...scheduledDeliveries].sort((a, b) =>
+        String(firstValue(a.delivery_date, a.date, '')).localeCompare(
+          String(firstValue(b.delivery_date, b.date, ''))
+        )
+      );
       const body = create('div');
-      body.append(create('p', 'dialog-copy', 'Skip or restore an eligible upcoming delivery here. You can also move future deliveries to another supported weekday; the live service will confirm the effective date before anything changes.'));
+      body.append(create('p', 'dialog-copy', remainingSkips === null
+        ? 'Skip or restore an eligible upcoming delivery here. Showing the next four available dates; the live service confirms the effective date before anything changes.'
+        : `Skip or restore an eligible upcoming delivery here. Showing the next ${upcomingSkipLimit} available date${upcomingSkipLimit === 1 ? '' : 's'} based on your remaining skips; the live service confirms the effective date before anything changes.`));
       if (Object.keys(summary).length) {
         const summaryBox = create('div', 'dialog-summary');
         [
@@ -4343,11 +4368,11 @@
         });
         body.append(summaryBox);
       }
-      if (!deliveries.length) {
+      if (!visibleDeliveries.length) {
         body.append(makeState('empty', 'No changeable dates right now.', 'Future delivery dates will appear here once they are within the allowed window.'));
       } else {
         const list = create('div', 'delivery-list');
-        deliveries.forEach((delivery) => {
+        visibleDeliveries.forEach((delivery) => {
           const date = firstValue(delivery.delivery_date, delivery.date, delivery.scheduled_date);
           const skipped = Boolean(firstValue(
             delivery.is_skipped,

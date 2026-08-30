@@ -1527,6 +1527,17 @@ select {
   line-height: 1.35;
 }
 
+.subscription-action-note.is-plan-locked {
+  max-width: 300px;
+  padding: 9px 11px;
+  border: 1px solid rgba(184, 79, 49, .2);
+  border-radius: 10px;
+  color: var(--rust-500);
+  background: rgba(255, 246, 239, .68);
+  font-size: .62rem;
+  font-weight: 700;
+}
+
 .address-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3001,6 +3012,12 @@ select {
   border-color: rgba(175, 67, 44, .34);
   border-left-color: var(--rust-500);
   background: rgba(175, 67, 44, .06);
+}
+
+.modification-preview.is-pending {
+  border-color: rgba(191, 148, 54, .42);
+  border-left-color: var(--gold-500, #c89f4d);
+  background: rgba(191, 148, 54, .08);
 }
 
 .modification-preview-header {
@@ -8471,6 +8488,80 @@ body.account-bag-open {
   line-height: 1.45;
 }
 
+.order-plan-change-summary {
+  margin: 0;
+  padding: 15px;
+  border: 1px solid rgba(184, 79, 49, .24);
+  border-radius: 10px;
+  background: rgba(255, 246, 239, .74);
+}
+
+.order-plan-change-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.order-plan-change-summary-copy {
+  color: var(--forest-950);
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.order-plan-change-summary-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--forest-800);
+  background: rgba(40, 100, 84, .1);
+  font-size: .52rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.order-plan-change-summary-intro {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: .64rem;
+  line-height: 1.55;
+}
+
+.order-plan-change-summary-grid {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(184, 79, 49, .16);
+}
+
+.order-plan-change-summary-row {
+  display: grid;
+  grid-template-columns: minmax(105px, .55fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(184, 79, 49, .12);
+}
+
+.order-plan-change-summary-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.order-plan-change-summary-row span {
+  color: var(--muted);
+  font-size: .59rem;
+  line-height: 1.4;
+}
+
+.order-plan-change-summary-row strong {
+  color: var(--forest-900);
+  font-size: .65rem;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .order-journey-timeline {
   position: relative;
   display: grid;
@@ -9060,6 +9151,42 @@ body.account-bag-open {
   letter-spacing: .025em;
 }
 
+.account-shell #ordersList .order-card.is-plan-change::before {
+  background: var(--forest-700);
+}
+
+.account-shell #ordersList .order-plan-change-compact {
+  display: grid;
+  gap: 3px;
+  max-width: 340px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border: 1px solid rgba(184, 79, 49, .2);
+  border-radius: 10px;
+  background: rgba(255, 246, 239, .72);
+}
+
+.account-shell #ordersList .order-plan-change-compact-label {
+  color: var(--rust-500);
+  font-size: .5rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.account-shell #ordersList .order-plan-change-compact-route {
+  color: var(--forest-950);
+  font-size: .65rem;
+  line-height: 1.35;
+}
+
+.account-shell #ordersList .order-plan-change-compact-details {
+  color: var(--muted);
+  font-size: .56rem;
+  line-height: 1.35;
+}
+
 .account-shell #ordersList .order-meta,
 .account-shell #ordersList .order-status,
 .account-shell #ordersList .order-total {
@@ -9361,6 +9488,15 @@ body.account-bag-open {
 }
 
 @media (max-width: 560px) {
+  .order-plan-change-summary-row {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .order-plan-change-summary-row strong {
+    text-align: left;
+  }
+
   .modification-preview {
     padding: 16px;
   }

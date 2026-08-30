@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260811-1">
   <link rel="stylesheet" href="ecommerce.css?v=20260825-2">
-  <link rel="stylesheet" href="checkout-page.css?v=20260826-6">
+  <link rel="stylesheet" href="checkout-page.css?v=20260830-2">
 </head>
 <body class="checkout-page checkout-handoff-open" data-commerce-page="checkout">
   <a class="skip-link" href="#checkoutTitle">Skip to checkout</a>
@@ -148,7 +148,28 @@
               <section class="checkout-step" data-checkout-step="2" aria-labelledby="checkoutDeliveryTitle" hidden>
                 <p class="checkout-kicker">Fresh-batch delivery</p>
                 <h2 id="checkoutDeliveryTitle">Choose where and when.</h2>
-                <p id="checkoutDeliveryIntro">Select a saved address or add a new one. Available fresh-batch dates will be checked for that location.</p>
+                <p id="checkoutDeliveryIntro">Confirm your address first. Once we verify delivery coverage, we’ll show the dates available for your home.</p>
+
+                <aside class="checkout-delivery-flow" id="checkoutDeliveryFlow" data-state="address" aria-label="Delivery setup steps">
+                  <div class="checkout-delivery-flow-heading">
+                    <span>How delivery setup works</span>
+                    <strong id="checkoutDeliveryFlowStatus">Step 1 of 3 · Complete your address details first.</strong>
+                  </div>
+                  <ol>
+                    <li data-delivery-flow-step="address" class="is-current">
+                      <b>1</b>
+                      <div><strong>Confirm address</strong><small>Enter details and verify your PIN.</small></div>
+                    </li>
+                    <li data-delivery-flow-step="dates">
+                      <b>2</b>
+                      <div><strong>Choose a date</strong><small>See fresh-batch dates for your home.</small></div>
+                    </li>
+                    <li data-delivery-flow-step="review">
+                      <b>3</b>
+                      <div><strong>Review &amp; pay</strong><small>Check the total before confirming.</small></div>
+                    </li>
+                  </ol>
+                </aside>
 
                 <div class="checkout-address-status" id="checkoutAddressStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
                   <span class="api-status-spinner" aria-hidden="true"></span>
@@ -166,8 +187,8 @@
                 </section>
 
                 <fieldset class="checkout-fieldset checkout-new-address" id="checkoutNewAddressFields">
-                  <legend id="checkoutNewAddressTitle">Add a delivery address</legend>
-                  <p class="checkout-fieldset-intro">This address will be saved to your account for future Atulyash deliveries.</p>
+                  <legend id="checkoutNewAddressTitle">1. Confirm a delivery address</legend>
+                  <p class="checkout-fieldset-intro">Use a saved address above, or complete the details below. We’ll save this address after the PIN is verified.</p>
                   <div class="checkout-fields checkout-fields-two">
                     <label class="checkout-field checkout-field-wide">
                       <span>House or flat number</span>
@@ -203,8 +224,8 @@
                     </label>
                     <div class="checkout-pincode-serviceability" id="checkoutPincodeServiceability" data-state="idle">
                       <span class="checkout-pincode-dot" aria-hidden="true"></span>
-                      <p><strong id="checkoutPincodeTitle">Check delivery availability</strong><small id="checkoutPincodeStatus">Enter your six-digit PIN code.</small></p>
-                      <button id="checkoutPincodeCheckButton" type="button">Check PIN code</button>
+                      <p><strong id="checkoutPincodeTitle">Verify delivery availability</strong><small id="checkoutPincodeStatus">Enter your six-digit PIN code.</small></p>
+                      <button id="checkoutPincodeCheckButton" type="button">Verify PIN code</button>
                       <a id="checkoutPincodeLoginLink" href="account.html?return=checkout#login" hidden>Sign in to check</a>
                     </div>
                     <label class="checkout-field">
@@ -223,14 +244,17 @@
                       <small class="field-error"></small>
                     </label>
                   </div>
+                  <div class="checkout-address-next" id="checkoutAddressNext">
+                    <p>Once your PIN is verified, save this address to see the delivery dates available for your home.</p>
+                    <button id="checkoutRefreshAvailabilityButton" type="button" disabled>Save address &amp; find dates</button>
+                  </div>
                 </fieldset>
 
-                <section class="checkout-delivery-availability" id="checkoutDeliveryAvailability" aria-labelledby="checkoutDeliveryAvailabilityTitle">
+                <section class="checkout-delivery-availability" id="checkoutDeliveryAvailability" aria-labelledby="checkoutDeliveryAvailabilityTitle" hidden>
                   <div class="checkout-subsection-heading">
-                    <div><span>Fresh-batch availability</span><h3 id="checkoutDeliveryAvailabilityTitle">Select a delivery date</h3></div>
-                    <button id="checkoutRefreshAvailabilityButton" type="button">Check dates</button>
+                    <div><span>Step 2 · Fresh-batch availability</span><h3 id="checkoutDeliveryAvailabilityTitle">Choose your delivery date</h3></div>
                   </div>
-                  <p id="checkoutDeliveryAvailabilityStatus" role="status" aria-live="polite" aria-atomic="true">Choose an address to see available delivery dates.</p>
+                  <p id="checkoutDeliveryAvailabilityStatus" role="status" aria-live="polite" aria-atomic="true">Complete your address and verify the PIN to find available dates.</p>
                   <div class="checkout-fields checkout-fields-two">
                     <label class="checkout-field" id="checkoutWeeklyScheduleField" hidden>
                       <span>Preferred weekly day</span>
@@ -252,7 +276,7 @@
 
                 <div class="checkout-step-actions">
                   <button class="checkout-back" id="checkoutDeliveryBackButton" type="button">Back to your details</button>
-                  <button class="button button-dark checkout-next api-async-button" id="checkoutDeliverySubmit" type="submit" aria-busy="false">
+                  <button class="button button-dark checkout-next api-async-button" id="checkoutDeliverySubmit" type="submit" aria-busy="false" disabled>
                     <span id="checkoutDeliverySubmitLabel">Review my order</span>
                     <span class="api-button-spinner" aria-hidden="true"></span>
                     <span aria-hidden="true">→</span>
@@ -416,6 +440,6 @@
   <noscript><p class="checkout-noscript">JavaScript is required for secure checkout. <a href="index.html#shop">Return to your bag</a>.</p></noscript>
   <script src="api-client.js?v=20260827-1"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="ecommerce.js?v=20260829-5"></script>
+  <script src="ecommerce.js?v=20260830-3"></script>
 </body>
 </html>

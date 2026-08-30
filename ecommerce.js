@@ -145,6 +145,8 @@
     checkoutDeliveryBackButton: document.getElementById('checkoutDeliveryBackButton'),
     checkoutDeliveryTitle: document.getElementById('checkoutDeliveryTitle'),
     checkoutDeliveryIntro: document.getElementById('checkoutDeliveryIntro'),
+    checkoutDeliveryFlow: document.getElementById('checkoutDeliveryFlow'),
+    checkoutDeliveryFlowStatus: document.getElementById('checkoutDeliveryFlowStatus'),
     checkoutDeliverySubmit: document.getElementById('checkoutDeliverySubmit'),
     checkoutDeliverySubmitLabel: document.getElementById('checkoutDeliverySubmitLabel'),
     checkoutReviewAddress: document.getElementById('checkoutReviewAddress'),
@@ -156,6 +158,7 @@
     checkoutAddressEmpty: document.getElementById('checkoutAddressEmpty'),
     checkoutAddAddressButton: document.getElementById('checkoutAddAddressButton'),
     checkoutNewAddressFields: document.getElementById('checkoutNewAddressFields'),
+    checkoutAddressNext: document.getElementById('checkoutAddressNext'),
     checkoutPincode: document.getElementById('checkoutPincode'),
     checkoutAreaField: document.getElementById('checkoutAreaField'),
     checkoutArea: document.getElementById('checkoutArea'),
@@ -165,6 +168,7 @@
     checkoutPincodeCheckButton: document.getElementById('checkoutPincodeCheckButton'),
     checkoutPincodeLoginLink: document.getElementById('checkoutPincodeLoginLink'),
     checkoutRefreshAvailabilityButton: document.getElementById('checkoutRefreshAvailabilityButton'),
+    checkoutDeliveryAvailability: document.getElementById('checkoutDeliveryAvailability'),
     checkoutDeliveryAvailabilityStatus: document.getElementById('checkoutDeliveryAvailabilityStatus'),
     checkoutDeliveryDate: document.getElementById('checkoutDeliveryDate'),
     checkoutDeliveryDateError: document.getElementById('checkoutDeliveryDateError'),
@@ -3012,6 +3016,8 @@
       elements.checkoutDeliveryDate.replaceChildren(new Option('Choose an address first', ''));
     }
     setCheckoutStep(1);
+    updateCheckoutDeliveryFlow();
+    updateCheckoutAvailabilityAction();
   }
 
   function openCheckout() {
@@ -3543,7 +3549,7 @@
     return showCheckoutValidationErrors(errors);
   }
 
-  function validateDelivery({ requireDate = true } = {}) {
+  function validateDelivery({ requireDate = true, requireSchedule = true } = {}) {
     clearCheckoutErrors();
     const fields = {
       address: document.getElementById('checkoutAddress'),
@@ -3566,7 +3572,7 @@
       if (!fields.state.value) errors.push([fields.state, 'Please select your state.']);
     }
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
-    if (hasWeekly && !DELIVERY_DAYS.includes(fields.deliveryDay.value)) {
+    if (hasWeekly && requireSchedule && !DELIVERY_DAYS.includes(fields.deliveryDay.value)) {
       errors.push([fields.deliveryDay, 'Please choose your preferred weekly delivery day.']);
     }
     if (requireDate && !fields.deliveryDate.value) {
@@ -3737,7 +3743,7 @@
   }
 
   function renderPincodeServiceability(state = 'idle', {
-    title = 'Check delivery availability',
+    title = 'Verify delivery availability',
     message = 'Enter your six-digit PIN code.'
   } = {}) {
     if (!elements.checkoutPincodeServiceability) return;
@@ -3745,12 +3751,15 @@
     if (elements.checkoutPincodeTitle) elements.checkoutPincodeTitle.textContent = title;
     if (elements.checkoutPincodeStatus) elements.checkoutPincodeStatus.textContent = message;
     if (elements.checkoutPincodeCheckButton) {
-      elements.checkoutPincodeCheckButton.hidden = state === 'auth';
+      elements.checkoutPincodeCheckButton.hidden = state === 'auth' || state === 'success';
       elements.checkoutPincodeCheckButton.disabled = pincodeCheckInFlight;
-      elements.checkoutPincodeCheckButton.textContent = pincodeCheckInFlight ? 'Checking…' : 'Check PIN code';
+      elements.checkoutPincodeCheckButton.textContent = pincodeCheckInFlight
+        ? 'Checking…'
+        : 'Verify PIN code';
       elements.checkoutPincodeCheckButton.setAttribute('aria-busy', String(pincodeCheckInFlight));
     }
     if (elements.checkoutPincodeLoginLink) elements.checkoutPincodeLoginLink.hidden = state !== 'auth';
+    updateCheckoutAvailabilityAction();
   }
 
   function resetPincodeServiceability() {
@@ -3872,6 +3881,8 @@
       renderSavedAddresses();
       if (selectedAddressId) loadDeliveryAvailability();
     }
+    updateCheckoutDeliveryFlow();
+    updateCheckoutAvailabilityAction();
   }
 
   function renderSavedAddresses() {
@@ -3912,6 +3923,8 @@
       elements.checkoutAddAddressButton.setAttribute('aria-expanded', String(savedAddresses.length === 0));
       elements.checkoutAddAddressButton.textContent = 'Add a new address';
     }
+    updateCheckoutDeliveryFlow();
+    updateCheckoutAvailabilityAction();
   }
 
   async function loadSavedAddresses() {
@@ -4048,6 +4061,90 @@
     });
   }
 
+  function newCheckoutAddressReady() {
+    if (selectedAddressId) return true;
+    const pincode = fieldValue('checkoutPincode');
+    return Boolean(
+      fieldValue('checkoutAddress')
+      && fieldValue('checkoutBuilding')
+      && /^\d{6}$/.test(pincode)
+      && fieldValue('checkoutArea')
+      && fieldValue('checkoutCity')
+      && fieldValue('checkoutState')
+      && checkedServiceabilityPincode === pincode
+      && checkedServiceabilityResult === true
+    );
+  }
+
+  function updateCheckoutDeliveryFlow() {
+    const flow = elements.checkoutDeliveryFlow;
+    if (!flow) return;
+    updateCheckoutDeliveryStage();
+    const dateSelected = Boolean(selectedDeliveryDate || elements.checkoutDeliveryDate?.value);
+    const hasDateOptions = filteredDeliveryDates().length > 0;
+    let state = 'address';
+    let message = 'Step 1 of 3 · Complete your address details, then verify the PIN.';
+    if (selectedAddressId && dateSelected) {
+      state = 'review';
+      message = 'Step 3 of 3 · Your date is selected. Continue to review your order.';
+    } else if (selectedAddressId && hasDateOptions) {
+      state = 'dates';
+      message = 'Step 2 of 3 · Choose one of the available delivery dates.';
+    } else if (selectedAddressId) {
+      state = 'dates';
+      message = 'Step 2 of 3 · Find an available delivery date for this address.';
+    } else if (newCheckoutAddressReady()) {
+      message = 'Step 1 of 3 · PIN verified. Save the address to find delivery dates.';
+    }
+    flow.dataset.state = state;
+    if (elements.checkoutDeliveryFlowStatus) {
+      elements.checkoutDeliveryFlowStatus.textContent = message;
+    }
+    flow.querySelectorAll('[data-delivery-flow-step]').forEach((step) => {
+      const key = step.dataset.deliveryFlowStep;
+      step.classList.toggle('is-current', key === state);
+      step.classList.toggle('is-complete',
+        (state === 'dates' && key === 'address')
+        || (state === 'review' && ['address', 'dates'].includes(key))
+      );
+    });
+    updateCheckoutReviewAction();
+  }
+
+  function updateCheckoutDeliveryStage() {
+    const hasSavedAddress = Boolean(selectedAddressId);
+    if (elements.checkoutDeliveryAvailability) {
+      elements.checkoutDeliveryAvailability.hidden = !hasSavedAddress;
+    }
+    if (elements.checkoutAddressNext) {
+      elements.checkoutAddressNext.hidden = hasSavedAddress;
+    }
+  }
+
+  function updateCheckoutReviewAction() {
+    const button = elements.checkoutDeliverySubmit;
+    if (!button || button.getAttribute('aria-busy') === 'true') return;
+    const dateSelected = Boolean(selectedDeliveryDate || elements.checkoutDeliveryDate?.value);
+    button.disabled = !(selectedAddressId && dateSelected);
+  }
+
+  function updateCheckoutAvailabilityAction() {
+    const button = elements.checkoutRefreshAvailabilityButton;
+    if (!button) return;
+    const saving = addressSaveInFlight;
+    const blocked = !selectedAddressId && !newCheckoutAddressReady();
+    button.disabled = saving || pincodeCheckInFlight || blocked;
+    button.setAttribute('aria-busy', String(saving));
+    if (saving) {
+      button.textContent = 'Saving address…';
+    } else if (selectedAddressId) {
+      button.textContent = 'Refresh available dates';
+    } else {
+      button.textContent = 'Save address & find dates';
+    }
+    updateCheckoutDeliveryFlow();
+  }
+
   function updateDeliveryAvailabilityStatus() {
     if (!elements.checkoutDeliveryAvailabilityStatus) return;
     const dates = filteredDeliveryDates();
@@ -4057,14 +4154,17 @@
       elements.checkoutDeliveryAvailabilityStatus.textContent = selectedAddressId
         ? 'No delivery date is currently available for this address.'
         : 'Choose an address to see available delivery dates.';
+      updateCheckoutDeliveryFlow();
       return;
     }
     if (hasWeekly && selectedDay && !dates.length) {
       elements.checkoutDeliveryAvailabilityStatus.textContent = `No ${selectedDay} delivery dates are currently available for this address. Choose another weekday or check dates again.`;
+      updateCheckoutDeliveryFlow();
       return;
     }
     const dayLabel = hasWeekly && selectedDay ? ` for ${selectedDay}` : '';
     elements.checkoutDeliveryAvailabilityStatus.textContent = `${dates.length} fresh-batch ${dates.length === 1 ? 'date is' : 'dates are'} available${dayLabel} for this address.`;
+    updateCheckoutDeliveryFlow();
   }
 
   function renderAvailableDeliveryDates(dates, { preserveSelection = false } = {}) {
@@ -4100,6 +4200,7 @@
       selectedDeliveryDate = '';
     }
     elements.checkoutDeliveryDate.disabled = visibleDates.length === 0;
+    updateCheckoutDeliveryFlow();
   }
 
   async function loadDeliveryAvailability() {
@@ -4109,6 +4210,7 @@
       if (elements.checkoutDeliveryAvailabilityStatus) {
         elements.checkoutDeliveryAvailabilityStatus.textContent = 'Choose an address to see available delivery dates.';
       }
+      updateCheckoutAvailabilityAction();
       return;
     }
     const requestedAddressId = String(selectedAddressId);
@@ -4117,6 +4219,7 @@
       elements.checkoutDeliveryAvailabilityStatus.textContent = 'Checking fresh-batch delivery dates…';
     }
     if (elements.checkoutRefreshAvailabilityButton) elements.checkoutRefreshAvailabilityButton.disabled = true;
+    updateCheckoutDeliveryFlow();
     try {
       const payload = await invokeApi('orders', 'deliveryAvailability', [requestedAddressId], {
         path: '/orders/order-delivery/delivery-availability/',
@@ -4138,12 +4241,13 @@
       if (elements.checkoutDeliveryAvailabilityStatus) {
         elements.checkoutDeliveryAvailabilityStatus.textContent = error?.message || 'Delivery availability could not be checked.';
       }
+      updateCheckoutDeliveryFlow();
     } finally {
       if (
         elements.checkoutRefreshAvailabilityButton
         && requestGeneration === deliveryAvailabilityGeneration
       ) {
-        elements.checkoutRefreshAvailabilityButton.disabled = addressSaveInFlight;
+        updateCheckoutAvailabilityAction();
       }
     }
   }
@@ -4155,9 +4259,11 @@
       elements.checkoutRefreshAvailabilityButton.disabled = true;
       elements.checkoutRefreshAvailabilityButton.setAttribute('aria-busy', 'true');
     }
+    updateCheckoutAvailabilityAction();
     try {
       if (!selectedAddressId) {
-        if (!validateDelivery({ requireDate: false })) return;
+        if (!validateDelivery({ requireDate: false, requireSchedule: false })) return;
+        if (!await ensurePincodeServiceability()) return;
         if (elements.checkoutDeliveryAvailabilityStatus) {
           elements.checkoutDeliveryAvailabilityStatus.textContent = 'Saving your address securely…';
         }
@@ -4166,10 +4272,7 @@
       await loadDeliveryAvailability();
     } finally {
       addressSaveInFlight = false;
-      if (elements.checkoutRefreshAvailabilityButton) {
-        elements.checkoutRefreshAvailabilityButton.disabled = false;
-        elements.checkoutRefreshAvailabilityButton.setAttribute('aria-busy', 'false');
-      }
+      updateCheckoutAvailabilityAction();
     }
   }
 
@@ -5644,6 +5747,7 @@
     event.target.closest('.checkout-field')?.classList.remove('has-error');
     const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
     if (error) error.textContent = '';
+    updateCheckoutAvailabilityAction();
   });
   elements.checkoutArea?.addEventListener('change', (event) => {
     event.target.removeAttribute('aria-invalid');
@@ -5651,7 +5755,14 @@
     if (error) error.textContent = '';
     resetPincodeServiceability();
     void checkPincodeServiceability({ force: true });
+    updateCheckoutAvailabilityAction();
   });
+  ['checkoutAddress', 'checkoutBuilding', 'checkoutLandmark', 'checkoutCity', 'checkoutState', 'checkoutAddressType']
+    .forEach((id) => {
+      const field = document.getElementById(id);
+      field?.addEventListener('input', updateCheckoutAvailabilityAction);
+      field?.addEventListener('change', updateCheckoutAvailabilityAction);
+    });
   elements.checkoutPincodeCheckButton?.addEventListener('click', async () => {
     const result = await checkPincodeServiceability({ force: true });
     if (result === true) announce('Fresh-batch delivery is available for this PIN code.');
@@ -5674,11 +5785,14 @@
     event.target.removeAttribute('aria-invalid');
     const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
     if (error) error.textContent = '';
+    updateCheckoutDeliveryFlow();
+    updateCheckoutAvailabilityAction();
   });
   elements.checkoutDeliveryDate?.addEventListener('change', (event) => {
     selectedDeliveryDate = event.target.value;
     if (elements.checkoutDeliveryDateError) elements.checkoutDeliveryDateError.textContent = '';
     event.target.removeAttribute('aria-invalid');
+    updateCheckoutDeliveryFlow();
   });
   elements.checkoutOrderNotes?.addEventListener('input', (event) => {
     if (elements.checkoutOrderNotesCount) {
@@ -5844,7 +5958,10 @@
       setCheckoutStep(1, { focus: true });
       return;
     }
-    if (!validateDelivery({ requireDate: Boolean(selectedAddressId) })) {
+    if (!validateDelivery({
+      requireDate: Boolean(selectedAddressId),
+      requireSchedule: Boolean(selectedAddressId)
+    })) {
       deliveryStepInFlight = false;
       return;
     }

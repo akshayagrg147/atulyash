@@ -1899,7 +1899,13 @@
       const cycle = quantityCycleFrom(
         order.weekly_quantity_cycle,
         order.delivery_quantity_cycle,
+        order.delivery_cycle,
+        order.cycle_quantities,
+        order.weekly_cycle,
         order.subscription_pack_weekly_quantity_cycle,
+        order.new_pack_weekly_quantity_cycle,
+        order.new_pack?.weekly_quantity_cycle,
+        order.new_pack?.delivery_cycle,
         ...items.map((item) => item.subscription_pack_weekly_quantity_cycle || item.weekly_quantity_cycle)
       );
       if (cycle.length === 4) {
@@ -1912,6 +1918,8 @@
         order.weekly_kg,
         order.quantity_per_week,
         order.subscription_pack_weekly_quantity,
+        order.new_pack_weekly_quantity,
+        order.new_pack?.quantity_per_week,
         ...items.map((item) => item.weekly_quantity),
         ...items.map((item) => item.subscription_pack_weekly_quantity)
       );
@@ -1921,6 +1929,9 @@
         order.monthly_quantity,
         order.monthly_kg,
         order.subscription_pack_monthly_quantity,
+        order.new_pack_monthly_quantity,
+        order.new_pack?.monthly_quantity,
+        order.new_pack?.name,
         ...items.map((item) => item.monthly_quantity),
         ...items.map((item) => item.subscription_pack_monthly_quantity)
       );
@@ -1999,11 +2010,21 @@
     const cycle = quantityCycleFrom(
       delivery?.weekly_quantity_cycle,
       delivery?.delivery_quantity_cycle,
+      delivery?.delivery_cycle,
+      delivery?.cycle_quantities,
       delivery?.subscription_pack_weekly_quantity_cycle,
+      delivery?.new_pack_weekly_quantity_cycle,
+      delivery?.new_pack?.weekly_quantity_cycle,
+      delivery?.new_pack?.delivery_cycle,
       ...deliveryItems.map((item) => item?.subscription_pack_weekly_quantity_cycle || item?.weekly_quantity_cycle),
       order?.weekly_quantity_cycle,
       order?.delivery_quantity_cycle,
+      order?.delivery_cycle,
+      order?.cycle_quantities,
       order?.subscription_pack_weekly_quantity_cycle,
+      order?.new_pack_weekly_quantity_cycle,
+      order?.new_pack?.weekly_quantity_cycle,
+      order?.new_pack?.delivery_cycle,
       ...orderItems(parentOrder).map((item) => item?.subscription_pack_weekly_quantity_cycle || item?.weekly_quantity_cycle)
     );
     if (cycle.length === 4) {
@@ -2186,6 +2207,284 @@
     return null;
   }
 
+  // Plan changes are returned by different order endpoints depending on
+  // whether the record is the confirmation order or the subscription detail.
+  // Normalize the supported shapes in one place so the history card and the
+  // tracking view tell the same story without rewriting older order records.
+  function planSnapshot(source) {
+    if (typeof source === 'string' || typeof source === 'number') source = { name: source };
+    if (!source || typeof source !== 'object') return null;
+    const sourceId = firstValue(source.id, source.pk, source.pack_id, source.subscription_pack_id);
+    const catalogPlan = sourceId != null && Array.isArray(state.weeklyPlans)
+      ? state.weeklyPlans.find((candidate) => String(candidate.id) === String(sourceId))
+      : null;
+    const historicalOrder = sourceId != null && Array.isArray(state.orders)
+      ? state.orders.find((candidate) => {
+        const candidatePackIds = [
+          candidate.subscription_pack,
+          candidate.subscription_pack_id,
+          ...orderItems(candidate).flatMap((item) => [
+            item.subscription_pack,
+            item.subscription_pack_id,
+            item.subscription_pack?.id,
+            item.subscription_pack?.pk
+          ])
+        ].filter((value) => value != null).map(String);
+        return candidatePackIds.includes(String(sourceId));
+      })
+      : null;
+    const sources = [
+      source,
+      source.plan,
+      source.pack,
+      source.subscription_pack,
+      source.subscription_plan,
+      source.pricing,
+      source.summary,
+      catalogPlan,
+      historicalOrder,
+      historicalOrder?.payment_summary
+    ].filter((candidate) => candidate && typeof candidate === 'object');
+    const value = (...keys) => firstValue(...sources.flatMap((candidate) => keys.map((key) => candidate[key])));
+    const cycle = quantityCycleFrom(
+      ...sources.flatMap((candidate) => [
+        candidate.delivery_cycle,
+        candidate.weekly_quantity_cycle,
+        candidate.weekly_cycle,
+        candidate.cycle_quantities,
+        candidate.quantity_cycle,
+        candidate.subscription_pack_weekly_quantity_cycle,
+        candidate.weeklyQuantityCycle
+      ])
+    );
+    const monthlyQuantity = quantityKg(
+      value('monthly_quantity', 'monthly_kg', 'monthlyKg', 'quantity_per_month', 'total_monthly_quantity'),
+      ...sources.map((candidate) => candidate.name),
+      ...sources.map((candidate) => candidate.title),
+      ...sources.map((candidate) => candidate.pack_name)
+    );
+    const weeklyQuantity = quantityKg(
+      value('quantity_per_week', 'weekly_quantity', 'weekly_kg', 'weeklyKg', 'kg_per_week', 'average_weekly_quantity')
+    );
+    const resolvedMonthlyQuantity = monthlyQuantity === null && cycle.length === 4
+      ? cycle.reduce((sum, quantity) => sum + quantity, 0)
+      : monthlyQuantity;
+    const price = finiteMoney(value(
+      'price_per_month',
+      'monthly_price',
+      'monthlyPrice',
+      'price',
+      'price_per_monthly_plan',
+      'monthly_amount',
+      'plan_price',
+      'total_price',
+      'subscription_total_amount'
+    ));
+    const averagePrice = finiteMoney(value(
+      'average_price_per_delivery',
+      'price_per_delivery',
+      'price',
+      'delivery_price',
+      'weekly_price',
+      'average_delivery_price'
+    ));
+    const priceCycle = sources
+      .map((candidate) => firstValue(candidate.price_cycle, candidate.delivery_price_cycle, candidate.weekly_price_cycle))
+      .find((candidate) => Array.isArray(candidate) && candidate.length)
+      || [];
+    if (resolvedMonthlyQuantity === null && weeklyQuantity === null && price === null && averagePrice === null && !cycle.length) return null;
+
+    const quantityText = resolvedMonthlyQuantity !== null
+      ? `${bagWeightLabel(resolvedMonthlyQuantity)} kg/month`
+      : weeklyQuantity !== null
+        ? `${bagWeightLabel(weeklyQuantity)} kg/week`
+        : cycle.length
+          ? `${bagWeightLabel(cycle.reduce((sum, quantity) => sum + quantity, 0))} kg/month`
+          : null;
+    const priceText = price !== null
+      ? `${formatMoney(price)} per month`
+      : averagePrice !== null
+        ? `${formatMoney(averagePrice)} average per delivery`
+        : null;
+    const cycleText = cycle.length === 4
+      ? cycle.every((quantity) => quantity === cycle[0])
+        ? `${bagWeightLabel(cycle[0])} kg every delivery`
+        : cycle.map((quantity) => `${bagWeightLabel(quantity)} kg`).join(' → ')
+      : null;
+    return {
+      quantityText,
+      priceText,
+      cycleText,
+      price,
+      averagePrice,
+      priceCycle: priceCycle.map((value) => finiteMoney(value)).filter((value) => value !== null)
+    };
+  }
+
+  function planChangeRecord(order) {
+    if (!order || typeof order !== 'object') return null;
+    const direct = [
+      order.plan_change,
+      order.planChange,
+      order.subscription_plan_change,
+      order.pack_change,
+      order.packChange,
+      order.change_details,
+      order.change_summary?.plan_change,
+      order.summary?.plan_change,
+      order.data?.plan_change,
+      order.previous_subscription_pack || order.current_subscription_pack
+    ].find((candidate) => candidate && typeof candidate === 'object');
+    const sources = [direct, order].filter((candidate) => candidate && typeof candidate === 'object');
+    const firstObject = (...keys) => firstValue(...sources.flatMap((source) => keys.map((key) => source[key]))) || null;
+    const previousSource = firstObject(
+      'previous_plan',
+      'existing_plan',
+      'old_plan',
+      'from_plan',
+      'previous_pack',
+      'old_pack',
+      'current_plan_before_change',
+      'previous_subscription_pack'
+    );
+    const updatedSource = firstObject(
+      'new_plan',
+      'updated_plan',
+      'to_plan',
+      'new_pack',
+      'updated_pack',
+      'current_plan_after_change',
+      'current_subscription_pack'
+    );
+    const previous = planSnapshot(previousSource);
+    const updatedBase = planSnapshot(updatedSource);
+    const deliveryCycle = quantityCycleFrom(
+      Array.isArray(order.deliveries)
+        ? order.deliveries
+          .slice()
+          .sort((left, right) => (dateValue(deliveryDate(left))?.getTime() ?? 0) - (dateValue(deliveryDate(right))?.getTime() ?? 0))
+          .map((delivery) => firstValue(delivery.delivery_quantity, delivery.quantity_kg))
+        : [],
+      order.delivery_cycle,
+      order.weekly_quantity_cycle
+    );
+    const updated = updatedBase && !updatedBase.cycleText && deliveryCycle.length === 4
+      ? {
+        ...updatedBase,
+        cycleText: deliveryCycle.every((quantity) => quantity === deliveryCycle[0])
+          ? `${bagWeightLabel(deliveryCycle[0])} kg every delivery`
+          : deliveryCycle.map((quantity) => `${bagWeightLabel(quantity)} kg`).join(' → ')
+      }
+      : updatedBase;
+    const changeType = String(firstValue(
+      order.change_type,
+      order.order_type,
+      order.order_kind,
+      order.order_source,
+      direct?.change_type,
+      direct?.type,
+      ''
+    ));
+    const confirmationId = firstValue(
+      order.confirmation_id,
+      order.plan_change_id,
+      order.pack_change_id,
+      direct?.confirmation_id,
+      direct?.plan_change_id
+    );
+    const explicit = [
+      order.is_plan_change,
+      order.is_pack_change,
+      direct?.is_plan_change,
+      direct?.is_pack_change
+    ].some((value) => value === true)
+      || /plan\s*change|pack\s*change|upgrade|downgrade/i.test(changeType)
+      || /subscription-pack-change/i.test(String(confirmationId || ''))
+      || (firstValue(order.new_pack_id, direct?.new_pack_id) != null && firstValue(
+        order.amount_debited,
+        direct?.amount_debited,
+        order.plan_change_amount,
+        direct?.payment_amount
+      ) != null);
+    if (!explicit && !(previous && updated)) return null;
+
+    const amount = finiteMoney(
+      direct?.amount_debited,
+      direct?.payment_amount,
+      direct?.amount_to_debit,
+      direct?.wallet_debit,
+      order.amount_debited,
+      order.plan_change_amount,
+      order.payment_amount,
+      order.wallet_debit,
+      orderPaymentValue(order, 'amount_debited', 'plan_change_amount', 'payment_amount', 'wallet_debit', 'wallet_amount')
+    ) ?? orderAmount(order);
+    return {
+      previous,
+      updated,
+      amount,
+      confirmationId: confirmationId ? String(confirmationId) : null,
+      effectiveFrom: firstValue(
+        direct?.effective_from,
+        direct?.applied_at,
+        order.effective_from,
+        order.plan_change_effective_from
+      ),
+      appliedImmediately: firstValue(direct?.applied_immediately, order.applied_immediately) === true
+    };
+  }
+
+  function planSnapshotText(snapshot) {
+    if (!snapshot) return 'Plan details supplied after confirmation';
+    return [snapshot.quantityText, snapshot.priceText].filter(Boolean).join(' · ')
+      || snapshot.cycleText
+      || 'Plan details supplied after confirmation';
+  }
+
+  function renderPlanChangeSummary(order, { compact = false } = {}) {
+    const change = planChangeRecord(order);
+    if (!change) return null;
+    if (compact) {
+      const summary = create('div', 'order-plan-change-compact');
+      summary.append(create('span', 'order-plan-change-compact-label', 'Plan change confirmed'));
+      const route = create('strong', 'order-plan-change-compact-route', `${change.previous?.quantityText || 'Previous plan'} → ${change.updated?.quantityText || 'Updated plan'}`);
+      summary.append(route);
+      const priceTransition = change.previous?.priceText && change.updated?.priceText
+        ? `${change.previous.priceText} → ${change.updated.priceText}`
+        : change.updated?.priceText || change.previous?.priceText;
+      const details = [
+        priceTransition,
+        change.amount !== null ? `${formatMoney(change.amount)} debited` : null
+      ].filter(Boolean);
+      if (details.length) summary.append(create('span', 'order-plan-change-compact-details', details.join(' · ')));
+      return summary;
+    }
+
+    const section = create('section', 'order-plan-change-summary');
+    const header = create('div', 'order-plan-change-summary-head');
+    header.append(
+      create('div', 'order-plan-change-summary-copy', 'Plan change'),
+      create('span', 'order-plan-change-summary-status', change.appliedImmediately ? 'Applied' : 'Confirmed')
+    );
+    section.append(header, create('p', 'order-plan-change-summary-intro', 'This order records the plan update separately from your original purchase. Your earlier deliveries and charges remain part of the order history.'));
+    const rows = [
+      ['Previous plan', planSnapshotText(change.previous)],
+      ['Updated plan', planSnapshotText(change.updated)]
+    ];
+    if (change.updated?.cycleText) rows.push(['Delivery cycle', change.updated.cycleText]);
+    if (change.amount !== null) rows.push(['Plan change payment', formatMoney(change.amount)]);
+    if (change.effectiveFrom) rows.push(['Effective from', formatDate(change.effectiveFrom)]);
+    if (change.confirmationId) rows.push(['Confirmation', change.confirmationId]);
+    const grid = create('div', 'order-plan-change-summary-grid');
+    rows.forEach(([label, value]) => {
+      const row = create('div', 'order-plan-change-summary-row');
+      row.append(create('span', '', label), create('strong', '', value));
+      grid.append(row);
+    });
+    section.append(grid);
+    return section;
+  }
+
   function orderAmountText(order) {
     const amount = orderAmount(order);
     return amount === null ? 'See details' : formatMoney(amount);
@@ -2257,6 +2556,8 @@
 
   function makeOrderCard(order, { compact = false } = {}) {
     const card = create('article', 'order-card');
+    const planChange = planChangeRecord(order);
+    if (planChange) card.classList.add('is-plan-change');
     const normalizedStatus = orderStatus(order).toLowerCase();
     if (/cancel|failed|refund/.test(normalizedStatus)) card.classList.add('is-cancelled');
     else if (/deliver|complete|fulfilled|paid|received|success|captur/.test(normalizedStatus)) card.classList.add('is-complete');
@@ -2277,6 +2578,8 @@
     );
     const quantityText = orderQuantityText(order);
     if (quantityText) title.append(create('p', 'order-quantity', `Delivering: ${quantityText}`));
+    const planChangeSummary = renderPlanChangeSummary(order, { compact: true });
+    if (planChangeSummary) title.append(planChangeSummary);
 
     const meta = create('div', 'order-meta');
     const deliveryDateValue = orderDeliveryDate(order);
@@ -2296,7 +2599,9 @@
     if (orderAmount(order) === null) total.classList.add('is-unavailable');
     total.append(
       create('strong', '', orderAmountText(order)),
-      create('span', '', orderAmount(order) === null ? 'Total not supplied in list' : 'Order total')
+      create('span', '', planChange
+        ? 'Plan change payment'
+        : orderAmount(order) === null ? 'Total not supplied in list' : 'Order total')
     );
 
     const actions = create('div', 'card-actions');
@@ -2669,6 +2974,9 @@
     product.append(productImage, productCopy);
     wrapper.append(product);
 
+    const planChangeSummary = renderPlanChangeSummary(order);
+    if (planChangeSummary) wrapper.append(planChangeSummary);
+
     const timeline = create('ol', 'order-journey-timeline');
     timeline.dataset.detailed = String(progress.detailed);
     timeline.style.setProperty('--journey-progress', `${progress.steps.length > 1 ? (progress.current / (progress.steps.length - 1)) * 100 : 0}%`);
@@ -3002,7 +3310,13 @@
         path: `/orders/order/${id}/`,
         method: 'GET'
       });
-      const detail = await loadOrderTracking(id, responseData(result));
+      const detailPayload = responseData(result);
+      // Keep plan-change metadata returned by the order list when the detail
+      // endpoint only returns the current order snapshot.
+      const detail = await loadOrderTracking(id, {
+        ...order,
+        ...(detailPayload && typeof detailPayload === 'object' ? detailPayload : {})
+      });
       const body = create('div');
       const layout = create('div', 'order-detail-layout');
       const journeyColumn = create('div', 'order-detail-primary');
@@ -3770,6 +4084,75 @@
     return state.weeklyPlans.find((plan) => String(plan.id) === String(packId)) || null;
   }
 
+  function subscriptionCurrentPackId(subscription) {
+    const pack = firstValue(subscription?.subscription_pack, subscription?.pack, subscription?.package, {});
+    const explicitPackId = firstValue(
+      subscription?.current_subscription_pack_id,
+      subscription?.current_pack_id,
+      subscription?.subscription_pack_id,
+      subscription?.pack_id,
+      pack?.id,
+      pack?.pk,
+      typeof pack === 'object' ? null : pack,
+      subscription?.subscription_pack,
+      subscription?.pack,
+      subscription?.package
+    );
+    const monthlyQuantity = quantityKg(
+      pack?.monthly_quantity,
+      pack?.monthly_kg,
+      pack?.total_monthly_quantity,
+      subscription?.monthly_quantity,
+      subscription?.monthly_kg,
+      subscription?.total_monthly_quantity
+    );
+    const deliveryCycle = quantityCycleFrom(
+      pack?.delivery_cycle,
+      pack?.weekly_quantity_cycle,
+      pack?.quantity_cycle,
+      pack?.cycle_quantities,
+      subscription?.delivery_cycle,
+      subscription?.weekly_quantity_cycle,
+      subscription?.quantity_cycle,
+      subscription?.cycle_quantities
+    );
+    const pricePerMonth = finiteMoney(
+      pack?.price,
+      pack?.price_per_month,
+      pack?.monthly_price,
+      pack?.monthly_amount,
+      subscription?.price_per_month,
+      subscription?.monthly_price,
+      subscription?.monthly_amount
+    );
+    const pricePerDelivery = finiteMoney(
+      pack?.weekly_price,
+      pack?.price_per_delivery,
+      pack?.delivery_price,
+      subscription?.price_per_delivery,
+      subscription?.weekly_price,
+      subscription?.delivery_price
+    );
+    const hasLiveShape = monthlyQuantity !== null
+      || deliveryCycle.length > 0
+      || pricePerMonth !== null
+      || pricePerDelivery !== null;
+    if (hasLiveShape) {
+      const liveMatch = state.weeklyPlans.find((plan) => {
+        if (monthlyQuantity !== null && Number(plan.monthlyKg) !== monthlyQuantity) return false;
+        if (deliveryCycle.length > 0) {
+          const planCycle = weeklyDeliveryCycle(plan);
+          if (planCycle.length !== deliveryCycle.length || planCycle.some((value, index) => value !== deliveryCycle[index])) return false;
+        }
+        if (pricePerMonth !== null && Math.abs(Number(plan.monthlyPrice) - pricePerMonth) > 0.005) return false;
+        if (pricePerDelivery !== null && Math.abs(Number(plan.price) - pricePerDelivery) > 0.005) return false;
+        return true;
+      });
+      if (liveMatch) return liveMatch.id;
+    }
+    return explicitPackId;
+  }
+
   function subscriptionName(subscription) {
     const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package, {});
     const catalogPlan = subscriptionCatalogPlan(subscription);
@@ -3833,12 +4216,103 @@
   }
 
   function subscriptionStatus(subscription) {
-    return String(firstValue(subscription.status_display, subscription.plan_status, subscription.status, subscription.is_active === false ? 'Cancelled' : 'Active'));
+    const status = firstValue(subscription.status_display, subscription.plan_status, subscription.status, subscription.is_active === false ? 'Cancelled' : 'Active');
+    return typeof status === 'object'
+      ? String(firstValue(status.name, status.label, status.status, 'Active'))
+      : String(status);
   }
 
   function subscriptionAllowsDeliveryChanges(subscription) {
     const continuous = subscription?.is_continuous;
     return continuous !== false && String(continuous).toLowerCase() !== 'false';
+  }
+
+  function subscriptionHasDeliveredQuantity(subscription) {
+    const explicit = firstValue(
+      subscription?.has_delivered_quantity,
+      subscription?.has_completed_delivery,
+      subscription?.has_started_delivery,
+      subscription?.deliveries_started
+    );
+    if (explicit !== undefined) return explicit === true || String(explicit).toLowerCase() === 'true';
+    const deliveredCount = firstFinite(
+      subscription?.delivered_deliveries_count,
+      subscription?.completed_deliveries_count,
+      subscription?.deliveries_delivered,
+      subscription?.delivered_order_count,
+      subscription?.delivered_quantity
+    );
+    if (deliveredCount !== null) return deliveredCount > 0;
+    const deliveries = firstValue(
+      subscription?.delivered_deliveries,
+      subscription?.completed_deliveries,
+      subscription?.delivered_orders,
+      subscription?.deliveries,
+      subscription?.subscription_orders
+    );
+    if (Array.isArray(deliveries)) {
+      return deliveries.some((delivery) => (
+        delivery?.delivered_at
+        || delivery?.completed_at
+        || /deliver|complete|fulfilled|received/i.test(deliveryStatus(delivery))
+      ));
+    }
+
+    // The subscription list may omit delivery history. If order history is
+    // already loaded, use the matching subscription order as a read-only
+    // fallback so the action still reflects a delivered batch immediately.
+    const planId = subscriptionId(subscription);
+    const matchingOrders = planId != null && Array.isArray(state.orders)
+      ? state.orders.filter((order) => {
+        const relation = firstValue(order?.subscription_plan, order?.subscription_plan_id, order?.plan_id);
+        const relationId = relation && typeof relation === 'object' ? idOf(relation) : relation;
+        return relationId != null && String(relationId) === String(planId);
+      })
+      : [];
+    if (matchingOrders.length) {
+      return matchingOrders.some((order) => (
+        /deliver|complete|fulfilled|received/i.test(orderStatus(order))
+        || (Array.isArray(order?.deliveries) && order.deliveries.some((delivery) => (
+          delivery?.delivered_at
+          || delivery?.completed_at
+          || /deliver|complete|fulfilled|received/i.test(deliveryStatus(delivery))
+        )))
+      ));
+    }
+    return null;
+  }
+
+  function subscriptionIsComplete(subscription) {
+    const explicit = firstValue(
+      subscription?.is_completed,
+      subscription?.is_complete,
+      subscription?.completed,
+      subscription?.subscription_completed,
+      subscription?.has_ended,
+      subscription?.is_expired
+    );
+    if (explicit !== undefined) return explicit === true || String(explicit).toLowerCase() === 'true';
+    const status = subscriptionStatus(subscription).toLowerCase();
+    return /complete|completed|finished|ended|expired|closed/.test(status)
+      || Boolean(firstValue(subscription?.completed_at, subscription?.ended_at, subscription?.expired_at));
+  }
+
+  function subscriptionAllowsPlanChanges(subscription) {
+    const explicit = firstValue(
+      subscription?.can_change_pack,
+      subscription?.can_change_plan,
+      subscription?.plan_change_allowed,
+      subscription?.is_plan_change_allowed,
+      subscription?.pack_change_allowed
+    );
+    if (explicit !== undefined) return explicit === true || String(explicit).toLowerCase() === 'true';
+    const delivered = subscriptionHasDeliveredQuantity(subscription);
+    // A pack/quantity change is locked while this subscription is in progress
+    // after any batch has been delivered. Once the cycle is complete, a new
+    // plan may be selected. If the list response has no delivery history, keep
+    // the action available and let the preview/confirmation endpoint decide.
+    if (subscriptionIsComplete(subscription)) return true;
+    return delivered === null ? true : !delivered;
   }
 
   function vacationCoveringDate(subscription, date) {
@@ -3908,8 +4382,14 @@
     next.append(tile, nextCopy);
 
     const actions = create('div', 'subscription-actions');
+    if (subscriptionAllowsPlanChanges(subscription)) {
+      actions.append(button('Change plan', 'card-action', () => openChangeSubscriptionPlan(subscription)));
+    } else {
+      const note = create('small', 'subscription-action-note is-plan-locked', 'Plan changes unlock after this subscription is complete.');
+      note.title = 'A batch from this subscription has already been delivered. Finish the current delivery cycle before changing quantity.';
+      actions.append(note);
+    }
     actions.append(
-      button('Change plan', 'card-action', () => openChangeSubscriptionPlan(subscription)),
       button('Vacation', 'card-action', () => openVacationForm(subscription)),
       button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
     );
@@ -3928,6 +4408,18 @@
   }
 
   async function openChangeSubscriptionPlan(subscription) {
+    if (!subscriptionAllowsPlanChanges(subscription)) {
+      openDialog(
+        'Weekly plan',
+        'Change plan',
+        makeState(
+          'empty',
+          'Plan changes are locked for this subscription.',
+          'A batch has already been delivered from this plan. You can choose a new quantity after the current subscription is complete.'
+        )
+      );
+      return;
+    }
     const id = subscriptionId(subscription);
     const loading = makeState('loading', 'Finding weekly plans.', 'Loading the live quantities available for your next batches…');
     openDialog('Weekly plan', 'Change plan', loading);
@@ -3937,8 +4429,7 @@
         elements.dialogBody.replaceChildren(makeState('empty', 'No alternative plans are available.', 'Please try again later or contact Atulyash care for help.'));
         return;
       }
-      const currentPack = firstValue(subscription.subscription_pack, subscription.pack, {});
-      const currentPackId = firstValue(currentPack?.id, subscription.subscription_pack_id, subscription.pack_id);
+      const currentPackId = subscriptionCurrentPackId(subscription);
       const form = create('form', 'dialog-form');
       form.append(create('p', 'dialog-copy', 'Choose the amount you want in each weekly fresh batch. Atulyash will recalculate the wallet requirement before you confirm.'));
       const label = create('label', '', 'Weekly quantity');
@@ -3965,6 +4456,7 @@
       let latestPreviewPackId = '';
       let previewRequestId = 0;
       let submitBusy = false;
+      let confirmationBusy = false;
 
       const walletCoverage = (canStartValue, shortfall) => {
         const hasServerDecision = canStartValue !== undefined && canStartValue !== null && canStartValue !== '';
@@ -3983,6 +4475,18 @@
 
       const previewPlan = (plan) => {
         const source = plan && typeof plan === 'object' ? plan : {};
+        const monthlyQuantity = quantityKg(
+          source.monthly_quantity,
+          source.monthly_kg,
+          source.total_monthly_quantity,
+          source.pack_name
+        );
+        const cycle = quantityCycleFrom(
+          source.delivery_cycle,
+          source.cycle_quantities,
+          source.weekly_quantity_cycle,
+          source.quantity_cycle
+        );
         const quantity = firstValue(
           source.quantity_per_week,
           source.weekly_quantity,
@@ -3990,13 +4494,27 @@
           source.weekly_kg
         );
         const quantityNumber = quantityKg(quantity);
-        const quantityText = quantityNumber !== null
-          ? `${bagWeightLabel(quantityNumber)} kg/week`
-          : quantity ? String(quantity) : 'Quantity not supplied';
+        const cycleText = cycle.length === 4
+          ? cycle.every((value) => value === cycle[0])
+            ? `${bagWeightLabel(cycle[0])} kg every week`
+            : `${cycle.map((value) => `${bagWeightLabel(value)} kg`).join(', ')} across four deliveries`
+          : '';
+        const quantityText = monthlyQuantity !== null
+          ? `${bagWeightLabel(monthlyQuantity)} kg/month`
+          : quantityNumber !== null
+            ? `${bagWeightLabel(quantityNumber)} kg/week`
+            : quantity ? String(quantity) : 'Quantity not supplied';
         const price = finiteMoney(source.price_per_month, source.monthly_price, source.price, source.amount);
+        const averagePrice = finiteMoney(
+          source.average_price_per_delivery,
+          source.weekly_price,
+          source.price_per_delivery
+        );
         return {
           quantityText,
           price,
+          cycleText,
+          averagePrice,
           priceText: price === null ? 'Monthly price not supplied' : `${formatMoney(price)} per month`
         };
       };
@@ -4004,6 +4522,10 @@
       const renderPackChangePreview = (preview, stateName = 'idle', message = '') => {
         previewPanel.replaceChildren();
         previewPanel.classList.toggle('is-error', stateName === 'error');
+        previewPanel.classList.remove('is-pending');
+        if (!submitBusy && submit.textContent === 'Payment confirmation required') {
+          submit.textContent = 'Update weekly plan →';
+        }
         const header = create('div', 'modification-preview-header');
         header.append(
           create('div', 'modification-preview-eyebrow', 'Server wallet preview'),
@@ -4044,9 +4566,33 @@
           data.minimum_wallet_required,
           data.gross_wallet_required
         );
-        const perDelivery = finiteMoney(funding.price_per_delivery, data.price_per_delivery);
+        const averagePerDelivery = finiteMoney(
+          funding.average_price_per_delivery,
+          data.average_price_per_delivery,
+          data.new_pack_average_price_per_delivery,
+          revised.averagePrice,
+          funding.price_per_delivery,
+          data.price_per_delivery
+        );
+        const priceCycleSource = firstValue(
+          funding.price_cycle,
+          data.price_cycle,
+          data.new_pack_price_cycle,
+          data.new_pack_weekly_price_cycle,
+          revised.price_cycle
+        );
+        const priceCycle = Array.isArray(priceCycleSource)
+          ? priceCycleSource.map((value) => finiteMoney(value)).filter((value) => value !== null)
+          : [];
         const deliveries = firstValue(funding.minimum_deliveries_required, data.minimum_deliveries_required);
         const shortfall = finiteMoney(funding.shortfall, data.shortfall);
+        const amountToDebit = finiteMoney(
+          funding.pack_change_amount_due,
+          data.amount_to_debit,
+          data.wallet_debit,
+          data.payment_summary?.balance_due,
+          data.payment_summary?.final_amount
+        );
         const canStartValue = firstValue(funding.can_start_subscription, data.can_start_subscription);
         const walletCovered = walletCoverage(canStartValue, shortfall);
 
@@ -4057,15 +4603,21 @@
           if (detailText) figure.append(create('small', '', detailText));
           figures.append(figure);
         };
-        addFigure('Current plan', existing.quantityText, existing.priceText);
-        addFigure('New plan', revised.quantityText, revised.priceText, 'is-primary');
+        addFigure('Current plan', existing.quantityText, [existing.priceText, existing.cycleText].filter(Boolean).join(' · '));
+        addFigure('New plan', revised.quantityText, [revised.priceText, revised.cycleText].filter(Boolean).join(' · '), 'is-primary');
         if (available !== null) addFigure('Wallet available', formatMoney(available));
         if (required !== null) {
           const requirementDetail = [
             deliveries ? `${deliveries} deliveries` : null,
-            perDelivery !== null ? `${formatMoney(perDelivery)} per delivery` : null
+            averagePerDelivery !== null ? `${formatMoney(averagePerDelivery)} average per delivery` : null,
+            priceCycle.length === 4 && !priceCycle.every((value) => value === priceCycle[0])
+              ? `cycle: ${priceCycle.map((value) => formatMoney(value)).join(' · ')}`
+              : null
           ].filter(Boolean).join(' · ');
           addFigure('Wallet required', formatMoney(required), requirementDetail);
+        }
+        if (amountToDebit !== null && amountToDebit > 0.005) {
+          addFigure('Plan-change payment', formatMoney(amountToDebit), 'Required to finish this upgrade.', 'is-due');
         }
         if (shortfall !== null && shortfall > 0.005) {
           addFigure('Additional recharge', formatMoney(shortfall), 'Add this amount before confirming.', 'is-due');
@@ -4074,8 +4626,10 @@
 
         if (walletCovered) {
           previewPanel.append(
-            create('p', 'modification-preview-message', 'Your wallet covers this plan. Confirm to apply the new pack to future deliveries.'),
-            create('small', '', 'Already charged or delivered records remain unchanged.')
+            create('p', 'modification-preview-message', amountToDebit !== null && amountToDebit > 0.005
+              ? `Your wallet covers the new plan. A ${formatMoney(amountToDebit)} payment confirmation is required to finish the upgrade.`
+              : 'Your wallet covers this plan. Confirm to apply the new pack to future deliveries.'),
+            create('small', '', 'Already charged or delivered records remain unchanged. The plan stays unchanged until payment confirmation succeeds.')
           );
           previewPanel.classList.remove('is-error');
         } else {
@@ -4146,6 +4700,87 @@
         }
       };
 
+      const showPackChangeConfirmation = (updateData) => {
+        const paymentAmount = finiteMoney(
+          updateData?.payment_amount,
+          updateData?.amount_to_debit,
+          updateData?.wallet_debit,
+          latestPreview?.wallet_funding?.pack_change_amount_due,
+          latestPreview?.amount_to_debit,
+          latestPreview?.payment_summary?.balance_due
+        );
+        const confirmationPayload = updateData?.confirmation_payload;
+        const hasConfirmationPayload = confirmationPayload && typeof confirmationPayload === 'object';
+
+        submitBusy = false;
+        setButtonBusy(submit, false);
+        submit.disabled = true;
+        submit.textContent = 'Payment confirmation required';
+        previewPanel.classList.remove('is-error');
+        previewPanel.classList.add('is-pending');
+
+        const panel = create('div', 'confirmation-panel');
+        panel.append(
+          create('strong', '', 'Confirm payment to apply this plan'),
+          create('p', '', paymentAmount !== null && paymentAmount > 0.005
+            ? `A ${formatMoney(paymentAmount)} payment is required before your weekly plan can change.`
+            : 'Payment confirmation is required before your weekly plan can change.'),
+          create('small', '', 'Your current plan remains active until the payment is confirmed.')
+        );
+        const actions = create('div', 'dialog-actions');
+        if (hasConfirmationPayload) {
+          const confirm = button(
+            paymentAmount !== null && paymentAmount > 0.005
+              ? `Confirm plan change · ${formatMoney(paymentAmount)} →`
+              : 'Confirm plan change →',
+            'primary-button',
+            async (event) => {
+              if (confirmationBusy) return;
+              const control = event.currentTarget;
+              confirmationBusy = true;
+              setButtonBusy(control, true, 'Confirming payment…');
+              try {
+                const requestedPath = String(updateData.confirmation_endpoint || '/orders/order/place/');
+                const confirmationPath = requestedPath.startsWith('/') ? requestedPath : '/orders/order/place/';
+                const result = await apiCall('orders', ['place'], confirmationPayload, {
+                  path: confirmationPath,
+                  method: 'POST',
+                  form: confirmationPayload
+                });
+                const data = responseData(result);
+                const appliedImmediately = data?.applied_immediately === true
+                  || String(data?.applied_immediately || '').toLowerCase() === 'true';
+                const appliedPackId = firstValue(data?.new_pack_id, data?.subscription_pack_id, data?.pack_id);
+                if (!appliedImmediately || (appliedPackId != null && String(appliedPackId) !== String(select.value))) {
+                  throw new Error(firstValue(data?.message, 'Payment was not confirmed. Your current plan was not changed.'));
+                }
+                closeDialog();
+                state.loaded.delete('subscriptions');
+                state.loaded.forEach((key) => {
+                  if (String(key).startsWith('orders:')) state.loaded.delete(key);
+                });
+                invalidateWalletCache();
+                await renderSubscriptions(true);
+                const debit = finiteMoney(data?.amount_debited, paymentAmount);
+                showToast(debit !== null && debit > 0.005
+                  ? `Your weekly plan was updated. ${formatMoney(debit)} was debited.`
+                  : 'Your weekly plan was updated.');
+              } catch (error) {
+                showToast(friendlyError(error, 'Payment confirmation failed. Your current plan was not changed.'), 'error');
+                setButtonBusy(control, false);
+              } finally {
+                confirmationBusy = false;
+              }
+            }
+          );
+          actions.append(confirm);
+        } else {
+          actions.append(create('small', '', 'The payment confirmation details were not returned. Please try again or contact Atulyash care.'));
+        }
+        panel.append(actions);
+        previewPanel.append(panel);
+      };
+
       select.addEventListener('change', () => {
         void requestPackChangePreview();
       });
@@ -4185,13 +4820,26 @@
             return;
           }
           setButtonBusy(submit, true, 'Updating…');
-          await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
+          const updateResult = await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
             path: `/subscription/subscription_plan/${id}/update-pack/`,
             method: 'POST',
             form: { new_pack_id }
           });
+          const updateData = responseData(updateResult);
+          const requiresConfirmation = updateData?.requires_confirmation === true
+            || String(updateData?.requires_confirmation || '').toLowerCase() === 'true';
+          const appliedImmediately = updateData?.applied_immediately === true
+            || String(updateData?.applied_immediately || '').toLowerCase() === 'true';
+          if (requiresConfirmation && !appliedImmediately) {
+            showPackChangeConfirmation(updateData);
+            return;
+          }
+          if (updateData?.success === false) {
+            throw new Error(firstValue(updateData.message, 'The plan change was not applied.'));
+          }
           closeDialog();
           state.loaded.delete('subscriptions');
+          invalidateWalletCache();
           showToast('Your weekly plan has been updated.');
           await renderSubscriptions(true);
         } catch (error) {
@@ -4314,13 +4962,40 @@
         })
       ]);
       if (deliveriesResult.status === 'rejected') throw deliveriesResult.reason;
-      const summary = summaryResult.status === 'fulfilled' ? responseData(summaryResult.value) : {};
+      const summaryPayload = summaryResult.status === 'fulfilled' ? responseData(summaryResult.value) : {};
+      const summary = summaryPayload && typeof summaryPayload === 'object' ? summaryPayload : {};
+      const summarySources = [
+        summary,
+        summary.summary,
+        summary.skip_summary,
+        summary.data,
+        summary.data?.summary,
+        summary.data?.skip_summary
+      ].filter((source) => source && typeof source === 'object');
+      const summaryValue = (...keys) => firstValue(
+        ...summarySources.flatMap((source) => keys.map((key) => source[key]))
+      );
       const remainingSkips = firstFinite(
-        summary.remaining,
-        summary.skips_remaining,
-        summary.remaining_skips,
-        summary.available,
-        summary.skips_available
+        summaryValue(
+          'remaining',
+          'skips_remaining',
+          'remaining_skips',
+          'available',
+          'skips_available',
+          'available_skips',
+          'skips_left',
+          'remaining_skip_count'
+        )
+      );
+      const usedSkips = summaryValue(
+        'used_this_month',
+        'used',
+        'skips_used',
+        'used_skips',
+        'used_this_period',
+        'total_used',
+        'skips_consumed',
+        'consumed_skips'
       );
       const upcomingSkipLimit = remainingSkips === null
         ? 4
@@ -4328,13 +5003,13 @@
       const deliveriesByDate = new Map();
       [
         ...responseList(deliveriesResult.value),
-        ...(Array.isArray(summary.skipped_deliveries)
-          ? summary.skipped_deliveries
+        ...(Array.isArray(summaryValue('skipped_deliveries'))
+          ? summaryValue('skipped_deliveries')
               .filter((delivery) => delivery.can_unskip !== false)
               .map((delivery) => ({ ...delivery, is_skipped: true }))
           : []),
-        ...(Array.isArray(summary.skipped_dates)
-          ? summary.skipped_dates.map((entry) => ({
+        ...(Array.isArray(summaryValue('skipped_dates'))
+          ? summaryValue('skipped_dates').map((entry) => ({
               ...(entry && typeof entry === 'object' ? entry : { delivery_date: entry }),
               is_skipped: true,
               skipped: true
@@ -4382,8 +5057,20 @@
       if (Object.keys(summary).length) {
         const summaryBox = create('div', 'dialog-summary');
         [
-          ['Skips available', firstValue(summary.remaining, summary.skips_remaining, summary.available, '—')],
-          ['Skips used', firstValue(summary.used_this_month, summary.used, summary.skips_used, '—')]
+          ['Skips available', firstValue(
+            summaryValue(
+              'remaining',
+              'skips_remaining',
+              'remaining_skips',
+              'available',
+              'skips_available',
+              'available_skips',
+              'skips_left',
+              'remaining_skip_count'
+            ),
+            '—'
+          )],
+          ['Skips used', firstValue(usedSkips, '—')]
         ].forEach(([label, value]) => {
           const row = create('div', 'dialog-summary-row');
           row.append(create('span', '', label), create('strong', '', value));
@@ -5429,6 +6116,13 @@
       : Promise.resolve(null);
     openDialog('Delivery address', editing ? 'Edit saved address' : 'Add an address', form);
     window.setTimeout(() => void initializeAddressMap(currentLocationRequest), 0);
+  }
+
+  function invalidateWalletCache() {
+    state.loaded.delete('wallet');
+    state.wallet = null;
+    state.walletTransactions = [];
+    state.walletPreview = null;
   }
 
   async function loadWallet(force = false) {

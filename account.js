@@ -80,6 +80,7 @@
     accountBagSubtotalLabel: $('accountBagSubtotalLabel'),
     accountBagSubtotal: $('accountBagSubtotal'),
     accountBagCreditRow: $('accountBagCreditRow'),
+    accountBagCreditLabel: $('accountBagCreditLabel'),
     accountBagCredit: $('accountBagCredit'),
     accountBagDeliveryRow: $('accountBagDeliveryRow'),
     accountBagDeliveryLabel: $('accountBagDeliveryLabel'),
@@ -148,6 +149,9 @@
     deliveryHomeCount: $('deliveryHomeCount'),
     deliveryHomeCountLabel: $('deliveryHomeCountLabel'),
     walletBalance: $('walletBalance'),
+    walletBalanceBreakdown: $('walletBalanceBreakdown'),
+    walletOriginalBalance: $('walletOriginalBalance'),
+    walletCashbackBalance: $('walletCashbackBalance'),
     rechargeForm: $('rechargeForm'),
     rechargeAmount: $('rechargeAmount'),
     rechargeOptions: $('rechargeOptions'),
@@ -821,6 +825,64 @@
       state.accountBagPayload,
       ['applied_coupon_discount', 'discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']
     );
+    const serverCashback = accountBagMoney(
+      state.accountBagPayload,
+      [
+        'cashback_balance',
+        'cashback_credit',
+        'cashback_amount',
+        'wallet_cashback',
+        'bonus_amount',
+        'extra_credit',
+        'prepaid_advantage_amount',
+        'atulyash_cashback',
+        'coupon_cashback',
+        'coupon_credit'
+      ]
+    );
+    const serverMinimumWalletRequired = accountBagMoney(
+      state.accountBagPayload,
+      ['minimum_wallet_required', 'minimum_wallet_balance', 'wallet_required']
+    );
+    const serverGrossWalletRequired = accountBagMoney(
+      state.accountBagPayload,
+      ['gross_wallet_required', 'wallet_cover', 'four_delivery_wallet_cover']
+    );
+    const serverWalletBalanceTotal = accountBagMoney(
+      state.accountBagPayload,
+      [
+        'wallet_balance_total',
+        'total_wallet_balance',
+        'wallet_total_balance',
+        'wallet_credit_total',
+        'post_payment_wallet_balance',
+        'wallet_balance_after_payment',
+        'total_credit',
+        'new_wallet_balance',
+        'new_balance'
+      ]
+    );
+    let couponCode = '';
+    let cashbackTreatment = '';
+    for (const source of bagPayloadSources(state.accountBagPayload)) {
+      const appliedCoupon = source.applied_coupon || source.coupon_detail || source.coupon;
+      couponCode = couponCode
+        || appliedCoupon?.code
+        || appliedCoupon?.coupon_code
+        || source.applied_coupon_code
+        || source.coupon_code
+        || '';
+      cashbackTreatment = cashbackTreatment
+        || source.cashback_treatment
+        || source.coupon_treatment
+        || source.credit_treatment
+        || source.wallet_credit_type
+        || '';
+    }
+    const cashbackCoupon = hasWeekly && (
+      String(couponCode).trim().toUpperCase() === 'ATULYASH100'
+      || /cashback|bonus|credit/i.test(String(cashbackTreatment))
+    );
     const serverTotal = accountBagMoney(
       state.accountBagPayload,
       ['cart_total', 'net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']
@@ -829,17 +891,39 @@
     const subtotal = useServerSummary && Number.isFinite(serverSubtotal)
       ? serverSubtotal
       : lineSubtotal;
-    const discount = useServerSummary && Number.isFinite(serverDiscount)
+    const cashback = useServerSummary && Number.isFinite(serverCashback)
+      ? Math.max(0, serverCashback)
+      : cashbackCoupon && Number.isFinite(serverDiscount)
+        ? Math.max(0, serverDiscount)
+        : 0;
+    const discount = useServerSummary && Number.isFinite(serverDiscount) && cashback <= 0
       ? Math.max(0, serverDiscount)
       : 0;
-    const total = useServerSummary && Number.isFinite(serverTotal)
+    const total = useServerSummary && Number.isFinite(serverTotal) && cashback <= 0
       ? serverTotal
       : Math.max(0, subtotal - discount);
+    const grossWalletRequired = Number.isFinite(serverGrossWalletRequired)
+      ? Math.max(0, serverGrossWalletRequired)
+      : subtotal;
+    const amountNeeded = hasWeekly
+      ? Number.isFinite(serverMinimumWalletRequired)
+        ? Math.max(0, serverMinimumWalletRequired)
+        : grossWalletRequired
+      : total;
+    const explicitWalletTotal = Number.isFinite(serverWalletBalanceTotal)
+      ? Math.max(0, serverWalletBalanceTotal)
+      : null;
+    const walletBalanceTotal = hasWeekly && cashback > 0
+      ? Math.max(explicitWalletTotal ?? 0, grossWalletRequired + cashback)
+      : explicitWalletTotal;
     const delivery = accountBagDeliverySummary(state.accountBagPayload, { hasWeekly, hasLocalSelections });
     return {
       subtotal,
       discount,
+      cashback,
       total,
+      amountNeeded,
+      walletBalanceTotal,
       deliveryCharge: delivery.amount,
       deliveryKnown: delivery.known,
       deliveryLabel: delivery.label,
@@ -969,8 +1053,16 @@
         : 'Subtotal';
     }
     if (elements.accountBagSubtotal) elements.accountBagSubtotal.textContent = currency.format(summary.subtotal);
-    if (elements.accountBagCreditRow) elements.accountBagCreditRow.hidden = summary.discount <= 0;
-    if (elements.accountBagCredit) elements.accountBagCredit.textContent = `−${currency.format(summary.discount)}`;
+    const hasCashback = hasWeekly && summary.cashback > 0;
+    if (elements.accountBagCreditRow) elements.accountBagCreditRow.hidden = summary.discount <= 0 && !hasCashback;
+    if (elements.accountBagCreditLabel) {
+      elements.accountBagCreditLabel.textContent = hasCashback ? 'Atulyash cashback' : 'Your first Atulyash experience';
+    }
+    if (elements.accountBagCredit) {
+      elements.accountBagCredit.textContent = hasCashback
+        ? `+${currency.format(summary.cashback)}`
+        : `−${currency.format(summary.discount)}`;
+    }
     if (elements.accountBagDeliveryRow) elements.accountBagDeliveryRow.hidden = state.accountBagItems.length === 0;
     if (elements.accountBagDeliveryLabel) elements.accountBagDeliveryLabel.textContent = summary.deliveryLabel;
     if (elements.accountBagDeliveryNote) elements.accountBagDeliveryNote.textContent = summary.deliveryNote;
@@ -989,11 +1081,18 @@
           : 'Your live delivery amount will appear as soon as this saved selection is synchronised.';
     }
     if (elements.accountBagTotalLabel) {
-      elements.accountBagTotalLabel.textContent = hasWeekly
-        ? 'Minimum wallet balance'
+      elements.accountBagTotalLabel.textContent = hasCashback
+        ? 'Wallet balance total'
+        : hasWeekly
+          ? 'Minimum wallet balance'
         : 'Order total';
     }
-    if (elements.accountBagTotal) elements.accountBagTotal.textContent = currency.format(summary.total);
+    if (elements.accountBagTotal) {
+      const displayTotal = hasCashback && Number.isFinite(summary.walletBalanceTotal)
+        ? summary.walletBalanceTotal
+        : summary.total;
+      elements.accountBagTotal.textContent = currency.format(displayTotal);
+    }
 
     const fragment = document.createDocumentFragment();
     state.accountBagItems.forEach((line) => fragment.append(makeAccountBagLine(line)));
@@ -3325,7 +3424,18 @@
       layout.append(journeyColumn, detailColumn);
       const summary = create('div', 'dialog-summary');
       const paymentThrough = firstValue(detail.payment_method_display, detail.payment_method, detail.payment_through, detail.payment_status);
-      const paymentLabel = /wallet/i.test(String(paymentThrough || '')) ? 'Atulyash Wallet' : String(paymentThrough || 'Recorded');
+      const walletReserved = orderPaymentValue(
+        detail,
+        'amount_reserved',
+        'reserved_amount',
+        'wallet_reserved_amount',
+        'reservation_amount',
+        'wallet_hold_amount',
+        'amount_held'
+      );
+      const paymentLabel = walletReserved !== null && walletReserved > 0
+        ? 'Wallet payment · charged after delivery confirmation'
+        : /wallet/i.test(String(paymentThrough || '')) ? 'Atulyash Wallet' : String(paymentThrough || 'Recorded');
       const summaryRows = [
         ['Status', orderStatus(detail)],
         ['Placed on', formatDate(orderDate(detail))],
@@ -3755,13 +3865,25 @@
     const body = create('div');
     body.append(create('p', 'dialog-copy', 'This customer receipt brings your order, delivery and payment details together in one place. You can print it for your records.'));
     const summary = create('div', 'dialog-summary');
-    [
+    const walletReserved = orderPaymentValue(
+      order,
+      'amount_reserved',
+      'reserved_amount',
+      'wallet_reserved_amount',
+      'reservation_amount',
+      'wallet_hold_amount',
+      'amount_held'
+    );
+    const summaryRows = [
       ['Order reference', orderNumber(order)],
       ['Placed on', formatDate(orderDate(order))],
       ['Status', orderStatus(order)],
-      ['Payment', String(firstValue(order.payment_method_display, order.payment_method, order.payment_status, 'Recorded'))],
+      ['Payment', walletReserved !== null && walletReserved > 0
+        ? 'Wallet payment · charged after delivery confirmation'
+        : String(firstValue(order.payment_method_display, order.payment_method, order.payment_status, 'Recorded'))],
       ['Order total', orderAmountText(order)]
-    ].forEach(([label, value]) => {
+    ];
+    summaryRows.forEach(([label, value]) => {
       const row = create('div', 'dialog-summary-row');
       row.append(create('span', '', label), create('strong', '', value));
       summary.append(row);
@@ -3792,12 +3914,24 @@
     const heading = documentRef.createElement('h1');
     heading.textContent = orderNumber(order);
     root.append(eyebrow, heading);
-    [
+    const walletReserved = orderPaymentValue(
+      order,
+      'amount_reserved',
+      'reserved_amount',
+      'wallet_reserved_amount',
+      'reservation_amount',
+      'wallet_hold_amount',
+      'amount_held'
+    );
+    const receiptRows = [
       ['Placed on', formatDate(orderDate(order))],
       ['Status', orderStatus(order)],
-      ['Payment', String(firstValue(order.payment_method_display, order.payment_method, order.payment_status, 'Recorded'))],
+      ['Payment', walletReserved !== null && walletReserved > 0
+        ? 'Wallet payment · charged after delivery confirmation'
+        : String(firstValue(order.payment_method_display, order.payment_method, order.payment_status, 'Recorded'))],
       ['Order total', orderAmountText(order)]
-    ].forEach(([label, value]) => {
+    ];
+    receiptRows.forEach(([label, value]) => {
       const row = documentRef.createElement('div');
       row.className = 'row';
       const key = documentRef.createElement('span');
@@ -4222,6 +4356,35 @@
       : String(status);
   }
 
+  function subscriptionPlanLength(subscription) {
+    const continuous = subscription?.is_continuous;
+    if (continuous === true || String(continuous).toLowerCase() === 'true') return 'Ongoing';
+
+    const deliveries = Number(firstValue(
+      subscription?.total_deliveries,
+      subscription?.delivery_count,
+      subscription?.deliveries_count
+    ));
+    const months = Number(firstValue(
+      subscription?.duration_in_months,
+      subscription?.duration_months,
+      subscription?.durationMonths
+    ));
+    if (Number.isFinite(deliveries) && deliveries > 0) {
+      const deliveryLabel = `${deliveries} ${deliveries === 1 ? 'delivery' : 'deliveries'}`;
+      if (Number.isFinite(months) && months > 0) {
+        return `${deliveryLabel} · ${months} ${months === 1 ? 'month' : 'months'}`;
+      }
+      return deliveryLabel;
+    }
+    if (Number.isFinite(months) && months > 0) {
+      return `${months} ${months === 1 ? 'month' : 'months'}`;
+    }
+
+    const explicit = firstValue(subscription?.duration_display, subscription?.duration);
+    return explicit || 'Ongoing';
+  }
+
   function subscriptionAllowsDeliveryChanges(subscription) {
     const continuous = subscription?.is_continuous;
     return continuous !== false && String(continuous).toLowerCase() !== 'false';
@@ -4347,7 +4510,7 @@
     const catalogPlan = subscriptionCatalogPlan(subscription);
     [
       ['Delivery day', firstValue(subscription.delivery_day, subscription.weekday, 'As scheduled')],
-      ['Plan length', firstValue(subscription.duration_display, subscription.duration, pack?.duration, 'Ongoing')],
+      ['Plan length', subscriptionPlanLength(subscription)],
       ['Weekly value', formatMoney(firstValue(subscription.price_per_delivery, subscription.weekly_price, pack?.weekly_price, catalogPlan?.price, 0))],
       ['Wallet cover (4 deliveries)', formatMoney(firstValue(subscription.monthly_price, pack?.price, catalogPlan?.monthlyPrice, 0))],
       ['Plan reference', `#${subscriptionId(subscription) || '—'}`]
@@ -6151,15 +6314,91 @@
     return state.wallet;
   }
 
+  function walletBalanceSnapshot(wallet) {
+    const sources = [wallet, wallet?.data, wallet?.wallet, wallet?.data?.wallet]
+      .filter((source) => source && typeof source === 'object');
+    const value = (...keys) => firstValue(...sources.flatMap((source) => keys.map((key) => source[key])));
+    const reserved = finiteMoney(value(
+      'reserved_balance',
+      'wallet_reserved_balance',
+      'reserved_amount',
+      'wallet_reserved_amount',
+      'amount_reserved',
+      'held_balance',
+      'wallet_hold_amount'
+    ));
+    const total = finiteMoney(value(
+      'wallet_balance_total',
+      'total_wallet_balance',
+      'wallet_total_balance',
+      'wallet_credit_total',
+      'post_payment_wallet_balance',
+      'wallet_balance_after_payment',
+      'total_credit',
+      'new_wallet_balance',
+      'new_balance',
+      'wallet_balance',
+      'current_balance',
+      'balance',
+      'total_balance',
+      'ledger_balance',
+      'amount'
+    ));
+    const cashback = finiteMoney(value(
+      'cashback_balance',
+      'wallet_cashback_balance',
+      'cashback_amount',
+      'cashback',
+      'bonus_balance',
+      'bonus_amount',
+      'extra_credit',
+      'prepaid_advantage_amount',
+      'atulyash_cashback',
+      'cashback_credit',
+      'atulyash_cashback_credit',
+      'atulyash_credit',
+      'coupon_cashback',
+      'coupon_bonus',
+      'promotional_credit',
+      'coupon_credit'
+    ));
+    const explicitOriginal = finiteMoney(value(
+      'original_balance',
+      'original_wallet_balance',
+      'cash_balance',
+      'cash_wallet_balance'
+    ));
+    const creditedTotal = total === null && explicitOriginal !== null && cashback !== null
+      ? explicitOriginal + cashback
+      : total;
+    const original = explicitOriginal !== null
+      ? Math.max(0, explicitOriginal)
+      : creditedTotal !== null && cashback !== null
+        ? Math.max(0, creditedTotal - cashback)
+        : null;
+    const explicitAvailable = finiteMoney(value(
+      'available_balance',
+      'available_to_spend',
+      'spendable_balance',
+      'wallet_available_balance'
+    ));
+    const available = explicitAvailable !== null
+      ? explicitAvailable
+      : creditedTotal !== null && reserved !== null
+        ? Math.max(0, creditedTotal - reserved)
+        : creditedTotal;
+    return {
+      total: creditedTotal,
+      available,
+      reserved: reserved === null ? null : Math.max(0, reserved),
+      original,
+      cashback: cashback === null ? null : Math.max(0, cashback)
+    };
+  }
+
   function walletBalanceValue(wallet) {
-    return firstValue(
-      wallet?.current_balance,
-      wallet?.balance,
-      wallet?.available_balance,
-      wallet?.wallet_balance,
-      wallet?.amount,
-      0
-    );
+    const snapshot = walletBalanceSnapshot(wallet);
+    return snapshot.total ?? snapshot.available ?? 0;
   }
 
   function renderWalletTransactions() {
@@ -6188,16 +6427,23 @@
       // visually neutral so customers do not mistake it for available balance.
       const pendingDescriptor = `${status} ${reference} ${type} ${title}`;
       const isPending = /pending|initiated|created|processing|awaiting|in[ -]?progress/i.test(pendingDescriptor);
-      const debit = !isPending && (/debit|payment|purchase|spent/i.test(type) || amount < 0);
+      const isReleasedReservation = /reserv|hold|authoriz/i.test(pendingDescriptor)
+        && /release|released|reversal|reversed|cancel/i.test(pendingDescriptor);
+      const isReservation = !isPending && !isReleasedReservation && /reserv|hold|authoriz/i.test(pendingDescriptor);
+      const debit = !isPending && !isReservation && (/debit|payment|purchase|spent/i.test(type) || amount < 0);
       if (isPending && /recharge/i.test(`${type} ${title}`)) hasPendingRecharge = true;
       const row = create('div', `transaction-row${isPending ? ' is-pending' : ''}`);
-      row.append(create('span', 'transaction-icon', isPending ? '…' : debit ? '−' : '+'));
+      row.append(create('span', 'transaction-icon', isPending ? '…' : isReservation ? '⌁' : debit ? '−' : '+'));
       const copy = create('div');
       const displayTitle = isPending && /recharge/i.test(title)
         ? 'Wallet recharge awaiting confirmation'
+        : isReservation
+          ? 'Subscription payment pending delivery'
         : title;
       const displayStatus = isPending
         ? 'Payment initiated · pending confirmation'
+        : isReservation
+          ? 'Applied after delivery confirmation'
         : firstValue(reference, status, 'Recorded');
       copy.append(
         create('h3', '', displayTitle),
@@ -6205,8 +6451,12 @@
       );
       const amountText = create(
         'strong',
-        `transaction-amount${debit ? ' is-debit' : isPending ? ' is-pending' : ''}`,
-        isPending ? `${formatMoney(Math.abs(amount))} pending` : `${debit ? '−' : '+'}${formatMoney(Math.abs(amount))}`
+        `transaction-amount${debit ? ' is-debit' : isReservation ? ' is-pending' : isPending ? ' is-pending' : ''}`,
+        isPending
+          ? `${formatMoney(Math.abs(amount))} pending`
+          : isReservation
+            ? `${formatMoney(Math.abs(amount))} pending`
+            : `${debit ? '−' : '+'}${formatMoney(Math.abs(amount))}`
       );
       row.append(copy, amountText);
       fragment.append(row);
@@ -6227,7 +6477,16 @@
     renderLoading(elements.walletTransactions, 'Preparing your wallet activity…');
     try {
       const wallet = await loadWallet(force);
-      elements.walletBalance.textContent = formatMoney(walletBalanceValue(wallet));
+      const walletSnapshot = walletBalanceSnapshot(wallet);
+      elements.walletBalance.textContent = formatMoney(walletSnapshot.total ?? walletSnapshot.available ?? 0);
+      const hasBreakdown = walletSnapshot.original !== null && walletSnapshot.cashback !== null;
+      if (elements.walletBalanceBreakdown) elements.walletBalanceBreakdown.hidden = !hasBreakdown;
+      if (elements.walletOriginalBalance) {
+        elements.walletOriginalBalance.textContent = hasBreakdown ? formatMoney(walletSnapshot.original) : '₹—';
+      }
+      if (elements.walletCashbackBalance) {
+        elements.walletCashbackBalance.textContent = hasBreakdown ? `+${formatMoney(walletSnapshot.cashback)}` : '+₹—';
+      }
       renderWalletTransactions();
       const options = state.rechargeOptionsData || [];
       if (options.length) {
@@ -7269,7 +7528,7 @@
       if (elements.weeklyChoicePerDelivery) elements.weeklyChoicePerDelivery.textContent = currency.format(plan.price);
       if (elements.weeklyChoiceFirstMonth) elements.weeklyChoiceFirstMonth.textContent = currency.format(plan.monthlyPrice);
       if (elements.weeklyChoicePaymentCopy) {
-        elements.weeklyChoicePaymentCopy.textContent = `Keep ${currency.format(plan.monthlyPrice)} in your Atulyash Wallet before starting. It is charged delivery by delivery, not as one upfront monthly debit.`;
+        elements.weeklyChoicePaymentCopy.textContent = `Keep ${currency.format(plan.monthlyPrice)} in your Atulyash Wallet before starting. It is charged only after the rider confirms each delivery, not as one upfront monthly debit.`;
       }
     }
     elements.quickOrderWeightBadge.textContent = weekly ? `${compactWeight} kg/mo` : `${compactWeight} kg`;

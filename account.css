@@ -2029,6 +2029,37 @@ select {
   letter-spacing: -.04em;
 }
 
+.wallet-balance-breakdown {
+  display: grid;
+  width: min(100%, 300px);
+  gap: 7px;
+  margin: 18px 0 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 253, 248, .2);
+}
+
+.wallet-balance-breakdown > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wallet-balance-breakdown span {
+  color: rgba(255, 253, 248, .62);
+  font-size: .68rem;
+}
+
+.wallet-balance-breakdown strong {
+  color: var(--cream-50);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.wallet-balance-breakdown > div:last-child strong {
+  color: var(--wheat-300);
+}
+
 .wallet-card > span {
   color: rgba(255, 253, 248, .6);
   font-size: .68rem;

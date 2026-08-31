@@ -179,6 +179,8 @@
     checkoutWalletCard: document.getElementById('checkoutWalletCard'),
     checkoutWalletState: document.getElementById('checkoutWalletState'),
     checkoutWalletBalance: document.getElementById('checkoutWalletBalance'),
+    checkoutWalletReservedRow: document.getElementById('checkoutWalletReservedRow'),
+    checkoutWalletReserved: document.getElementById('checkoutWalletReserved'),
     checkoutWalletOrderLabel: document.getElementById('checkoutWalletOrderLabel'),
     checkoutWalletOrderTotal: document.getElementById('checkoutWalletOrderTotal'),
     checkoutWalletRequirementRow: document.getElementById('checkoutWalletRequirementRow'),
@@ -295,6 +297,7 @@
   let deliveryAvailabilityGeneration = 0;
   let orderInFlight = false;
   let checkoutWalletBalanceAmount = null;
+  let checkoutWalletReservedAmount = null;
   let checkoutWalletBalanceGeneration = 0;
   let walletRechargePreview = null;
   let walletFundingPolicy = null;
@@ -1205,6 +1208,37 @@
     const sources = cartResponseSources(payload);
     const subtotal = firstMoney(sources, ['items_total', 'subtotal', 'sub_total', 'cart_subtotal', 'gross_amount', 'total_before_discount']);
     const discount = firstMoney(sources, ['applied_coupon_discount', 'discount_amount', 'discount', 'coupon_discount', 'kit_discount', 'total_discount']);
+    const cashback = firstMoney(sources, [
+      'cashback_balance',
+      'cashback_credit',
+      'cashback_amount',
+      'wallet_cashback',
+      'bonus_amount',
+      'extra_credit',
+      'prepaid_advantage_amount',
+      'atulyash_cashback',
+      'coupon_cashback',
+      'coupon_credit'
+    ]);
+    const cashbackTreatment = firstValue(
+      ...sources.flatMap((source) => [
+        source?.cashback_treatment,
+        source?.coupon_treatment,
+        source?.credit_treatment,
+        source?.wallet_credit_type
+      ])
+    );
+    const walletBalanceTotal = firstMoney(sources, [
+      'wallet_balance_total',
+      'total_wallet_balance',
+      'wallet_total_balance',
+      'wallet_credit_total',
+      'post_payment_wallet_balance',
+      'wallet_balance_after_payment',
+      'total_credit',
+      'new_wallet_balance',
+      'new_balance'
+    ]);
     const deliveryCharge = firstMoney(sources, ['delivery_charge']);
     const total = firstMoney(sources, ['cart_total', 'net_payable', 'grand_total', 'final_amount', 'payable_amount', 'total_amount', 'total']);
     let deliveryReason = '';
@@ -1220,6 +1254,9 @@
     return {
       subtotal: Number.isFinite(subtotal) ? subtotal : undefined,
       discount: Number.isFinite(discount) ? Math.max(0, discount) : 0,
+      cashback: Number.isFinite(cashback) ? Math.max(0, cashback) : 0,
+      cashbackTreatment: cashbackTreatment ? String(cashbackTreatment) : '',
+      walletBalanceTotal: Number.isFinite(walletBalanceTotal) ? Math.max(0, walletBalanceTotal) : undefined,
       deliveryCharge: Number.isFinite(deliveryCharge) ? Math.max(0, deliveryCharge) : undefined,
       deliveryReason,
       requiresSupport,
@@ -1430,7 +1467,11 @@
       saveSessionRecord(COUPON_CONTEXT_KEY, null);
       serverCartSummary.coupon = appliedCouponFromSources(cartResponseSources(payload));
     }
-    if (!appliedCouponFromSources(cartResponseSources(payload)) && serverCartSummary.discount === 0) {
+    if (
+      !appliedCouponFromSources(cartResponseSources(payload))
+      && serverCartSummary.discount === 0
+      && serverCartSummary.cashback === 0
+    ) {
       appliedCouponOverride = null;
       saveSessionRecord(COUPON_CONTEXT_KEY, null);
       serverCartSummary.coupon = null;
@@ -1971,9 +2012,68 @@
   function experienceCredit() {
     // Welcome savings are server-authoritative. Never invent a promotional
     // credit while the cart is a guest draft or while the live cart is syncing.
+    if (couponIsCashback()) return 0;
     return serverCartActive && Number.isFinite(serverCartSummary?.discount)
       ? Math.max(0, serverCartSummary.discount)
       : 0;
+  }
+
+  function cashbackCouponIsApplied() {
+    if (!cart.some((item) => item.purchaseType === 'weekly')) return false;
+    const coupon = appliedCoupon();
+    if (!coupon) return false;
+    const code = String(coupon.code || '').trim().toUpperCase();
+    const descriptor = [coupon.discountType, coupon.name, coupon.description]
+      .map((value) => String(value || '').toLowerCase())
+      .join(' ');
+    // ATULYASH100 is the legacy code for the subscription cashback offer. The
+    // amount still comes from the live cart/backend response; only the
+    // treatment is inferred here when an older cart response omits it.
+    return code === 'ATULYASH100' || /cashback|bonus|credit/.test(descriptor);
+  }
+
+  function cashbackAmount() {
+    if (!serverCartActive || !serverCartSummary) return 0;
+    const treatment = String(
+      serverCartSummary.cashbackTreatment || walletFundingPolicy?.cashbackTreatment || ''
+    ).toLowerCase();
+    const explicitCashback = Number(serverCartSummary.cashback) || Number(walletFundingPolicy?.cashbackCredit);
+    if (explicitCashback > 0) return explicitCashback;
+    return (cashbackCouponIsApplied() || /cashback|bonus|credit/.test(treatment)) && Number(serverCartSummary.discount) > 0
+      ? Math.max(0, serverCartSummary.discount)
+      : 0;
+  }
+
+  function couponIsCashback() {
+    const treatment = String(
+      serverCartSummary?.cashbackTreatment || walletFundingPolicy?.cashbackTreatment || ''
+    ).toLowerCase();
+    return cashbackAmountFromSummary() > 0
+      || Number(walletFundingPolicy?.cashbackCredit) > 0
+      || cashbackCouponIsApplied()
+      || /cashback|bonus|credit/.test(treatment);
+  }
+
+  function cashbackAmountFromSummary() {
+    const value = Number(serverCartSummary?.cashback);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  function walletBalanceTotalForDisplay() {
+    const explicit = numericValue(
+      walletFundingPolicy?.walletBalanceTotal,
+      numericValue(serverCartSummary?.walletBalanceTotal, NaN)
+    );
+    if (Number.isFinite(explicit) && explicit >= 0) return explicit;
+    const gross = numericValue(
+      walletFundingPolicy?.grossWalletRequired,
+      numericValue(serverCartSummary?.subtotal, cartSubtotal())
+    );
+    const cashback = cashbackAmount();
+    // This value is presentation-only. Payment validation continues to use
+    // the server's minimum_wallet_required amount.
+    if (Number.isFinite(gross) && cashback > 0) return gross + cashback;
+    return NaN;
   }
 
   function orderTotal() {
@@ -1983,7 +2083,9 @@
     // authoritative; before that response, the live cart discount is the best
     // estimate available to prepare the first policy request.
     const minimumWalletRequired = hasWeekly
-      ? numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
+      ? couponIsCashback() && Number.isFinite(walletFundingPolicy?.grossWalletRequired)
+        ? walletFundingPolicy.grossWalletRequired
+        : numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
       : NaN;
     if (Number.isFinite(minimumWalletRequired) && minimumWalletRequired >= 0) {
       return minimumWalletRequired;
@@ -2360,7 +2462,7 @@
       ? descriptor.deliveryDay
       : 'Schedule selected at checkout';
     const schedule = isWeekly
-      ? `${formatWeight(descriptor.monthlyKg * item.quantity)} kg/month · ${weeklyDeliveryCycleText(plan, { includeWeeks: true })} · ${deliverySchedule} · charged delivery by delivery`
+      ? `${formatWeight(descriptor.monthlyKg * item.quantity)} kg/month · ${weeklyDeliveryCycleText(plan, { includeWeeks: true })} · ${deliverySchedule} · charged after rider confirmation`
       : 'Delivered once · no automatic repeat order';
     const summaryWeight = isWeekly
       ? weeklyPlanSelectionLabel(plan)
@@ -2412,7 +2514,7 @@
     let deliveryIntro = 'Select an address and an available fresh-batch delivery date. This order will not repeat.';
     let consent = 'I confirm this one-time order, delivery address, date and Atulyash Wallet payment.';
     let walletPolicyTitle = 'Wallet-only order payment';
-    let walletPolicyDescription = 'This one-time order is debited once from your Atulyash Wallet. If the balance is low, you can add the exact shortfall first.';
+    let walletPolicyDescription = 'Your wallet funds are credited to your account after payment. Delivery charges are applied only after the delivery partner confirms delivery. If the balance is low, you can add the exact shortfall first.';
 
     if (hasWeekly && !hasOneTime) {
       const monthlyKg = weeklyItems.reduce((total, item) => (
@@ -2423,20 +2525,20 @@
       ), 0);
       const walletCopy = weeklyWalletRequirementCopy(monthlyCharge);
       title = 'Fresh weekly plan';
-      description = `${formatWeight(monthlyKg)} kg across 4 scheduled deliveries. ${walletCopy.detail} Each delivery is charged when it is processed.`;
+      description = `${formatWeight(monthlyKg)} kg across 4 scheduled deliveries. ${walletCopy.detail} Each delivery is charged only after the rider confirms it.`;
       deliveryTitle = 'Choose your weekly rhythm.';
       deliveryIntro = 'Select an address, your preferred weekly delivery day and an available starting date.';
       consent = 'I confirm this 1-month weekly plan, its 4-delivery schedule, address and minimum wallet-balance requirement.';
       walletPolicyTitle = 'Four-delivery wallet requirement';
-      walletPolicyDescription = `${walletCopy.detail} The wallet is charged delivery by delivery, not for the entire month at once.`;
+      walletPolicyDescription = `${walletCopy.detail} The paid amount stays in your wallet and is charged only after the delivery partner confirms each delivery, not as one upfront monthly debit.`;
     } else if (hasWeekly && hasOneTime) {
       title = 'One-time + weekly items';
-      description = 'One-time packs are charged once. Each weekly plan needs enough wallet balance for four scheduled deliveries and is charged delivery by delivery.';
+      description = 'Wallet-funded one-time packs are charged after rider confirmation. Each weekly plan needs enough wallet balance for four scheduled deliveries and is charged after rider confirmation, delivery by delivery.';
       deliveryTitle = 'Choose delivery for this bag.';
       deliveryIntro = 'Your one-time packs arrive on the selected date; weekly-plan packs follow your chosen weekly day from that date.';
       consent = 'I confirm the one-time order and 1-month weekly plan, their delivery schedules, address and Atulyash Wallet payment.';
       walletPolicyTitle = 'Wallet requirement before delivery';
-      walletPolicyDescription = 'Your wallet covers the one-time items and the minimum four-delivery balance for each weekly plan before this mixed order begins.';
+      walletPolicyDescription = 'The paid amount stays in your wallet. One-time and weekly delivery charges are applied only after the delivery partner confirms each delivery.';
     }
 
     elements.checkoutPurchaseClarity.dataset.mode = mode;
@@ -2477,6 +2579,7 @@
   }
 
   function couponDiscountPending() {
+    if (couponIsCashback()) return false;
     return Boolean(
       serverCartActive
       && appliedCoupon()
@@ -2540,16 +2643,23 @@
     if (!elements.couponOffer || !elements.couponList) return;
     const currentCoupon = appliedCoupon();
     const discount = experienceCredit();
+    const cashback = cashbackAmount();
     if (elements.couponOfferSummary) {
       elements.couponOfferSummary.textContent = currentCoupon
-        ? discount > 0
+        ? cashback > 0
+          ? `${currentCoupon.code} applied · +${formatPrice(cashback)} cashback`
+          : discount > 0
           ? `${currentCoupon.code} applied · ${formatPrice(discount)} saved`
           : `${currentCoupon.code} attached · discount not confirmed`
         : 'See eligible Atulyash coupons';
     }
     [elements.cartDiscountLabel, elements.checkoutDiscountLabel].forEach((label) => {
       if (!label) return;
-      label.textContent = currentCoupon ? `Coupon ${currentCoupon.code}` : 'Welcome saving';
+      label.textContent = cashback > 0
+        ? 'Atulyash cashback'
+        : currentCoupon
+          ? `Coupon ${currentCoupon.code}`
+          : 'Welcome saving';
     });
     elements.couponList.replaceChildren();
 
@@ -2710,6 +2820,7 @@
     const quantity = cartQuantity();
     const subtotal = cartSubtotal();
     const credit = experienceCredit();
+    const cashback = cashbackAmount();
     const total = orderTotal();
     const delivery = deliveryChargeQuote();
 
@@ -2741,17 +2852,23 @@
       : cadence === 'mixed'
         ? 'Bag subtotal'
         : 'Subtotal';
+    const walletBalanceTotal = cadence === 'weekly' && cashback > 0
+      ? walletBalanceTotalForDisplay()
+      : NaN;
+    const displayTotal = Number.isFinite(walletBalanceTotal) ? walletBalanceTotal : total;
     const totalLabel = cadence === 'weekly'
-      ? 'Minimum wallet balance'
+      ? cashback > 0 ? 'Wallet balance total' : 'Minimum wallet balance'
       : cadence === 'mixed'
         ? 'Wallet needed to begin'
         : 'Order total';
     if (elements.cartSubtotalLabel) elements.cartSubtotalLabel.textContent = subtotalLabel;
     if (elements.checkoutSubtotalLabel) elements.checkoutSubtotalLabel.textContent = subtotalLabel;
-    if (elements.cartExperienceCreditRow) elements.cartExperienceCreditRow.hidden = credit === 0;
-    if (elements.checkoutExperienceCreditRow) elements.checkoutExperienceCreditRow.hidden = credit === 0;
-    if (elements.cartExperienceCredit) elements.cartExperienceCredit.textContent = `−${formatPrice(credit)}`;
-    if (elements.checkoutExperienceCredit) elements.checkoutExperienceCredit.textContent = `−${formatPrice(credit)}`;
+    if (elements.cartExperienceCreditRow) elements.cartExperienceCreditRow.hidden = credit === 0 && cashback === 0;
+    if (elements.checkoutExperienceCreditRow) elements.checkoutExperienceCreditRow.hidden = credit === 0 && cashback === 0;
+    if (elements.cartDiscountLabel) elements.cartDiscountLabel.textContent = cashback > 0 ? 'Atulyash cashback' : 'Welcome saving';
+    if (elements.checkoutDiscountLabel) elements.checkoutDiscountLabel.textContent = cashback > 0 ? 'Atulyash cashback' : 'Welcome saving';
+    if (elements.cartExperienceCredit) elements.cartExperienceCredit.textContent = cashback > 0 ? `+${formatPrice(cashback)}` : `−${formatPrice(credit)}`;
+    if (elements.checkoutExperienceCredit) elements.checkoutExperienceCredit.textContent = cashback > 0 ? `+${formatPrice(cashback)}` : `−${formatPrice(credit)}`;
     [
       [elements.cartDeliveryChargeRow, elements.cartDeliveryChargeLabel, elements.cartDeliveryCharge, elements.cartDeliveryChargeNote],
       [elements.checkoutDeliveryChargeRow, elements.checkoutDeliveryChargeLabel, elements.checkoutDeliveryCharge, elements.checkoutDeliveryChargeNote]
@@ -2763,8 +2880,8 @@
     });
     if (elements.cartTotalLabel) elements.cartTotalLabel.textContent = totalLabel;
     if (elements.checkoutTotalLabel) elements.checkoutTotalLabel.textContent = totalLabel;
-    if (elements.cartTotal) elements.cartTotal.textContent = formatPrice(total);
-    if (elements.checkoutTotal) elements.checkoutTotal.textContent = formatPrice(total);
+    if (elements.cartTotal) elements.cartTotal.textContent = formatPrice(displayTotal);
+    if (elements.checkoutTotal) elements.checkoutTotal.textContent = formatPrice(displayTotal);
     renderCouponPanel();
     renderCheckoutPurchaseClarity();
     renderWalletPaymentState();
@@ -3010,6 +3127,7 @@
     savedAddresses = [];
     checkoutWalletBalanceGeneration += 1;
     checkoutWalletBalanceAmount = null;
+    checkoutWalletReservedAmount = null;
     resetWalletRechargePreview();
     if (elements.checkoutDeliveryDay) elements.checkoutDeliveryDay.value = '';
     if (elements.checkoutDeliveryDate) {
@@ -4305,6 +4423,7 @@
           address_id: selectedAddressId,
           subscription_pack_id: plan.apiId,
           duration_in_months: 1,
+          is_continuous: true,
           delivery_day: fieldValue('checkoutDeliveryDay'),
           start_date: date
         }], {
@@ -4316,6 +4435,7 @@
               address_id: selectedAddressId,
               subscription_pack_id: plan.apiId,
               duration_in_months: 1,
+              is_continuous: true,
               delivery_day: fieldValue('checkoutDeliveryDay'),
               start_date: date
             },
@@ -4352,7 +4472,7 @@
       const plan = WEEKLY_PLAN_BY_ID.get(weeklyItem.planId) || descriptor;
       const deliveryDay = fieldValue('checkoutDeliveryDay') || descriptor.deliveryDay;
       const scheduleLine = document.createElement('span');
-      scheduleLine.textContent = `Weekly plan: ${weeklyDeliveryCycleText(plan, { includeWeeks: true })} every ${deliveryDay} · starting ${selectedDeliveryDate} · charged delivery by delivery.`;
+      scheduleLine.textContent = `Weekly plan: ${weeklyDeliveryCycleText(plan, { includeWeeks: true })} every ${deliveryDay} · starting ${selectedDeliveryDate} · charged after rider confirmation.`;
       reviewLines.push(scheduleLine);
     });
     elements.checkoutReviewAddress.replaceChildren(...reviewLines);
@@ -4373,6 +4493,8 @@
       payload?.data?.order,
       payload?.payment,
       payload?.data?.payment,
+      payload?.wallet,
+      payload?.data?.wallet,
       payload?.razorpay,
       payload?.data?.razorpay
     ].filter((source) => source && typeof source === 'object');
@@ -4385,6 +4507,75 @@
       }
     }
     return null;
+  }
+
+  function walletAmountValue(...values) {
+    for (const value of values) {
+      if (value == null || value === '') continue;
+      const normalized = typeof value === 'string' ? value.replace(/[^0-9.-]/g, '') : value;
+      const parsed = Number(normalized);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function walletBalanceSnapshot(payload) {
+    const reserved = walletAmountValue(firstResponseValue(payload, [
+      'reserved_balance',
+      'wallet_reserved_balance',
+      'reserved_amount',
+      'wallet_reserved_amount',
+      'amount_reserved',
+      'held_balance',
+      'wallet_hold_amount'
+    ]));
+    const total = walletAmountValue(firstResponseValue(payload, [
+      'wallet_balance',
+      'current_balance',
+      'balance',
+      'total_balance',
+      'ledger_balance',
+      'amount'
+    ]));
+    const explicitAvailable = walletAmountValue(firstResponseValue(payload, [
+      'available_balance',
+      'available_to_spend',
+      'spendable_balance',
+      'wallet_available_balance'
+    ]));
+    const available = explicitAvailable !== null
+      ? explicitAvailable
+      : total !== null && reserved !== null
+        ? Math.max(0, total - reserved)
+        : total;
+    return {
+      total,
+      available,
+      reserved: reserved === null ? null : Math.max(0, reserved)
+    };
+  }
+
+  function walletReservationAmount(payload) {
+    const value = walletAmountValue(firstResponseValue(payload, [
+      'amount_reserved',
+      'reserved_amount',
+      'wallet_reserved_amount',
+      'reservation_amount',
+      'wallet_hold_amount',
+      'amount_held'
+    ]));
+    return value === null ? null : Math.max(0, value);
+  }
+
+  function walletReservationStatus(payload) {
+    const value = firstResponseValue(payload, [
+      'reservation_status',
+      'wallet_reservation_status',
+      'hold_status',
+      'wallet_hold_status',
+      'settlement_status'
+    ]);
+    return value == null ? '' : String(value);
   }
 
   function walletFundingRequestPayload(amount) {
@@ -4424,7 +4615,7 @@
     const backendShortfall = cart.some((item) => item.purchaseType === 'weekly')
       ? numericValue(walletFundingPolicy?.shortfall, NaN)
       : NaN;
-    if (Number.isFinite(backendShortfall)) return Math.max(0, backendShortfall);
+    if (Number.isFinite(backendShortfall) && !couponIsCashback()) return Math.max(0, backendShortfall);
     return Math.max(0, walletRequiredBalance() - checkoutWalletBalanceAmount);
   }
 
@@ -4437,7 +4628,9 @@
 
   function walletRequiredBalance() {
     const backendMinimum = cart.some((item) => item.purchaseType === 'weekly')
-      ? numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
+      ? couponIsCashback() && Number.isFinite(walletFundingPolicy?.grossWalletRequired)
+        ? walletFundingPolicy.grossWalletRequired
+        : numericValue(walletFundingPolicy?.minimumWalletRequired, NaN)
       : NaN;
     return Number.isFinite(backendMinimum) && backendMinimum >= 0
       ? backendMinimum
@@ -4456,11 +4649,20 @@
     const serverGross = numericValue(walletFundingPolicy?.grossWalletRequired, NaN);
     const resolvedGross = Number.isFinite(serverGross) ? serverGross : grossAmount;
     const couponDiscount = numericValue(walletFundingPolicy?.couponDiscount, NaN);
-    const hasCouponSaving = Number.isFinite(couponDiscount) && couponDiscount > 0;
+    const cashback = numericValue(walletFundingPolicy?.cashbackCredit, NaN);
+    const hasCashback = Number.isFinite(cashback) && cashback > 0;
+    const hasCouponSaving = Number.isFinite(couponDiscount) && couponDiscount > 0 && !hasCashback;
+    const projectedWalletTotal = hasCashback
+      ? (Number.isFinite(walletFundingPolicy?.walletBalanceTotal)
+        ? walletFundingPolicy.walletBalanceTotal
+        : resolvedGross + cashback)
+      : null;
     return {
       required,
       text: formatPrice(required),
-      detail: hasCouponSaving
+      detail: hasCashback
+        ? `The four-delivery wallet cover is ${formatPrice(resolvedGross)}. It includes ${formatPrice(cashback)} Atulyash cashback; your projected wallet total will be ${formatPrice(projectedWalletTotal)}.`
+        : hasCouponSaving
         ? `The four-delivery cover is ${formatPrice(resolvedGross)}. Your ${formatPrice(couponDiscount)} coupon reduces the minimum wallet balance to ${formatPrice(required)}.`
         : `Keep at least ${formatPrice(required)} in your wallet for the first four scheduled deliveries.`
     };
@@ -4470,6 +4672,24 @@
     const minimumWalletRequired = numericValue(firstResponseValue(payload, ['minimum_wallet_required']), NaN);
     const grossWalletRequired = numericValue(firstResponseValue(payload, ['gross_wallet_required']), NaN);
     const couponDiscount = numericValue(firstResponseValue(payload, ['coupon_discount']), NaN);
+    const cashbackCredit = numericValue(firstResponseValue(payload, [
+      'cashback_balance',
+      'cashback_credit',
+      'cashback_amount',
+      'wallet_cashback',
+      'bonus_amount',
+      'extra_credit',
+      'prepaid_advantage_amount',
+      'atulyash_cashback',
+      'coupon_cashback',
+      'coupon_credit'
+    ]), NaN);
+    const cashbackTreatment = firstResponseValue(payload, [
+      'cashback_treatment',
+      'coupon_treatment',
+      'credit_treatment',
+      'wallet_credit_type'
+    ]);
     const minimumDeliveriesRequired = numericValue(firstResponseValue(payload, ['minimum_deliveries_required']), NaN);
     const pricePerDelivery = numericValue(firstResponseValue(payload, ['price_per_delivery']), NaN);
     const shortfall = numericValue(firstResponseValue(payload, ['shortfall']), NaN);
@@ -4479,12 +4699,26 @@
       'minimum_recharge',
       'min_recharge_amount'
     ]), NaN);
+    const walletBalanceTotal = numericValue(firstResponseValue(payload, [
+      'wallet_balance_total',
+      'total_wallet_balance',
+      'wallet_total_balance',
+      'wallet_credit_total',
+      'post_payment_wallet_balance',
+      'wallet_balance_after_payment',
+      'total_credit',
+      'new_wallet_balance',
+      'new_balance'
+    ]), NaN);
     const canStart = firstResponseValue(payload, ['can_start_subscription']);
     if (!Number.isFinite(minimumWalletRequired)) return null;
     walletFundingPolicy = {
       minimumWalletRequired,
       grossWalletRequired: Number.isFinite(grossWalletRequired) ? Math.max(0, grossWalletRequired) : null,
       couponDiscount: Number.isFinite(couponDiscount) ? Math.max(0, couponDiscount) : 0,
+      cashbackCredit: Number.isFinite(cashbackCredit) ? Math.max(0, cashbackCredit) : 0,
+      cashbackTreatment: cashbackTreatment ? String(cashbackTreatment) : '',
+      walletBalanceTotal: Number.isFinite(walletBalanceTotal) ? Math.max(0, walletBalanceTotal) : null,
       minimumDeliveriesRequired: Number.isFinite(minimumDeliveriesRequired)
         ? minimumDeliveriesRequired
         : 4,
@@ -4581,11 +4815,11 @@
       elements.checkoutWalletState.textContent = 'Ready';
       elements.checkoutWalletBalance.textContent = formatPrice(balance);
       elements.checkoutWalletExplanation.textContent = hasWeekly
-        ? `Your verified wallet balance meets the minimum recharge policy for the next ${numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4)} scheduled deliveries. Each delivery is charged only when it is processed.`
-        : 'Your verified wallet balance covers this order.';
+        ? `Your verified wallet balance meets the minimum recharge policy for the next ${numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4)} scheduled deliveries. The paid amount stays in your wallet and is charged only after the delivery partner confirms each delivery.`
+        : 'Your verified wallet balance covers this order. The paid amount stays in your wallet and is charged only after the delivery partner confirms delivery.';
       elements.checkoutPaymentStatus.textContent = hasWeekly
-        ? `${formatPrice(walletRequiredBalance())} is the required wallet balance for ${numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4)} scheduled deliveries. Your wallet is charged delivery by delivery.`
-        : 'The final amount will be debited only from your Atulyash Wallet.';
+          ? `${formatPrice(walletRequiredBalance())} is the required wallet balance for ${numericValue(walletFundingPolicy?.minimumDeliveriesRequired, 4)} scheduled deliveries. Your wallet is charged only after the rider confirms each delivery.`
+        : 'The order amount will stay in your wallet and be charged only after the delivery partner confirms delivery.';
       if (walletRechargePreview) resetWalletRechargePreview();
     }
     syncWalletOrderAvailability();
@@ -4610,16 +4844,11 @@
         options: { method: 'GET', auth: true }
       });
       if (requestGeneration !== checkoutWalletBalanceGeneration) return checkoutWalletBalanceAmount;
-      const balance = numericValue(firstResponseValue(payload, [
-        'current_balance',
-        'available_balance',
-        'wallet_balance',
-        'balance',
-        'amount'
-      ]), NaN);
-      if (!Number.isFinite(balance)) {
+      const walletSnapshot = walletBalanceSnapshot(payload);
+      if (!Number.isFinite(walletSnapshot.available)) {
         throw new Error('The live service did not return a valid wallet balance.');
       }
+      checkoutWalletReservedAmount = walletSnapshot.reserved;
       walletFundingPolicy = null;
       if (cart.some((item) => item.purchaseType === 'weekly')) {
         // Seed the server-authoritative policy with the coupon-adjusted
@@ -4637,11 +4866,14 @@
         if (!policy) {
           throw new Error('The live service did not return the four-delivery wallet requirement.');
         }
+        if (checkoutWalletReservedAmount === null) {
+          checkoutWalletReservedAmount = walletBalanceSnapshot(preview.payload).reserved;
+        }
         checkoutWalletBalanceAmount = Number.isFinite(policy.availableBalance)
           ? policy.availableBalance
-          : balance;
+          : walletSnapshot.available;
       } else {
-        checkoutWalletBalanceAmount = balance;
+        checkoutWalletBalanceAmount = walletSnapshot.available;
       }
       // The server policy can differ from the couponed cart total (for
       // example, ₹960 wallet cover versus an ₹860 discounted order total).
@@ -4652,6 +4884,7 @@
     } catch (error) {
       if (requestGeneration !== checkoutWalletBalanceGeneration) return checkoutWalletBalanceAmount;
       checkoutWalletBalanceAmount = null;
+      checkoutWalletReservedAmount = null;
       const message = isUnauthorizedError(error)
         ? 'Your secure session has expired. Sign in again before continuing.'
         : error?.message || 'Your live wallet balance could not be confirmed.';
@@ -4751,7 +4984,7 @@
     const rows = [];
     if (walletFundingPolicy) {
       rows.push(
-        ['Minimum wallet required', formatPrice(walletFundingPolicy.minimumWalletRequired)],
+        ['Wallet balance required', formatPrice(walletRequiredBalance())],
         ['Available balance', formatPrice(checkoutWalletBalanceAmount)]
       );
     }
@@ -5147,7 +5380,12 @@
     ]);
     const deliveryCharge = firstResponseValue(payload, ['delivery_charge', 'delivery_fee']);
     const walletDebit = firstResponseValue(payload, ['wallet_debit', 'wallet_amount_debited']);
+    const reservedAmount = walletReservationAmount(payload);
     const address = firstResponseValue(payload, ['delivery_address', 'address', 'customer_address']);
+    const paymentLabel = paymentStatus
+      || (walletDebit != null
+        ? 'Wallet payment recorded'
+        : 'Wallet payment · charged after delivery confirmation');
     const rows = [
       ['Order', reference],
       productName ? ['Product', String(productName)] : null,
@@ -5161,7 +5399,7 @@
       address ? ['Delivery address', confirmedAddressText(address)] : null,
       weeklyQuantity ? ['Weekly quantity', `${weeklyQuantity}${/kg/i.test(String(weeklyQuantity)) ? '' : ' kg'} per week`] : null,
       deliveryDay ? ['Preferred delivery day', String(deliveryDay)] : null,
-      ['Payment', String(paymentStatus || 'Wallet payment recorded')]
+      ['Payment', String(paymentLabel)]
     ].filter(Boolean);
     details.replaceChildren(...rows.map(([label, value]) => {
       const row = document.createElement('div');
@@ -5216,11 +5454,16 @@
       elements.checkoutSuccessDeliveryDate.textContent = confirmedDate ? confirmedDateText(confirmedDate) : 'Confirmed in your account';
     }
     if (elements.checkoutSuccessPaymentStatus) {
-      elements.checkoutSuccessPaymentStatus.textContent = firstResponseValue(finalPayload, [
+      const reservationAmount = walletReservationAmount(finalPayload);
+      const paymentStatus = firstResponseValue(finalPayload, [
         'payment_status_display',
         'payment_status',
         'wallet_payment_status'
-      ]) || 'Wallet payment recorded';
+      ]);
+      elements.checkoutSuccessPaymentStatus.textContent = paymentStatus
+        || (reservationAmount !== null && reservationAmount > 0
+          ? 'Wallet payment · charged after delivery confirmation'
+          : 'Wallet payment will be charged after delivery confirmation');
     }
     renderCheckoutSuccessDetails(finalPayload, reference);
     if (elements.checkoutViewOrderLink) {
@@ -5326,7 +5569,7 @@
       payment_method: 'wallet',
       notes: fieldValue('checkoutOrderNotes'),
       delivery_date: selectedDeliveryDate,
-      ...(hasWeekly ? { duration_in_months: 1 } : {})
+      ...(hasWeekly ? { duration_in_months: 1, is_continuous: true } : {})
     };
 
     setOrderInteractionLocked(true);

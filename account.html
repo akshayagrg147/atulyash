@@ -182,7 +182,7 @@
           <strong id="accountBagSubtotal">₹0</strong>
         </div>
         <div class="account-bag-credit unified-bag-credit" id="accountBagCreditRow" hidden>
-          <span>Your first Atulyash experience</span>
+          <span id="accountBagCreditLabel">Your first Atulyash experience</span>
           <strong id="accountBagCredit">−₹0</strong>
         </div>
         <div class="account-bag-delivery unified-bag-delivery" id="accountBagDeliveryRow">
@@ -333,7 +333,7 @@
                   </div>
                   <div class="weekly-choice-explanation">
                     <span aria-hidden="true">✓</span>
-                    <p><strong>Four-delivery wallet cover</strong><small id="weeklyChoicePaymentCopy">Keep enough balance for four deliveries. Your wallet is charged only when each delivery is processed.</small></p>
+                    <p><strong>Four-delivery wallet cover</strong><small id="weeklyChoicePaymentCopy">Keep enough balance for four deliveries. Your wallet is charged only after the rider confirms each delivery.</small></p>
                   </div>
                 </section>
                 <details class="quick-calculator" id="accountCalculatorDetails">
@@ -434,7 +434,7 @@
           <section class="home-details" aria-labelledby="homeDetailsTitle">
             <div class="home-details-heading">
               <div><p class="section-label">Made around your home</p><h2 id="homeDetailsTitle">Your Atulyash, at a glance</h2></div>
-              <p>Just the useful things—your weekly rhythm, available balance and anything new for you.</p>
+              <p>Just the useful things—your weekly rhythm, wallet balance and anything new for you.</p>
             </div>
             <div class="metric-grid" id="overviewMetrics" aria-live="polite">
               <article class="metric-card"><span>Ready for your next batch</span><strong>—</strong><small>Loading your wallet</small></article>
@@ -549,8 +549,12 @@
           </div>
           <div class="wallet-layout">
             <article class="wallet-card">
-              <p>Available balance</p>
+              <p>Wallet balance</p>
               <strong id="walletBalance">₹—</strong>
+              <div class="wallet-balance-breakdown" id="walletBalanceBreakdown" hidden>
+                <div><span>Original balance</span><strong id="walletOriginalBalance">₹—</strong></div>
+                <div><span>Atulyash cashback</span><strong id="walletCashbackBalance">+₹—</strong></div>
+              </div>
               <span>Securely linked to your Atulyash account</span>
               <div class="wallet-emblem" aria-hidden="true">A</div>
             </article>
@@ -661,6 +665,6 @@
 
   <script src="api-client.js?v=20260826-3"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="account.js?v=20260830-14"></script>
+  <script src="account.js?v=20260831-24"></script>
 </body>
 </html>

@@ -421,6 +421,111 @@
     return response;
   }
 
+  function planChangeLockDetails(value) {
+    if (!value) return null;
+    const errorPayload = firstValue(value?.details, value?.data, value?.response?.data, value?.body);
+    const payload = value instanceof Error && errorPayload
+      ? responseData(errorPayload)
+      : responseData(value);
+    const nested = firstValue(
+      payload?.plan_change_lock,
+      payload?.plan_change_policy,
+      payload?.lock,
+      payload?.policy,
+      payload?.error && typeof payload.error === 'object' ? payload.error : null,
+      payload
+    );
+    const source = nested && typeof nested === 'object' ? nested : payload;
+    const code = String(firstValue(
+      value?.code,
+      payload?.code,
+      payload?.error_code,
+      payload?.errorCode,
+      source?.code
+    ) || '').trim().toUpperCase();
+    const status = Number(firstValue(value?.status, value?.statusCode, value?.response?.status));
+    const planChangeAllowed = firstValue(
+      source?.plan_change_allowed,
+      source?.is_plan_change_allowed,
+      payload?.plan_change_allowed,
+      payload?.is_plan_change_allowed
+    );
+    const lockedDelivery = firstValue(
+      source?.locked_delivery,
+      source?.delivery,
+      payload?.locked_delivery,
+      payload?.delivery
+    );
+    const deliveryDate = firstValue(
+      source?.locked_delivery_date,
+      source?.delivery_date,
+      source?.deliveryDate,
+      lockedDelivery?.delivery_date,
+      lockedDelivery?.date,
+      payload?.locked_delivery_date,
+      payload?.delivery_date
+    );
+    const lockStartAt = firstValue(
+      source?.lock_start_at,
+      source?.lock_starts_at,
+      source?.cutoff_at,
+      source?.cutoff_datetime,
+      payload?.lock_start_at,
+      payload?.lock_starts_at,
+      payload?.cutoff_at
+    );
+    const nextEligibleDate = firstValue(
+      source?.next_eligible_delivery_date,
+      source?.next_plan_change_date,
+      source?.effective_delivery_date,
+      payload?.next_eligible_delivery_date,
+      payload?.next_plan_change_date,
+      payload?.effective_delivery_date
+    );
+    const isLocked = code === 'PLAN_CHANGE_LOCKED'
+      || (status === 409 && (String(planChangeAllowed).toLowerCase() === 'false'
+        || Boolean(deliveryDate || lockStartAt || nextEligibleDate || source?.reason)))
+      || (planChangeAllowed !== undefined
+        && planChangeAllowed !== null
+        && String(planChangeAllowed).toLowerCase() === 'false'
+        && Boolean(deliveryDate || lockStartAt || nextEligibleDate || source?.reason));
+    if (!isLocked) return null;
+
+    return {
+      code: code || 'PLAN_CHANGE_LOCKED',
+      allowed: false,
+      deliveryId: firstValue(
+        source?.locked_delivery_id,
+        source?.delivery_id,
+        lockedDelivery?.id,
+        lockedDelivery?.pk,
+        payload?.locked_delivery_id
+      ),
+      deliveryDate,
+      lockStartAt,
+      serverNow: firstValue(source?.server_now, source?.now, payload?.server_now, payload?.now),
+      nextEligibleDate,
+      reason: firstValue(source?.reason, source?.lock_reason, payload?.reason, payload?.lock_reason),
+      message: firstValue(source?.message, payload?.message, value?.message)
+    };
+  }
+
+  function planChangeLockMessage(lock) {
+    const delivery = lock?.deliveryDate ? formatDate(lock.deliveryDate) : '';
+    const next = lock?.nextEligibleDate ? formatDate(lock.nextEligibleDate) : '';
+    const starts = lock?.lockStartAt ? formatDate(lock.lockStartAt, true) : '';
+    if (delivery && next) {
+      return `Plan changes are locked for the ${delivery} delivery. You can change the plan after the rider confirms it. The next eligible delivery is ${next}.`;
+    }
+    if (delivery) {
+      return `Plan changes are locked for the ${delivery} delivery. You can change the plan after the rider confirms it.`;
+    }
+    if (starts) {
+      return `Plan changes are locked from ${starts} until the rider confirms the upcoming delivery.`;
+    }
+    return 'Plan changes are temporarily locked until the upcoming delivery is confirmed.';
+  }
+
   function responseList(response) {
     const data = responseData(response);
     if (Array.isArray(data)) return data;
@@ -4460,6 +4565,35 @@
       || Boolean(firstValue(subscription?.completed_at, subscription?.ended_at, subscription?.expired_at));
   }
 
+  function subscriptionPlanChangeLock(subscription) {
+    if (!subscription || typeof subscription !== 'object') return null;
+    const policy = firstValue(
+      subscription?.plan_change_lock,
+      subscription?.plan_change_policy,
+      subscription?.lock,
+      subscription
+    );
+    const details = planChangeLockDetails(policy);
+    if (details) return details;
+    const allowed = firstValue(
+      subscription?.plan_change_allowed,
+      subscription?.is_plan_change_allowed,
+      subscription?.can_change_plan,
+      subscription?.can_change_pack,
+      subscription?.pack_change_allowed
+    );
+    if (allowed === undefined || allowed === null || String(allowed).toLowerCase() !== 'false') return null;
+    return {
+      code: 'PLAN_CHANGE_LOCKED',
+      allowed: false,
+      deliveryDate: firstValue(subscription?.locked_delivery_date, subscription?.delivery_date),
+      lockStartAt: firstValue(subscription?.lock_start_at, subscription?.cutoff_at),
+      nextEligibleDate: firstValue(subscription?.next_eligible_delivery_date, subscription?.next_plan_change_date),
+      reason: firstValue(subscription?.plan_change_reason, subscription?.lock_reason),
+      message: firstValue(subscription?.plan_change_message, subscription?.lock_message)
+    };
+  }
+
   function subscriptionAllowsPlanChanges(subscription) {
     const explicit = firstValue(
       subscription?.can_change_pack,
@@ -4469,13 +4603,11 @@
       subscription?.pack_change_allowed
     );
     if (explicit !== undefined) return explicit === true || String(explicit).toLowerCase() === 'true';
-    const delivered = subscriptionHasDeliveredQuantity(subscription);
-    // A pack/quantity change is locked while this subscription is in progress
-    // after any batch has been delivered. Once the cycle is complete, a new
-    // plan may be selected. If the list response has no delivery history, keep
-    // the action available and let the preview/confirmation endpoint decide.
-    if (subscriptionIsComplete(subscription)) return true;
-    return delivered === null ? true : !delivered;
+    // The cutoff window is calculated per upcoming delivery by the service.
+    // Do not infer a permanent lock from historical delivered rows here: after
+    // rider confirmation, the next future delivery may be changed. If the
+    // list response omits the live policy, let preview/update-pack decide.
+    return true;
   }
 
   function vacationCoveringDate(subscription, date) {
@@ -4545,11 +4677,22 @@
     next.append(tile, nextCopy);
 
     const actions = create('div', 'subscription-actions');
-    if (subscriptionAllowsPlanChanges(subscription)) {
+    const planChangeLock = subscriptionPlanChangeLock(subscription);
+    if (subscriptionAllowsPlanChanges(subscription) && !planChangeLock) {
       actions.append(button('Change plan', 'card-action', () => openChangeSubscriptionPlan(subscription)));
     } else {
-      const note = create('small', 'subscription-action-note is-plan-locked', 'Plan changes unlock after this subscription is complete.');
-      note.title = 'A batch from this subscription has already been delivered. Finish the current delivery cycle before changing quantity.';
+      const lockedButton = button('Change plan locked', 'card-action is-plan-locked-button', null);
+      lockedButton.disabled = true;
+      lockedButton.setAttribute('aria-disabled', 'true');
+      lockedButton.title = planChangeLock
+        ? planChangeLockMessage(planChangeLock)
+        : 'A batch from this subscription has already been delivered. Finish the current delivery cycle before changing quantity.';
+      actions.append(lockedButton);
+      const note = create(
+        'small',
+        'subscription-action-note is-plan-locked',
+        planChangeLock ? planChangeLockMessage(planChangeLock) : 'Plan changes unlock after this subscription is complete.'
+      );
       actions.append(note);
     }
     actions.append(
@@ -4620,6 +4763,8 @@
       let previewRequestId = 0;
       let submitBusy = false;
       let confirmationBusy = false;
+      let planChangeLocked = false;
+      let currentPlanChangeLock = null;
 
       const walletCoverage = (canStartValue, shortfall) => {
         const hasServerDecision = canStartValue !== undefined && canStartValue !== null && canStartValue !== '';
@@ -4684,7 +4829,8 @@
 
       const renderPackChangePreview = (preview, stateName = 'idle', message = '') => {
         previewPanel.replaceChildren();
-        previewPanel.classList.toggle('is-error', stateName === 'error');
+        previewPanel.classList.toggle('is-error', stateName === 'error' || stateName === 'locked');
+        previewPanel.classList.toggle('is-locked', stateName === 'locked');
         previewPanel.classList.remove('is-pending');
         if (!submitBusy && submit.textContent === 'Payment confirmation required') {
           submit.textContent = 'Update weekly plan →';
@@ -4692,12 +4838,30 @@
         const header = create('div', 'modification-preview-header');
         header.append(
           create('div', 'modification-preview-eyebrow', 'Server wallet preview'),
-          create('strong', '', stateName === 'loading' ? 'Recalculating this plan…' : 'Review the wallet requirement')
+          create('strong', '', stateName === 'loading'
+            ? 'Recalculating this plan…'
+            : stateName === 'locked'
+              ? 'Plan change temporarily locked'
+              : 'Review the wallet requirement')
         );
         previewPanel.append(header);
 
         if (stateName === 'loading') {
           previewPanel.append(create('p', 'modification-preview-message', 'Checking the selected quantity, four-delivery cover and your current wallet balance.'));
+          updatePackChangeSubmitState();
+          return;
+        }
+        if (stateName === 'locked') {
+          const lock = currentPlanChangeLock || {};
+          const lockDetails = [];
+          if (lock.lockStartAt) lockDetails.push(`Locked from ${formatDate(lock.lockStartAt, true)}.`);
+          if (lock.nextEligibleDate) lockDetails.push(`Next eligible delivery: ${formatDate(lock.nextEligibleDate)}.`);
+          previewPanel.append(
+            create('p', 'modification-preview-message', message || planChangeLockMessage(lock)),
+            create('small', '', `${lockDetails.join(' ')} No plan change was made. The current plan remains active.`)
+          );
+          submit.disabled = true;
+          submit.textContent = 'Plan change unavailable';
           updatePackChangeSubmitState();
           return;
         }
@@ -4812,6 +4976,19 @@
         updatePackChangeSubmitState();
       };
 
+      const applyPlanChangeLock = (errorOrPayload) => {
+        planChangeLocked = true;
+        currentPlanChangeLock = planChangeLockDetails(errorOrPayload) || {
+          code: 'PLAN_CHANGE_LOCKED',
+          allowed: false
+        };
+        latestPreview = null;
+        latestPreviewPackId = '';
+        submitBusy = false;
+        setButtonBusy(submit, false);
+        renderPackChangePreview(null, 'locked', planChangeLockMessage(currentPlanChangeLock));
+      };
+
       function updatePackChangeSubmitState() {
         const changed = currentPackId == null || String(select.value) !== String(currentPackId);
         const previewMatchesSelection = latestPreview && latestPreviewPackId === String(select.value);
@@ -4823,12 +5000,14 @@
           ? firstValue(funding.can_start_subscription, latestPreview.can_start_subscription)
           : null;
         const walletCovered = walletCoverage(canStartValue, shortfall);
-        submit.disabled = submitBusy || !changed || !previewMatchesSelection || !walletCovered;
+        submit.disabled = planChangeLocked || submitBusy || !changed || !previewMatchesSelection || !walletCovered;
       }
 
       const requestPackChangePreview = async ({ silent = false } = {}) => {
         const new_pack_id = select.value;
         const requestId = ++previewRequestId;
+        planChangeLocked = false;
+        currentPlanChangeLock = null;
         latestPreview = null;
         latestPreviewPackId = '';
         if (!new_pack_id || String(new_pack_id) === String(currentPackId)) {
@@ -4849,11 +5028,23 @@
           });
           if (requestId !== previewRequestId) return false;
           latestPreview = responseData(result);
+          const lock = planChangeLockDetails(latestPreview);
+          if (lock) {
+            applyPlanChangeLock(latestPreview);
+            if (!silent) showToast(planChangeLockMessage(lock), 'error');
+            return false;
+          }
           latestPreviewPackId = String(new_pack_id);
           renderPackChangePreview(latestPreview);
           return true;
         } catch (error) {
           if (requestId !== previewRequestId) return false;
+          const lock = planChangeLockDetails(error);
+          if (lock) {
+            applyPlanChangeLock(error);
+            if (!silent) showToast(planChangeLockMessage(lock), 'error');
+            return false;
+          }
           latestPreview = null;
           latestPreviewPackId = '';
           const message = planChangeErrorMessage(error);
@@ -4872,8 +5063,31 @@
           latestPreview?.amount_to_debit,
           latestPreview?.payment_summary?.balance_due
         );
-        const confirmationPayload = updateData?.confirmation_payload;
-        const hasConfirmationPayload = confirmationPayload && typeof confirmationPayload === 'object';
+        /*
+         * Plan changes have their own confirmation contract. Keep the payload
+         * deliberately narrow even if an older backend response includes
+         * checkout-only fields such as address_id or payment_method.
+         */
+        const rawConfirmationPayload = updateData?.confirmation_payload;
+        const confirmationPayload = rawConfirmationPayload && typeof rawConfirmationPayload === 'object'
+          ? {
+              new_pack_id: rawConfirmationPayload.new_pack_id,
+              confirmation_id: rawConfirmationPayload.confirmation_id
+            }
+          : null;
+        const confirmationEndpoint = String(firstValue(
+          updateData?.confirmation_endpoint,
+          updateData?.confirmationEndpoint
+        ) || '').trim();
+        const isOneTimeOrderEndpoint = /\/orders\/order\/place\/?$/i.test(confirmationEndpoint);
+        const hasConfirmationPayload = Boolean(
+          confirmationEndpoint
+          && !isOneTimeOrderEndpoint
+          && confirmationPayload
+          && confirmationPayload.new_pack_id !== null
+          && typeof confirmationPayload.new_pack_id !== 'undefined'
+          && String(confirmationPayload.confirmation_id || '').trim()
+        );
 
         submitBusy = false;
         setButtonBusy(submit, false);
@@ -4903,18 +5117,26 @@
               confirmationBusy = true;
               setButtonBusy(control, true, 'Confirming payment…');
               try {
-                const requestedPath = String(updateData.confirmation_endpoint || '/orders/order/place/');
-                const confirmationPath = requestedPath.startsWith('/') ? requestedPath : '/orders/order/place/';
-                const result = await apiCall('orders', ['place'], confirmationPayload, {
-                  path: confirmationPath,
+                const api = client();
+                if (!api || typeof api.request !== 'function') {
+                  throw new Error('The secure Atulyash service is not available on this page.');
+                }
+                const result = await api.request(confirmationEndpoint, {
                   method: 'POST',
-                  form: confirmationPayload
+                  body: confirmationPayload,
+                  form: true,
+                  auth: true
                 });
                 const data = responseData(result);
+                const confirmationSucceeded = data?.success === true
+                  || String(data?.success || '').toLowerCase() === 'true';
                 const appliedImmediately = data?.applied_immediately === true
                   || String(data?.applied_immediately || '').toLowerCase() === 'true';
                 const appliedPackId = firstValue(data?.new_pack_id, data?.subscription_pack_id, data?.pack_id);
-                if (!appliedImmediately || (appliedPackId != null && String(appliedPackId) !== String(select.value))) {
+                if (data?.success === false
+                  || String(data?.success || '').toLowerCase() === 'false'
+                  || (!confirmationSucceeded && !appliedImmediately)
+                  || (appliedPackId != null && String(appliedPackId) !== String(select.value))) {
                   throw new Error(firstValue(data?.message, 'Payment was not confirmed. Your current plan was not changed.'));
                 }
                 closeDialog();
@@ -4929,7 +5151,53 @@
                   ? `Your weekly plan was updated. ${formatMoney(debit)} was debited.`
                   : 'Your weekly plan was updated.');
               } catch (error) {
-                showToast(friendlyError(error, 'Payment confirmation failed. Your current plan was not changed.'), 'error');
+                const lock = planChangeLockDetails(error);
+                if (lock) {
+                  applyPlanChangeLock(error);
+                  showToast(planChangeLockMessage(lock), 'error');
+                } else {
+                  const errorPayload = responseData(firstValue(
+                    error?.details,
+                    error?.data,
+                    error?.response?.data,
+                    error?.body
+                  ));
+                  const errorCode = String(firstValue(
+                    error?.code,
+                    errorPayload?.code,
+                    errorPayload?.error_code,
+                    errorPayload?.errorCode
+                  ) || '').toUpperCase();
+                  const errorMessage = friendlyError(error, 'Payment confirmation failed. Your current plan was not changed.');
+                  const isInsufficientWallet = /INSUFFICIENT.*(?:WALLET|BALANCE)|(?:WALLET|BALANCE).*(?:INSUFFICIENT|SHORTFALL)|SHORTFALL/i.test(
+                    `${errorCode} ${errorMessage}`
+                  );
+                  let walletShortfall = null;
+                  if (isInsufficientWallet && latestPreview) {
+                    const errorFunding = errorPayload?.wallet_funding
+                      || errorPayload?.wallet_impact
+                      || errorPayload?.wallet
+                      || {};
+                    walletShortfall = finiteMoney(
+                      errorFunding.shortfall,
+                      errorPayload?.shortfall,
+                      latestPreview.wallet_funding?.shortfall,
+                      latestPreview.shortfall
+                    );
+                    latestPreview = {
+                      ...latestPreview,
+                      wallet_funding: {
+                        ...(latestPreview.wallet_funding || {}),
+                        ...errorFunding,
+                        ...(walletShortfall !== null ? { shortfall: walletShortfall } : {})
+                      }
+                    };
+                    renderPackChangePreview(latestPreview);
+                  }
+                  showToast(isInsufficientWallet && walletShortfall !== null
+                    ? `Add ${formatMoney(walletShortfall)} to your wallet before confirming this plan.`
+                    : errorMessage, 'error');
+                }
                 setButtonBusy(control, false);
               } finally {
                 confirmationBusy = false;
@@ -4938,7 +5206,9 @@
           );
           actions.append(confirm);
         } else {
-          actions.append(create('small', '', 'The payment confirmation details were not returned. Please try again or contact Atulyash care.'));
+          actions.append(create('small', '', isOneTimeOrderEndpoint
+            ? 'The service returned a new-order endpoint for this plan change. Please try again or contact Atulyash care.'
+            : 'The payment confirmation details were not returned. Please try again or contact Atulyash care.'));
         }
         panel.append(actions);
         previewPanel.append(panel);
@@ -4950,6 +5220,10 @@
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const new_pack_id = select.value;
+        if (planChangeLocked) {
+          showToast(planChangeLockMessage(currentPlanChangeLock), 'error');
+          return;
+        }
         if (!new_pack_id || String(new_pack_id) === String(currentPackId)) {
           showToast('Choose a different weekly plan before updating.', 'error');
           return;
@@ -5006,6 +5280,12 @@
           showToast('Your weekly plan has been updated.');
           await renderSubscriptions(true);
         } catch (error) {
+          const lock = planChangeLockDetails(error);
+          if (lock) {
+            applyPlanChangeLock(error);
+            showToast(planChangeLockMessage(lock), 'error');
+            return;
+          }
           const message = planChangeErrorMessage(error, 'The plan change could not be completed.');
           showToast(message, 'error');
           const errorData = responseData(error?.data || error?.response?.data || error?.body);

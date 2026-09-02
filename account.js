@@ -1186,17 +1186,12 @@
           : 'Your live delivery amount will appear as soon as this saved selection is synchronised.';
     }
     if (elements.accountBagTotalLabel) {
-      elements.accountBagTotalLabel.textContent = hasCashback
-        ? 'Wallet balance total'
-        : hasWeekly
-          ? 'Minimum wallet balance'
+      elements.accountBagTotalLabel.textContent = hasWeekly
+        ? 'Amount to pay'
         : 'Order total';
     }
     if (elements.accountBagTotal) {
-      const displayTotal = hasCashback && Number.isFinite(summary.walletBalanceTotal)
-        ? summary.walletBalanceTotal
-        : summary.total;
-      elements.accountBagTotal.textContent = currency.format(displayTotal);
+      elements.accountBagTotal.textContent = currency.format(summary.total);
     }
 
     const fragment = document.createDocumentFragment();
@@ -2089,6 +2084,9 @@
     const items = orderItems(order);
     const weekly = orderCadence(order) === 'Weekly freshness';
     if (weekly) {
+      const liveSubscription = activeSubscriptionForOrder(order);
+      const livePack = subscriptionCurrentPackObject(liveSubscription);
+      const liveCatalogPlan = liveSubscription ? subscriptionCatalogPlan(liveSubscription) : null;
       const deliveries = Array.isArray(order.deliveries) ? order.deliveries : [];
       const nextDelivery = deliveries.find((delivery) => delivery?.is_active !== false) || deliveries[0];
       const nextQuantity = quantityKg(
@@ -2101,6 +2099,9 @@
       if (nextQuantity !== null) return `${bagWeightLabel(nextQuantity)} kg for the next delivery`;
 
       const cycle = quantityCycleFrom(
+        livePack?.delivery_cycle,
+        livePack?.weekly_quantity_cycle,
+        liveCatalogPlan ? weeklyDeliveryCycle(liveCatalogPlan) : null,
         order.weekly_quantity_cycle,
         order.delivery_quantity_cycle,
         order.delivery_cycle,
@@ -2118,6 +2119,9 @@
       }
 
       const weeklyQuantity = quantityKg(
+        livePack?.quantity_per_week,
+        livePack?.weekly_quantity,
+        liveCatalogPlan?.weeklyKg,
         order.weekly_quantity,
         order.weekly_kg,
         order.quantity_per_week,
@@ -2130,6 +2134,10 @@
       if (weeklyQuantity !== null) return `${bagWeightLabel(weeklyQuantity)} kg per delivery`;
 
       const monthlyQuantity = quantityKg(
+        livePack?.monthly_quantity,
+        livePack?.monthly_kg,
+        livePack?.name,
+        liveCatalogPlan?.monthlyKg,
         order.monthly_quantity,
         order.monthly_kg,
         order.subscription_pack_monthly_quantity,
@@ -2359,6 +2367,77 @@
   }
 
   function orderAmount(order) {
+    // Subscription order serializers expose the current plan's four-delivery
+    // value as `subscription_total_amount`. The legacy `net_order_amount` on
+    // the parent order can still contain the amount from before an 8 kg →
+    // 10 kg plan change, so prefer the live subscription total for the
+    // active weekly order card. Plan-change confirmation rows are deliberately
+    // excluded: those cards should continue to show the one-time change
+    // payment (for example ₹240), not the new plan's ₹1,200 cover.
+    const planChangeSources = [
+      order?.plan_change,
+      order?.planChange,
+      order?.subscription_plan_change,
+      order?.pack_change,
+      order?.packChange,
+      order?.change_details
+    ];
+    const isPlanChangeOrder = [
+      order?.is_edit_subscription,
+      order?.is_plan_change,
+      order?.is_pack_change,
+      ...planChangeSources.map((source) => Boolean(source && typeof source === 'object')),
+      /subscription-pack-change/i.test(String(firstValue(
+        order?.confirmation_id,
+        order?.plan_change_id,
+        order?.pack_change_id,
+        ''
+      )))
+    ].some((value) => value === true);
+    const matchingSubscription = activeSubscriptionForOrder(order);
+    const matchingCatalogPlan = matchingSubscription ? subscriptionCatalogPlan(matchingSubscription) : null;
+    const subscriptionSources = [
+      matchingCatalogPlan ? { current_subscription_total_amount: matchingCatalogPlan.monthlyPrice } : null,
+      subscriptionCurrentPackObject(matchingSubscription),
+      matchingSubscription,
+      order,
+      order?.subscription,
+      order?.subscription_plan,
+      order?.current_plan,
+      order?.updated_plan,
+      order?.new_plan
+    ].filter((source) => source && typeof source === 'object');
+    const planSources = [
+      order?.subscription,
+      order?.subscription_plan,
+      order?.current_plan,
+      order?.updated_plan,
+      order?.new_plan
+    ].filter((source) => source && typeof source === 'object');
+    const hasPlanActivityFlag = typeof order?.subscription_plan_is_active === 'boolean'
+      || planSources.some((source) => typeof source.is_active === 'boolean');
+    const isActiveSubscription = order?.subscription_plan_is_active === true
+      || planSources.some((source) => source.is_active === true);
+    if (
+      orderCadence(order) === 'Weekly freshness'
+      && !isPlanChangeOrder
+      && !orderIsCancelled(order)
+      && (!hasPlanActivityFlag || isActiveSubscription)
+    ) {
+      const currentSubscriptionTotal = finiteMoney(...subscriptionSources.flatMap((source) => [
+        source.subscription_total_amount,
+        source.current_subscription_total_amount,
+        source.updated_subscription_total_amount,
+        source.new_subscription_total_amount,
+        source.current_plan_total_amount,
+        source.new_plan_total_amount,
+        source.monthly_price,
+        source.monthly_amount,
+        source.price_per_month
+      ]), matchingCatalogPlan?.monthlyPrice);
+      if (currentSubscriptionTotal !== null) return currentSubscriptionTotal;
+    }
+
     const amountKeys = [
       'net_payable', 'net_order_amount', 'wallet_debit', 'net_amount', 'final_amount', 'total_amount', 'grand_total', 'order_total',
       'total_price', 'payable_amount', 'amount_payable', 'subtotal', 'total', 'amount'
@@ -2822,11 +2901,19 @@
   async function renderOrders({ page = 1, force = false } = {}) {
     if (page === 1) renderLoading(elements.ordersList, 'Finding your fresh-batch history…');
     try {
-      const orders = await getOrders({
-        page,
-        oneTime: elements.orderFilter.value,
-        force
-      });
+      const [ordersResult, subscriptionsResult] = await Promise.allSettled([
+        getOrders({
+          page,
+          oneTime: elements.orderFilter.value,
+          force
+        }),
+        loadSubscriptions(page === 1 ? force : false)
+      ]);
+      if (ordersResult.status === 'rejected') throw ordersResult.reason;
+      if (subscriptionsResult.status === 'rejected' && isUnauthorized(subscriptionsResult.reason)) {
+        throw subscriptionsResult.reason;
+      }
+      const orders = ordersResult.value;
       if (!orders.length) {
         renderEmpty(
           elements.ordersList,
@@ -4315,28 +4402,61 @@
     return firstValue(subscription?.id, subscription?.subscription_plan_id, subscription?.plan_id, subscription?.pk);
   }
 
+  function subscriptionCurrentPackObject(subscription) {
+    if (!subscription || typeof subscription !== 'object') return {};
+    return [
+      subscription.current_subscription_pack,
+      subscription.current_pack,
+      subscription.updated_subscription_pack,
+      subscription.updated_pack,
+      subscription.new_subscription_pack,
+      subscription.new_pack,
+      subscription.subscription_pack,
+      subscription.pack,
+      subscription.package
+    ].find((candidate) => candidate && typeof candidate === 'object') || {};
+  }
+
+  function subscriptionAuthoritativePackId(subscription) {
+    if (!subscription || typeof subscription !== 'object') return null;
+    const currentPack = subscriptionCurrentPackObject(subscription);
+    return firstValue(
+      subscription.current_subscription_pack_id,
+      subscription.current_pack_id,
+      idOf(subscription.current_subscription_pack),
+      idOf(subscription.current_pack),
+      subscription.updated_subscription_pack_id,
+      subscription.updated_pack_id,
+      subscription.new_subscription_pack_id,
+      subscription.new_pack_id,
+      idOf(subscription.updated_subscription_pack),
+      idOf(subscription.updated_pack),
+      idOf(subscription.new_subscription_pack),
+      idOf(subscription.new_pack),
+      subscription.subscription_pack_id,
+      subscription.pack_id,
+      idOf(currentPack),
+      typeof subscription.subscription_pack === 'object' ? null : subscription.subscription_pack,
+      typeof subscription.pack === 'object' ? null : subscription.pack,
+      typeof subscription.package === 'object' ? null : subscription.package
+    );
+  }
+
   function subscriptionCatalogPlan(subscription) {
-    const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package);
-    const packId = typeof pack === 'object'
-      ? firstValue(pack?.id, pack?.pk)
-      : firstValue(pack, subscription.subscription_pack_id, subscription.pack_id);
+    const packId = subscriptionAuthoritativePackId(subscription);
     return state.weeklyPlans.find((plan) => String(plan.id) === String(packId)) || null;
   }
 
   function subscriptionCurrentPackId(subscription) {
-    const pack = firstValue(subscription?.subscription_pack, subscription?.pack, subscription?.package, {});
-    const explicitPackId = firstValue(
+    const pack = subscriptionCurrentPackObject(subscription);
+    const explicitPackId = subscriptionAuthoritativePackId(subscription);
+    const explicitCurrentPackId = firstValue(
       subscription?.current_subscription_pack_id,
       subscription?.current_pack_id,
-      subscription?.subscription_pack_id,
-      subscription?.pack_id,
-      pack?.id,
-      pack?.pk,
-      typeof pack === 'object' ? null : pack,
-      subscription?.subscription_pack,
-      subscription?.pack,
-      subscription?.package
+      idOf(subscription?.current_subscription_pack),
+      idOf(subscription?.current_pack)
     );
+    if (explicitCurrentPackId != null) return explicitCurrentPackId;
     const monthlyQuantity = quantityKg(
       pack?.monthly_quantity,
       pack?.monthly_kg,
@@ -4393,13 +4513,13 @@
   }
 
   function subscriptionName(subscription) {
-    const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package, {});
+    const pack = subscriptionCurrentPackObject(subscription);
     const catalogPlan = subscriptionCatalogPlan(subscription);
     return String(firstValue(pack?.name, pack?.title, catalogPlan?.name, subscription.name, subscription.plan_name, 'Fresh Weekly Atta'));
   }
 
   function subscriptionWeight(subscription) {
-    const pack = firstValue(subscription.subscription_pack, subscription.pack, subscription.package, {});
+    const pack = subscriptionCurrentPackObject(subscription);
     const catalogPlan = subscriptionCatalogPlan(subscription);
     if (catalogPlan) {
       return `${catalogPlan.monthlyKg} kg/month · ${weeklyDeliveryCycleText(catalogPlan)}`;
@@ -4493,6 +4613,26 @@
   function subscriptionAllowsDeliveryChanges(subscription) {
     const continuous = subscription?.is_continuous;
     return continuous !== false && String(continuous).toLowerCase() !== 'false';
+  }
+
+  function orderSubscriptionPlanId(order) {
+    const relation = firstValue(
+      order?.subscription_plan_id,
+      order?.subscription_id,
+      order?.plan_id,
+      order?.subscription_plan,
+      order?.subscription
+    );
+    return relation && typeof relation === 'object'
+      ? firstValue(relation.id, relation.pk, relation.subscription_plan_id, relation.plan_id)
+      : relation;
+  }
+
+  function activeSubscriptionForOrder(order) {
+    if (!order || !Array.isArray(state.subscriptions)) return null;
+    const planId = orderSubscriptionPlanId(order);
+    if (planId == null) return null;
+    return state.subscriptions.find((subscription) => String(subscriptionId(subscription)) === String(planId)) || null;
   }
 
   function subscriptionHasDeliveredQuantity(subscription) {
@@ -4638,13 +4778,30 @@
     head.append(copy, statusPill(subscriptionStatus(subscription)));
 
     const body = create('div', 'subscription-body');
-    const pack = firstValue(subscription.subscription_pack, subscription.pack, {});
+    const pack = subscriptionCurrentPackObject(subscription);
     const catalogPlan = subscriptionCatalogPlan(subscription);
     [
       ['Delivery day', firstValue(subscription.delivery_day, subscription.weekday, 'As scheduled')],
       ['Plan length', subscriptionPlanLength(subscription)],
-      ['Weekly value', formatMoney(firstValue(subscription.price_per_delivery, subscription.weekly_price, pack?.weekly_price, catalogPlan?.price, 0))],
-      ['Wallet cover (4 deliveries)', formatMoney(firstValue(subscription.monthly_price, pack?.price, catalogPlan?.monthlyPrice, 0))],
+      ['Weekly value', formatMoney(firstValue(
+        subscription.current_price_per_delivery,
+        subscription.current_weekly_price,
+        pack?.weekly_price,
+        pack?.price_per_delivery,
+        catalogPlan?.price,
+        subscription.price_per_delivery,
+        subscription.weekly_price,
+        0
+      ))],
+      ['Wallet cover (4 deliveries)', formatMoney(firstValue(
+        subscription.current_monthly_price,
+        subscription.current_monthly_amount,
+        pack?.price,
+        pack?.monthly_price,
+        catalogPlan?.monthlyPrice,
+        subscription.monthly_price,
+        0
+      ))],
       ['Plan reference', `#${subscriptionId(subscription) || '—'}`]
     ].forEach(([label, value]) => {
       const stat = create('div', 'subscription-stat');
@@ -4837,17 +4994,17 @@
         }
         const header = create('div', 'modification-preview-header');
         header.append(
-          create('div', 'modification-preview-eyebrow', 'Server wallet preview'),
+          create('div', 'modification-preview-eyebrow', 'Plan change preview'),
           create('strong', '', stateName === 'loading'
-            ? 'Recalculating this plan…'
+            ? 'Checking your new plan…'
             : stateName === 'locked'
               ? 'Plan change temporarily locked'
-              : 'Review the wallet requirement')
+              : 'Compare your plans')
         );
         previewPanel.append(header);
 
         if (stateName === 'loading') {
-          previewPanel.append(create('p', 'modification-preview-message', 'Checking the selected quantity, four-delivery cover and your current wallet balance.'));
+          previewPanel.append(create('p', 'modification-preview-message', 'Checking the selected plan and recharge amount.'));
           updatePackChangeSubmitState();
           return;
         }
@@ -4875,7 +5032,7 @@
         }
         if (!preview) {
           previewPanel.append(
-            create('p', 'modification-preview-message', 'Select a different weekly quantity to see its live price and wallet requirement.'),
+            create('p', 'modification-preview-message', 'Select a different weekly quantity to compare the plans and see the recharge amount.'),
             create('small', '', 'The selected plan is not changed until you confirm after this preview.')
           );
           updatePackChangeSubmitState();
@@ -4886,32 +5043,6 @@
         const existing = previewPlan(data.existing_plan || data.current_plan || data.previous_plan);
         const revised = previewPlan(data.new_plan || data.revised_plan || data.next_plan);
         const funding = data.wallet_funding || data.wallet_impact || data.wallet || {};
-        const available = finiteMoney(funding.available_balance, data.available_balance);
-        const required = finiteMoney(
-          funding.minimum_wallet_required,
-          funding.gross_wallet_required,
-          data.minimum_wallet_required,
-          data.gross_wallet_required
-        );
-        const averagePerDelivery = finiteMoney(
-          funding.average_price_per_delivery,
-          data.average_price_per_delivery,
-          data.new_pack_average_price_per_delivery,
-          revised.averagePrice,
-          funding.price_per_delivery,
-          data.price_per_delivery
-        );
-        const priceCycleSource = firstValue(
-          funding.price_cycle,
-          data.price_cycle,
-          data.new_pack_price_cycle,
-          data.new_pack_weekly_price_cycle,
-          revised.price_cycle
-        );
-        const priceCycle = Array.isArray(priceCycleSource)
-          ? priceCycleSource.map((value) => finiteMoney(value)).filter((value) => value !== null)
-          : [];
-        const deliveries = firstValue(funding.minimum_deliveries_required, data.minimum_deliveries_required);
         const shortfall = finiteMoney(funding.shortfall, data.shortfall);
         const amountToDebit = finiteMoney(
           funding.pack_change_amount_due,
@@ -4932,40 +5063,31 @@
         };
         addFigure('Current plan', existing.quantityText, [existing.priceText, existing.cycleText].filter(Boolean).join(' · '));
         addFigure('New plan', revised.quantityText, [revised.priceText, revised.cycleText].filter(Boolean).join(' · '), 'is-primary');
-        if (available !== null) addFigure('Wallet available', formatMoney(available));
-        if (required !== null) {
-          const requirementDetail = [
-            deliveries ? `${deliveries} deliveries` : null,
-            averagePerDelivery !== null ? `${formatMoney(averagePerDelivery)} average per delivery` : null,
-            priceCycle.length === 4 && !priceCycle.every((value) => value === priceCycle[0])
-              ? `cycle: ${priceCycle.map((value) => formatMoney(value)).join(' · ')}`
-              : null
-          ].filter(Boolean).join(' · ');
-          addFigure('Wallet required', formatMoney(required), requirementDetail);
-        }
-        if (amountToDebit !== null && amountToDebit > 0.005) {
-          addFigure('Plan-change payment', formatMoney(amountToDebit), 'Required to finish this upgrade.', 'is-due');
-        }
-        if (shortfall !== null && shortfall > 0.005) {
-          addFigure('Additional recharge', formatMoney(shortfall), 'Add this amount before confirming.', 'is-due');
+        if (shortfall !== null) {
+          addFigure(
+            'Recharge amount',
+            formatMoney(Math.max(0, shortfall)),
+            shortfall > 0.005 ? 'Add this amount before confirming.' : 'Your wallet already covers this plan change.',
+            `is-due is-recharge${shortfall <= 0.005 ? ' is-covered' : ''}`
+          );
         }
         previewPanel.append(figures);
 
         if (walletCovered) {
           previewPanel.append(
             create('p', 'modification-preview-message', amountToDebit !== null && amountToDebit > 0.005
-              ? `Your wallet covers the new plan. A ${formatMoney(amountToDebit)} payment confirmation is required to finish the upgrade.`
+              ? 'Your wallet covers this plan. Confirm the change to continue.'
               : 'Your wallet covers this plan. Confirm to apply the new pack to future deliveries.'),
-            create('small', '', 'Already charged or delivered records remain unchanged. The plan stays unchanged until payment confirmation succeeds.')
+            create('small', '', 'Your current plan stays active until the change is confirmed.')
           );
           previewPanel.classList.remove('is-error');
         } else {
           previewPanel.classList.add('is-error');
           previewPanel.append(
             create('p', 'modification-preview-message', shortfall !== null && shortfall > 0.005
-              ? `Add ${formatMoney(shortfall)} to your wallet before confirming this plan.`
+              ? `Recharge ${formatMoney(shortfall)} to continue with this plan change.`
               : 'Your wallet does not currently cover this plan.'),
-            create('small', '', 'No plan change will be applied until the required wallet balance is available.')
+            create('small', '', 'Your current plan stays active until the recharge is complete.')
           );
           if (shortfall !== null && shortfall > 0.005) {
             const rechargeActions = create('div', 'dialog-actions');
@@ -5139,13 +5261,25 @@
                   || (appliedPackId != null && String(appliedPackId) !== String(select.value))) {
                   throw new Error(firstValue(data?.message, 'Payment was not confirmed. Your current plan was not changed.'));
                 }
-                closeDialog();
                 state.loaded.delete('subscriptions');
                 state.loaded.forEach((key) => {
                   if (String(key).startsWith('orders:')) state.loaded.delete(key);
                 });
                 invalidateWalletCache();
-                await renderSubscriptions(true);
+                await loadSubscriptions(true);
+                const refreshedSubscription = state.subscriptions.find((candidate) => (
+                  String(subscriptionId(candidate)) === String(id)
+                ));
+                const refreshedPackId = subscriptionCurrentPackId(refreshedSubscription);
+                if (!refreshedSubscription || String(refreshedPackId) !== String(select.value)) {
+                  const replayed = data?.idempotent_replay === true
+                    || String(data?.idempotent_replay || '').toLowerCase() === 'true';
+                  throw new Error(replayed
+                    ? 'An earlier confirmation was replayed, but this new plan change was not applied. Please try again after the service creates a new confirmation.'
+                    : 'The confirmation completed, but the active plan still has the previous quantity. Please try again or contact Atulyash care.');
+                }
+                closeDialog();
+                await renderSubscriptions(false);
                 const debit = finiteMoney(data?.amount_debited, paymentAmount);
                 showToast(debit !== null && debit > 0.005
                   ? `Your weekly plan was updated. ${formatMoney(debit)} was debited.`

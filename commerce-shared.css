@@ -107,7 +107,7 @@
 
 .unified-bag .unified-bag-header > button:hover {
   color: #fffdf8;
-  background: #08251f;
+  background: var(--brand-green);
   transform: rotate(8deg);
 }
 
@@ -219,7 +219,7 @@
   margin-bottom: 20px;
   background:
     radial-gradient(circle at 50% 46%, rgba(222, 197, 143, .17), transparent 42%),
-    #08251f;
+    #3B7B3B;
   border: 1px solid rgba(222, 197, 143, .35);
   border-radius: 90px 90px 4px 4px;
 }
@@ -262,7 +262,7 @@
   padding: 12px 20px;
   margin: 0;
   color: #fffdf8;
-  background: #08251f;
+  background: var(--brand-green);
   border: 1px solid #08251f;
   font-size: .68rem;
   font-weight: 700;
@@ -318,7 +318,7 @@
   grid-row: auto;
   overflow: hidden;
   place-items: center;
-  background: #08251f;
+  background: var(--brand-green);
 }
 
 .unified-bag .unified-bag-item-visual::before {
@@ -603,7 +603,7 @@
   justify-content: space-between;
   padding: 13px 17px;
   color: #fffdf8;
-  background: #0d342a;
+  background: var(--brand-green);
   border: 1px solid #0d342a;
   border-radius: 0;
   box-shadow: none;
@@ -618,7 +618,7 @@
 }
 
 .unified-bag .unified-bag-footer > button:not(.unified-bag-continue):hover:not(:disabled) {
-  background: #194b3e;
+  background: var(--brand-green);
   transform: none;
 }
 

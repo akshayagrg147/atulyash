@@ -2059,23 +2059,6 @@
     return Number.isFinite(value) ? Math.max(0, value) : 0;
   }
 
-  function walletBalanceTotalForDisplay() {
-    const explicit = numericValue(
-      walletFundingPolicy?.walletBalanceTotal,
-      numericValue(serverCartSummary?.walletBalanceTotal, NaN)
-    );
-    if (Number.isFinite(explicit) && explicit >= 0) return explicit;
-    const gross = numericValue(
-      walletFundingPolicy?.grossWalletRequired,
-      numericValue(serverCartSummary?.subtotal, cartSubtotal())
-    );
-    const cashback = cashbackAmount();
-    // This value is presentation-only. Payment validation continues to use
-    // the server's minimum_wallet_required amount.
-    if (Number.isFinite(gross) && cashback > 0) return gross + cashback;
-    return NaN;
-  }
-
   function orderTotal() {
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
     // A weekly plan is funded in the wallet for the minimum number of
@@ -2852,12 +2835,12 @@
       : cadence === 'mixed'
         ? 'Bag subtotal'
         : 'Subtotal';
-    const walletBalanceTotal = cadence === 'weekly' && cashback > 0
-      ? walletBalanceTotalForDisplay()
-      : NaN;
-    const displayTotal = Number.isFinite(walletBalanceTotal) ? walletBalanceTotal : total;
+    // The grand total is the amount the customer pays into the wallet. A
+    // cashback credit increases the projected wallet balance, but must not be
+    // presented as an additional payment amount.
+    const displayTotal = total;
     const totalLabel = cadence === 'weekly'
-      ? cashback > 0 ? 'Wallet balance total' : 'Minimum wallet balance'
+      ? 'Amount to pay'
       : cadence === 'mixed'
         ? 'Wallet needed to begin'
         : 'Order total';

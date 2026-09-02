@@ -1,4 +1,5 @@
 :root {
+  --brand-green: #3B7B3B;
   --forest-950: #08251f;
   --forest-900: #0d342a;
   --forest-850: #123c31;
@@ -3119,9 +3120,24 @@ select {
   background: rgba(31, 112, 84, .11);
 }
 
+.modification-preview-figure.is-recharge {
+  grid-column: 1 / -1;
+  border-color: rgba(175, 67, 44, .28);
+  background: rgba(175, 67, 44, .06);
+}
+
 .modification-preview-figure.is-due strong,
 .modification-preview-figure.is-discount strong {
   color: var(--rust-500);
+}
+
+.modification-preview-figure.is-recharge.is-covered {
+  border-color: rgba(31, 112, 84, .24);
+  background: rgba(31, 112, 84, .06);
+}
+
+.modification-preview-figure.is-recharge.is-covered strong {
+  color: var(--forest-700);
 }
 
 .modification-preview-figure.is-reduced strong {
@@ -4837,7 +4853,7 @@ select {
   background:
     radial-gradient(circle at 77% 42%, rgba(222, 197, 143, .24), transparent 25%),
     radial-gradient(circle at 15% 112%, rgba(40, 100, 84, .8), transparent 43%),
-    linear-gradient(128deg, #103f34 0%, var(--forest-950) 70%);
+    linear-gradient(128deg, #3B7B3B 0%, var(--brand-green) 70%);
   box-shadow: 0 34px 92px rgba(8, 37, 31, .18);
 }
 
@@ -5675,7 +5691,7 @@ select {
   margin-bottom: 24px;
   padding: 15px 17px;
   color: #f9f3e7;
-  background: #0b3028;
+  background: var(--brand-green);
   border-left: 3px solid #d4ac55;
   box-shadow: 0 16px 35px rgba(7, 35, 29, .14);
 }
@@ -5717,7 +5733,7 @@ select {
     padding: 24px 24px 38px;
     background:
       linear-gradient(180deg, transparent 0 275px, var(--cream-100) 275px),
-      linear-gradient(135deg, #16493c, var(--forest-950));
+      linear-gradient(135deg, #3B7B3B, var(--brand-green));
     isolation: isolate;
   }
 
@@ -5868,7 +5884,7 @@ select {
     padding: 18px 14px 28px;
     background:
       linear-gradient(180deg, transparent 0 235px, var(--cream-100) 235px),
-      linear-gradient(135deg, #16493c, var(--forest-950));
+      linear-gradient(135deg, #3B7B3B, var(--brand-green));
   }
 
   .auth-entry::before {
@@ -6205,7 +6221,7 @@ select {
   background:
     radial-gradient(circle at 50% 35%, rgba(222, 197, 143, .27), transparent 30%),
     radial-gradient(circle at 2% 100%, rgba(40, 100, 84, .9), transparent 38%),
-    linear-gradient(145deg, #164a3d, #08251f 68%);
+    linear-gradient(145deg, #3B7B3B, #3B7B3B 68%);
 }
 
 .quick-order-visual::before {
@@ -7278,7 +7294,7 @@ body.account-bag-open {
 }
 
 .account-bag-status[data-state="success"] > span {
-  background: var(--forest-600);
+  background: var(--brand-green);
 }
 
 .account-bag-status p {

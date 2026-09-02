@@ -1163,7 +1163,7 @@ body.checkout-page.checkout-handoff-open {
   background:
     radial-gradient(circle at 46% 50%, rgba(224, 197, 137, .2), transparent 25%),
     radial-gradient(circle at 88% 18%, rgba(74, 137, 114, .34), transparent 32%),
-    linear-gradient(145deg, #164b3e, #08251f 72%);
+    linear-gradient(145deg, #3B7B3B, #3B7B3B 72%);
   box-shadow: 0 26px 60px rgba(8, 37, 31, .2), inset 0 1px 0 rgba(255, 253, 248, .08);
   isolation: isolate;
 }

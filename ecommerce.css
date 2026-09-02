@@ -162,7 +162,7 @@ button {
   color: var(--cream-50);
   background:
     radial-gradient(circle at 50% 47%, rgba(222, 197, 143, 0.19), transparent 32%),
-    linear-gradient(145deg, #0a2a23 0%, #123d32 68%, #09251f 100%);
+    linear-gradient(145deg, #3B7B3B 0%, #3B7B3B 68%, #3B7B3B 100%);
   isolation: isolate;
 }
 
@@ -4087,7 +4087,7 @@ body.commerce-open .atulyash-cursor {
   padding: 38px;
   background:
     radial-gradient(circle at 50% 45%, rgba(222, 197, 143, 0.22), transparent 34%),
-    linear-gradient(150deg, #09251f 0%, #123e33 60%, #0a2922 100%);
+    linear-gradient(150deg, #3B7B3B 0%, #3B7B3B 60%, #3B7B3B 100%);
 }
 
 .product-gallery::after {
@@ -4921,7 +4921,7 @@ body.commerce-open .atulyash-cursor {
 .checkout-handoff-actions button {
   border-color: #08251f;
   color: #fffdf8;
-  background: #08251f;
+  background: var(--brand-green);
 }
 
 .checkout-handoff-actions a:hover {
@@ -4929,7 +4929,7 @@ body.commerce-open .atulyash-cursor {
 }
 
 .checkout-handoff-actions button:hover {
-  background: #194b3e;
+  background: var(--brand-green);
 }
 
 @keyframes checkout-handoff-progress {

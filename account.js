@@ -971,10 +971,22 @@
     let cashbackTreatment = '';
     for (const source of bagPayloadSources(state.accountBagPayload)) {
       const appliedCoupon = source.applied_coupon || source.coupon_detail || source.coupon;
+      const couponDescriptor = appliedCoupon && typeof appliedCoupon === 'object'
+        ? [
+          appliedCoupon.code,
+          appliedCoupon.coupon_code,
+          appliedCoupon.couponCode,
+          appliedCoupon.name,
+          appliedCoupon.title,
+          appliedCoupon.description,
+          appliedCoupon.discount_type,
+          appliedCoupon.type
+        ]
+        : [appliedCoupon];
       couponCode = couponCode
-        || appliedCoupon?.code
-        || appliedCoupon?.coupon_code
+        || couponDescriptor.find((value) => value != null && String(value).trim())
         || source.applied_coupon_code
+        || source.appliedCouponCode
         || source.coupon_code
         || '';
       cashbackTreatment = cashbackTreatment
@@ -996,7 +1008,7 @@
     const subtotal = useServerSummary && Number.isFinite(serverSubtotal)
       ? serverSubtotal
       : lineSubtotal;
-    const cashback = useServerSummary && Number.isFinite(serverCashback)
+    const cashback = useServerSummary && Number.isFinite(serverCashback) && serverCashback > 0
       ? Math.max(0, serverCashback)
       : cashbackCoupon && Number.isFinite(serverDiscount)
         ? Math.max(0, serverDiscount)

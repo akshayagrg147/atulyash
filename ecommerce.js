@@ -270,6 +270,7 @@
   let serverCartId = null;
   let serverCartSummary = null;
   let firstOrderEligibility = null;
+  let firstOrderEligibilityRequest = null;
   let serverCartActive = false;
   let cartNeedsAuthentication = false;
   let pendingGuestCart = [];
@@ -1125,6 +1126,20 @@
     return null;
   }
 
+  function sessionHasVerifiedIdentity(session = getApiSession()) {
+    if (!session || typeof session !== 'object') return false;
+    const aliases = {
+      userId: ['userId', 'user_id', 'user'],
+      customerId: ['customerId', 'customer_id', 'customer'],
+      cartId: ['cartId', 'cart_id', 'cart']
+    };
+    return Object.values(aliases).every((keys) => keys.some((key) => {
+      const value = session[key];
+      if (value && typeof value === 'object') return value.id != null || value.pk != null || value.uuid != null;
+      return value != null && value !== '';
+    }));
+  }
+
   function cartResponseSources(payload) {
     return [
       payload,
@@ -1396,27 +1411,6 @@
     return null;
   }
 
-  function selectCartFromCollection(payload, customerId) {
-    const carts = apiResults(payload)
-      .filter((item) => item?.id != null && item?.is_active !== false);
-    const matchingCustomer = customerId == null ? null : carts.find((item) => (
-      String(cartCustomerIdentifier(item) ?? '') === String(customerId)
-    ));
-    if (matchingCustomer) return matchingCustomer;
-
-    const rememberedCartId = serverCartId || sessionIdentifier('cartId');
-    const rememberedCart = carts.find((item) => String(item.id) === String(rememberedCartId));
-    if (rememberedCart) return rememberedCart;
-    if (carts.length === 1) return carts[0];
-
-    const customerIds = carts
-      .map(cartCustomerIdentifier)
-      .filter((value) => value != null)
-      .map(String);
-    const uniqueCustomerIds = [...new Set(customerIds)];
-    return uniqueCustomerIds.length === 1 ? carts[0] : null;
-  }
-
   function rememberCustomerId(customerId) {
     if (customerId == null || customerId === '') return;
     API?.setSession?.({ customerId });
@@ -1434,6 +1428,11 @@
     } catch (error) {
       // The authenticated API session remains the source of truth.
     }
+  }
+
+  function selectCartFromCollection(payload) {
+    const firstCart = apiResults(payload)[0];
+    return firstCart && firstCart.id != null ? firstCart : null;
   }
 
   function rememberServerCartId(cartId) {
@@ -1554,32 +1553,24 @@
     }
 
     try {
-      const collection = await invokeApi('cart', 'list', [{
-        is_active: true,
-        page_size: 100,
-        ordering: '-updated_at'
-      }], {
+      // Resolve the authenticated customer's cart from the collection only
+      // when there is no usable remembered ID (or that ID no longer exists).
+      // The cart ID is always results[0].id; customer/user IDs are never used
+      // as cart identifiers.
+      const collection = await invokeApi('cart', 'list', [{ is_active: true }], {
         path: '/orders/cart/',
         options: {
           method: 'GET',
           auth: true,
           cache: 'no-store',
-          query: { is_active: true, page_size: 100, ordering: '-updated_at' }
+          query: { is_active: true }
         }
       });
-      const existingCart = selectCartFromCollection(collection, customerId);
-      if (existingCart?.id != null) {
+      const existingCart = selectCartFromCollection(collection);
+      if (existingCart) {
         const payload = await readServerCart(existingCart.id, { render });
         setCartApiStatus('Your bag is securely synchronised.', { state: 'success' });
-        window.setTimeout(() => {
-          if (elements.cartApiStatus?.dataset.state === 'success') {
-            setCartApiStatus('', { hidden: true });
-          }
-        }, 1800);
         return payload;
-      }
-      if (apiResults(collection).length > 1) {
-        throw new Error('We found more than one active bag and could not safely choose between them.');
       }
       if (!createIfMissing) {
         throw new Error('No active cart is available for this customer.');
@@ -1588,42 +1579,8 @@
     } catch (error) {
       if (isUnauthorizedError(error)) {
         showCartLoginGate();
-        throw error;
       }
-      if (
-        createIfMissing
-        && (
-          isMissingCartError(error)
-          || /No active cart is available/i.test(String(error?.message || ''))
-        )
-      ) {
-        try {
-          return await createServerCart(customerId, { render });
-        } catch (createError) {
-          if (isUnauthorizedError(createError)) {
-            showCartLoginGate();
-            throw createError;
-          }
-          try {
-            // If the create request reached the server but its response was
-            // interrupted, a single read confirms the cart without creating
-            // a duplicate.
-            return await refreshServerCart({ render, createIfMissing: false });
-          } catch (confirmationError) {
-            // Report the create response; the read-only confirmation was only
-            // a protection against an uncertain network result.
-          }
-          setCartApiStatus(
-            friendlyCartError(createError),
-            { state: 'error', retry: true }
-          );
-          throw createError;
-        }
-      }
-      setCartApiStatus(
-        friendlyCartError(error),
-        { state: 'error', retry: true }
-      );
+      setCartApiStatus(friendlyCartError(error), { state: 'error', retry: true });
       throw error;
     }
   }
@@ -1882,32 +1839,50 @@
     return cart.reduce((total, item) => total + cartItemTotal(item), 0);
   }
 
+  function needsFirstOrderEligibility() {
+    // The live cart is authoritative for delivery charges. The separate
+    // order-history request only matters for an unsynchronised one-time bag
+    // where the client still needs to decide whether first delivery is free.
+    return isApiAuthenticated()
+      && !serverCartActive
+      && cart.some((item) => item.purchaseType !== 'weekly');
+  }
+
   async function loadFirstOrderEligibility() {
-    if (!isApiAuthenticated()) {
+    if (!needsFirstOrderEligibility()) {
       firstOrderEligibility = null;
       return null;
     }
+    if (firstOrderEligibilityRequest) return firstOrderEligibilityRequest;
     const query = {
       page_size: 1,
       page: 1,
       is_active: true,
       pending_order: false
     };
+    const request = (async () => {
+      try {
+        const response = await invokeApi('orders', 'list', [query], {
+          path: '/orders/order/',
+          options: { method: 'GET', auth: true, cache: 'no-store', query }
+        });
+        const suppliedCount = Number(response?.count ?? response?.data?.count);
+        const hasEarlierOrder = Number.isFinite(suppliedCount)
+          ? suppliedCount > 0
+          : apiResults(response).length > 0;
+        firstOrderEligibility = !hasEarlierOrder;
+        renderCart();
+        return firstOrderEligibility;
+      } catch (error) {
+        firstOrderEligibility = null;
+        return null;
+      }
+    })();
+    firstOrderEligibilityRequest = request;
     try {
-      const response = await invokeApi('orders', 'list', [query], {
-        path: '/orders/order/',
-        options: { method: 'GET', auth: true, cache: 'no-store', query }
-      });
-      const suppliedCount = Number(response?.count ?? response?.data?.count);
-      const hasEarlierOrder = Number.isFinite(suppliedCount)
-        ? suppliedCount > 0
-        : apiResults(response).length > 0;
-      firstOrderEligibility = !hasEarlierOrder;
-      renderCart();
-      return firstOrderEligibility;
-    } catch (error) {
-      firstOrderEligibility = null;
-      return null;
+      return await request;
+    } finally {
+      if (firstOrderEligibilityRequest === request) firstOrderEligibilityRequest = null;
     }
   }
 
@@ -3406,7 +3381,7 @@
 
   function restoreAuthenticatedCheckout() {
     apiSession = getApiSession();
-    if (!isApiAuthenticated()) {
+    if (!isApiAuthenticated() || !sessionHasVerifiedIdentity(apiSession)) {
       resetOtpState({ preserveSession: true });
       return false;
     }
@@ -3417,9 +3392,9 @@
     authVerifiedPhone = phone;
     checkoutProfilePhone = phone;
     if (elements.checkoutOtpStatus) {
-      elements.checkoutOtpStatus.textContent = sessionIdentifier('customerId')
+      elements.checkoutOtpStatus.textContent = sessionHasVerifiedIdentity(apiSession)
         ? 'Your secure Atulyash session is active.'
-        : 'Your mobile is verified. We’ll connect your customer account when you continue.';
+        : 'Verify your mobile to continue with your Atulyash account.';
     }
     renderOtpState();
     return true;
@@ -3535,6 +3510,9 @@
       if (!isApiAuthenticated()) {
         throw new Error('The login response did not include a usable access token.');
       }
+      if (!sessionHasVerifiedIdentity(apiSession)) {
+        throw new Error('The login response did not include user, customer, and cart IDs. Please try again.');
+      }
       authOtpState = 'verified';
       authVerifiedPhone = authPendingPhone;
       checkoutProfilePhone = authVerifiedPhone;
@@ -3542,29 +3520,9 @@
       clearOtpError();
       clearOtpResendTimer();
       if (elements.checkoutOtpStatus) {
-        elements.checkoutOtpStatus.textContent = 'Mobile verified. Connecting your Atulyash account…';
+        elements.checkoutOtpStatus.textContent = 'Mobile verified. Your Atulyash account is ready.';
       }
       renderOtpState({ focus: true });
-      try {
-        if (typeof API?.auth?.resolveCustomerSession === 'function') {
-          await API.auth.resolveCustomerSession(authVerifiedPhone);
-          apiSession = getApiSession();
-        }
-        if (!sessionIdentifier('customerId')) {
-          await refreshServerCart({ render: false });
-        }
-        if (!sessionIdentifier('customerId')) {
-          throw new Error('The customer account could not be resolved.');
-        }
-        if (elements.checkoutOtpStatus) {
-          elements.checkoutOtpStatus.textContent = 'Mobile verified. Your Atulyash account is ready.';
-        }
-      } catch (profileError) {
-        if (elements.checkoutOtpStatus) {
-          elements.checkoutOtpStatus.textContent = 'Mobile verified. We’ll reconnect your customer account when you continue.';
-        }
-        announce('Your mobile is verified. Customer account connection will retry when you continue.');
-      }
     } catch (error) {
       if (elements.checkoutOtpStatus) elements.checkoutOtpStatus.textContent = '';
       setOtpError(error?.message || 'The OTP is incorrect or expired. Try the latest code.');

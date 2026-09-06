@@ -861,7 +861,7 @@
     list: function listCarts(params, options) {
       return getRequest(
         '/orders/cart/',
-        withDefaults({ is_active: true, page_size: 100, ordering: '-updated_at' }, params),
+        withDefaults({ is_active: true }, params),
         options
       );
     },
@@ -959,6 +959,13 @@
     return [];
   }
 
+  function firstListedActiveCart(payload) {
+    var firstCart = cartListItems(payload)[0];
+    return firstCart && firstCart.id != null && firstCart.is_active !== false
+      ? firstCart
+      : null;
+  }
+
   function cartIdentity(payload) {
     var root =
       payload && payload.data && !Array.isArray(payload.data)
@@ -1001,71 +1008,56 @@
 
   cart.ensureActive = function ensureActiveCart(mobile, options) {
     options = options || {};
-    return cart.list(
-      { is_active: true, page_size: 100, ordering: '-updated_at' },
-      options
-    ).then(function selectActiveCart(response) {
-      var activeCarts = cartListItems(response).filter(function activeOnly(item) {
-        return item && item.id != null && item.is_active !== false;
-      });
-      var selected = null;
-      if (session.cartId != null) {
-        selected = activeCarts.find(function matchRememberedCart(item) {
-          return String(item.id) === String(session.cartId);
-        });
-      }
-      if (!selected && session.customerId != null) {
-        selected = activeCarts.find(function matchRememberedCustomer(item) {
-          return String(objectIdentifier(item.customer)) === String(session.customerId);
-        });
-      }
-      if (!selected && activeCarts.length) {
-        var customerIds = activeCarts
-          .map(function customerForCart(item) {
-            return objectIdentifier(item.customer);
-          })
-          .filter(function present(value) {
-            return typeof value !== 'undefined';
-          })
-          .map(String);
-        var uniqueCustomerIds = customerIds.filter(function unique(value, index) {
-          return customerIds.indexOf(value) === index;
-        });
-        if (activeCarts.length === 1 || uniqueCustomerIds.length === 1) {
-          selected = activeCarts[0];
-        } else {
-          throw new AtulyashAPIError(
-            'We could not safely identify the active bag for this account.',
-            {
-              code: 'CART_IDENTITY_AMBIGUOUS',
-              details: response
-            }
+    var rememberedCartId = session.cartId;
+    var activeCart;
+    if (rememberedCartId != null) {
+      activeCart = cart.get(rememberedCartId, options).catch(function refreshMissingCart(error) {
+        if (Number(error && error.status) !== 404) throw error;
+        return cart.list({ is_active: true }, options).then(function selectListedCart(response) {
+          var listedCart = firstListedActiveCart(response);
+          return listedCart || cart.create(
+            { name: 'Atulyash Web Bag', is_active: true },
+            options
           );
-        }
-      }
-      if (!selected) {
-        return cart.create(
+        });
+      });
+    } else {
+      activeCart = cart.list({ is_active: true }, options).then(function selectListedCart(response) {
+        var listedCart = firstListedActiveCart(response);
+        return listedCart || cart.create(
           { name: 'Atulyash Web Bag', is_active: true },
           options
         );
-      }
-      return cart.get(selected.id, options).catch(function useListedCart(error) {
-        if (cartIdentity(selected).customerId !== undefined) return selected;
-        throw error;
       });
-    }).then(function saveActiveCartIdentity(activeCart) {
-      return persistCartIdentity(activeCart, mobile);
+    }
+    return activeCart.then(function saveActiveCartIdentity(activeCartPayload) {
+      return persistCartIdentity(activeCartPayload, mobile);
     });
   };
 
-  auth.resolveCustomerSession = function resolveCustomerSession(mobile, options) {
-    if (session.customerId != null && session.cartId != null) {
+  auth.resolveCustomerSession = function resolveCustomerSession(mobile) {
+    /*
+     * OTP verification is the authoritative identity handshake. The response
+     * includes user_id, customer_id, and cart_id, so resolving any of those by
+     * listing carts or fetching a user record is both unnecessary and can
+     * trigger permission errors for customer sessions.
+     */
+    if (session.userId != null && session.customerId != null && session.cartId != null) {
       if (mobile) setSession({ mobile: String(mobile).replace(/\D/g, '').slice(-10) });
       return Promise.resolve(cloneSession());
     }
-    return cart.ensureActive(mobile, options).then(function resolvedCustomerSession() {
-      return cloneSession();
-    });
+    return Promise.reject(new AtulyashAPIError(
+      'OTP verification did not return a complete account session. Please sign in again.',
+      {
+        status: 401,
+        code: 'LOGIN_CONTEXT_MISSING',
+        details: {
+          hasUserId: session.userId != null,
+          hasCustomerId: session.customerId != null,
+          hasCartId: session.cartId != null
+        }
+      }
+    ));
   };
 
   var orders = {

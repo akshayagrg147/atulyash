@@ -185,6 +185,7 @@
     mobile: '',
     userId: null,
     customerId: null,
+    cartId: null,
     user: null,
     customer: null,
     activeView: 'shop',
@@ -202,11 +203,17 @@
     walletPreview: null,
     notifications: [],
     unreadCount: 0,
+    // Delivery details are loaded on demand from the order journey. Keep the
+    // result so reopening the same delivery does not issue the same two GETs.
+    deliveryDetails: new Map(),
     products: [],
     quickProductPacks: [],
-    quickProductCatalogStatus: 'loading',
+    // Catalogues are loaded only when a screen needs them. Starting them in
+    // the background on Wallet, Orders, or Profile used two unnecessary API
+    // requests before the customer could use the page.
+    quickProductCatalogStatus: 'idle',
     weeklyPlans: [],
-    weeklyCatalogStatus: 'loading',
+    weeklyCatalogStatus: 'idle',
     quickOrderSubmitting: false,
     accountBagItems: [],
     accountBagPayload: null,
@@ -222,6 +229,28 @@
 
   function client() {
     return window.AtulyashAPI || null;
+  }
+
+  // Several route changes can ask for the same data in the same event loop
+  // (for example, the Wallet view and the overview). Keep one in-flight
+  // request per resource so the page never sends duplicate GET requests.
+  function coalesceLoad(key, loader) {
+    const pending = state.loading.get(key);
+    if (pending) return pending;
+    let request;
+    try {
+      // Call the loader immediately so the UI can enter its loading state in
+      // the same paint, while still normalising every result to a Promise.
+      request = Promise.resolve(loader());
+    } catch (error) {
+      request = Promise.reject(error);
+    }
+    state.loading.set(key, request);
+    const clear = () => {
+      if (state.loading.get(key) === request) state.loading.delete(key);
+    };
+    request.then(clear, clear);
+    return request;
   }
 
   function methodFrom(group, names) {
@@ -1064,10 +1093,16 @@
     const localQuantity = localBagQuantity();
     if (localQuantity > 0) showPortalBagCount(localQuantity);
 
-    const ensureActiveBag = methodFrom('cart', ['ensureActive']);
-    if (!ensureActiveBag) return;
+    // A header badge must not create a cart or list every cart for the
+    // customer. If this session already knows its cart, a single read gives
+    // us the live count; otherwise the local count is enough until My Bag is
+    // opened (where the full cart is loaded deliberately).
+    const activeSession = client()?.getSession?.() || {};
+    const cartId = firstValue(activeSession.cartId, activeSession.cart_id);
+    const getBag = methodFrom('cart', ['get']);
+    if (cartId == null || !getBag) return;
     try {
-      const payload = await ensureActiveBag(state.mobile);
+      const payload = await coalesceLoad(`portal-bag-count:${cartId}`, () => getBag(cartId));
       state.accountBagPayload = payload;
       const liveQuantity = bagQuantityFromPayload(payload);
       if (localQuantity === 0 && liveQuantity != null) {
@@ -1636,7 +1671,8 @@
     const meta = {
       mobile: state.mobile,
       userId: state.userId,
-      customerId: state.customerId
+      customerId: state.customerId,
+      cartId: state.cartId
     };
     sessionStorage.setItem(SESSION_META_KEY, JSON.stringify(meta));
   }
@@ -1679,22 +1715,27 @@
       idOf(user?.customer),
       state.customerId
     );
+    state.cartId = firstValue(
+      idOf(data.cart),
+      data.cart_id,
+      data.cartId,
+      idOf(customer?.cart),
+      state.cartId
+    );
     if (user && typeof user === 'object') state.user = user;
     if (customer && typeof customer === 'object') state.customer = customer;
     persistMeta();
   }
 
   async function resolveCustomerIdentity() {
-    if (state.customerId) return true;
-    const resolver = methodFrom('auth', ['resolveCustomerSession']);
-    if (resolver) {
-      const session = await resolver(state.mobile);
-      captureIdentity(session, state.mobile);
-    }
-    if (!state.customerId) {
-      throw new Error('Your mobile is verified, but we could not connect your customer account yet.');
-    }
-    return true;
+    /*
+     * OTP verification returns the complete account context. Do not make a
+     * second request to discover these IDs (or to fetch /users/users/{id}/).
+     * An incomplete session is a login-response problem, not a reason to list
+     * carts or probe another account endpoint.
+     */
+    if (state.userId && state.customerId && state.cartId) return true;
+    throw new Error('Your login response did not include a complete account session. Please sign in again.');
   }
 
   async function restoreSession() {
@@ -1702,6 +1743,7 @@
     state.mobile = String(meta.mobile || '');
     state.userId = meta.userId || null;
     state.customerId = meta.customerId || null;
+    state.cartId = meta.cartId || null;
 
     const getSession = methodFrom('auth', ['getSession', 'session']) || methodFrom(null, ['getSession']);
     if (getSession) {
@@ -1876,10 +1918,13 @@
       closeAccountBag({ restoreFocus: false });
     }
     sessionStorage.removeItem(SESSION_META_KEY);
+    state.loading.clear();
     state.loaded.clear();
+    state.deliveryDetails.clear();
     state.mobile = '';
     state.userId = null;
     state.customerId = null;
+    state.cartId = null;
     state.user = null;
     state.customer = null;
     elements.accountShell.hidden = true;
@@ -1929,20 +1974,12 @@
 
   async function loadProfile(force = false) {
     if (!force && state.loaded.has('profile')) return;
+    if (!force) return coalesceLoad('profile', () => loadProfile(true));
     const tasks = [];
-    if (state.userId) {
-      tasks.push(apiCall('profile', ['getUser', 'getUserData'], {
-        id: state.userId,
-        userId: state.userId
-      }, {
-        path: ({ id, userId }) => (id || userId) ? `/users/users/${id || userId}/` : null,
-        method: 'GET'
-      }).then((result) => {
-        const data = responseData(result);
-        state.user = data;
-        captureIdentity({ user: data }, state.mobile);
-      }));
-    }
+    // The OTP response already supplies user_id. Avoid a customer-side GET to
+    // /users/users/{id}/, which is commonly restricted with HTTP 403. Profile
+    // edits still use the existing PATCH request; this only removes the
+    // unnecessary identity lookup.
     if (state.customerId) {
       tasks.push(apiCall('profile', ['getCustomer', 'getCustomerData'], {
         id: state.customerId,
@@ -1969,6 +2006,7 @@
 
   async function loadUnread(force = false) {
     if (!force && state.loaded.has('unread')) return state.unreadCount;
+    if (!force) return coalesceLoad('unread', () => loadUnread(true));
     const result = await apiCall('notifications', ['unreadCount', 'fetchUnreadCount'], undefined, {
       path: '/notifications/unread-count/',
       method: 'GET'
@@ -1981,6 +2019,9 @@
 
   async function getOrders({ page = 1, oneTime = '', force = false } = {}) {
     if (!force && page === 1 && state.loaded.has(`orders:${oneTime}`)) return state.orders;
+    if (!force) {
+      return coalesceLoad(`orders:${page}:${oneTime}`, () => getOrders({ page, oneTime, force: true }));
+    }
     const query = {
       page_size: 15,
       page,
@@ -3331,71 +3372,60 @@
   }
 
   async function loadOrderTracking(orderIdValue, detail) {
-    let listedDeliveries = [];
-    let subscriptionOrders = [];
-    try {
-      const [deliveriesResult, subscriptionResult] = await Promise.allSettled([
-        apiCall('orders', ['deliveries', 'listDeliveries', 'getOrderDeliveries'], {
+    // The order-detail response already contains the delivery schedule for
+    // current orders. Use it directly instead of requesting the same rows
+    // from /deliveries/ and then fetching detail + history for every row.
+    let sourceDeliveries = Array.isArray(detail?.deliveries) ? detail.deliveries : [];
+    let subscriptionOrders = Array.isArray(detail?.subscription_orders) ? detail.subscription_orders : [];
+
+    // Older order responses may not embed deliveries. Keep one fallback list
+    // request for those responses, but never run it when the embedded schedule
+    // is available.
+    if (!sourceDeliveries.length) {
+      try {
+        const deliveriesResult = await apiCall('orders', ['deliveries', 'listDeliveries', 'getOrderDeliveries'], {
           id: orderIdValue,
           orderId: orderIdValue
         }, {
           path: `/orders/order/${orderIdValue}/deliveries/`,
           method: 'GET'
-        }),
-        apiCall('orders', ['subscriptionDeliveries', 'subscriptionOrders', 'getSubscriptionDeliveries'], {
+        });
+        sourceDeliveries = responseList(deliveriesResult);
+      } catch (error) {
+        if (isUnauthorized(error)) throw error;
+      }
+    }
+
+    // Only ask for the weekly ledger if the order has no delivery schedule at
+    // all. For normal orders this request is unnecessary.
+    if (!sourceDeliveries.length && !subscriptionOrders.length && orderCadence(detail) === 'Weekly freshness') {
+      try {
+        const subscriptionResult = await apiCall('orders', ['subscriptionDeliveries', 'subscriptionOrders', 'getSubscriptionDeliveries'], {
           id: orderIdValue,
           orderId: orderIdValue
         }, {
           path: `/orders/order/${orderIdValue}/subscription-orders/`,
           method: 'GET'
-        })
-      ]);
-      const unauthorized = [deliveriesResult, subscriptionResult]
-        .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
-      if (unauthorized) throw unauthorized.reason;
-      if (deliveriesResult.status === 'fulfilled') listedDeliveries = responseList(deliveriesResult.value);
-      if (subscriptionResult.status === 'fulfilled') subscriptionOrders = responseList(subscriptionResult.value);
-    } catch (error) {
-      if (isUnauthorized(error)) throw error;
+        });
+        subscriptionOrders = responseList(subscriptionResult);
+      } catch (error) {
+        if (isUnauthorized(error)) throw error;
+      }
     }
 
-    const sourceDeliveries = listedDeliveries.length
-      ? listedDeliveries
-      : Array.isArray(detail?.deliveries) ? detail.deliveries : [];
     if (!sourceDeliveries.length) return { ...detail, subscription_orders: subscriptionOrders };
 
-    const enrichedResults = await Promise.all(sourceDeliveries.map(async (delivery) => {
-      const id = deliveryId(delivery);
-      if (!id) return { ...delivery, history: deliveryHistoryFor(delivery) };
-
-      const [detailResult, historyResult] = await Promise.allSettled([
-        apiCall('orders', ['deliveryDetail', 'getDeliveryDetails'], { id, deliveryId: id }, {
-          path: `/orders/order-delivery/${id}/`,
-          method: 'GET'
-        }),
-        apiCall('orders', ['deliveryHistory', 'getDeliveryHistory'], { id, deliveryId: id }, {
-          path: `/orders/order-delivery/${id}/history/`,
-          method: 'GET'
-        })
-      ]);
-      const unauthorized = [detailResult, historyResult]
-        .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
-      if (unauthorized) throw unauthorized.reason;
-
-      const details = detailResult.status === 'fulfilled'
-        ? responseData(detailResult.value)
-        : {};
-      const history = historyResult.status === 'fulfilled'
-        ? responseList(historyResult.value)
-        : deliveryHistoryFor(delivery);
+    // Keep any history that the order endpoint supplied. Per-delivery detail
+    // and history are deliberately loaded only from the delivery detail view.
+    const enrichedResults = sourceDeliveries.map((delivery) => {
+      const history = deliveryHistoryFor(delivery);
       return {
         ...delivery,
-        ...(details && typeof details === 'object' ? details : {}),
         history,
-        delivery_history: history,
-        tracking_events: history
+        delivery_history: delivery.delivery_history || history,
+        tracking_events: delivery.tracking_events || history
       };
-    }));
+    });
 
     const directEvents = [
       detail?.tracking_events,
@@ -3483,24 +3513,32 @@
       let detail = delivery || {};
       let history = deliveryHistoryFor(detail);
       if (id) {
-        const [detailResult, historyResult] = await Promise.allSettled([
-          apiCall('orders', ['deliveryDetail', 'getDeliveryDetails'], { id, deliveryId: id }, {
-            path: `/orders/order-delivery/${id}/`,
-            method: 'GET'
-          }),
-          apiCall('orders', ['deliveryHistory', 'getDeliveryHistory'], { id, deliveryId: id }, {
-            path: `/orders/order-delivery/${id}/history/`,
-            method: 'GET'
-          })
-        ]);
-        const unauthorized = [detailResult, historyResult]
-          .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
-        if (unauthorized) throw unauthorized.reason;
-        if (detailResult.status === 'fulfilled') {
-          const payload = responseData(detailResult.value);
-          if (payload && typeof payload === 'object') detail = { ...detail, ...payload };
+        const cacheKey = String(id);
+        const cached = state.deliveryDetails.get(cacheKey);
+        if (cached) {
+          detail = { ...detail, ...cached.detail };
+          history = cached.history;
+        } else {
+          const [detailResult, historyResult] = await Promise.allSettled([
+            apiCall('orders', ['deliveryDetail', 'getDeliveryDetails'], { id, deliveryId: id }, {
+              path: `/orders/order-delivery/${id}/`,
+              method: 'GET'
+            }),
+            apiCall('orders', ['deliveryHistory', 'getDeliveryHistory'], { id, deliveryId: id }, {
+              path: `/orders/order-delivery/${id}/history/`,
+              method: 'GET'
+            })
+          ]);
+          const unauthorized = [detailResult, historyResult]
+            .find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
+          if (unauthorized) throw unauthorized.reason;
+          const fetchedDetail = detailResult.status === 'fulfilled'
+            ? responseData(detailResult.value)
+            : {};
+          if (fetchedDetail && typeof fetchedDetail === 'object') detail = { ...detail, ...fetchedDetail };
+          if (historyResult.status === 'fulfilled') history = responseList(historyResult.value);
+          state.deliveryDetails.set(cacheKey, { detail: fetchedDetail, history });
         }
-        if (historyResult.status === 'fulfilled') history = responseList(historyResult.value);
       }
       const body = create('div', 'delivery-detail');
       const hero = create('div', 'delivery-detail-hero');
@@ -4379,6 +4417,7 @@
 
   async function loadSubscriptions(force = false) {
     if (!force && state.loaded.has('subscriptions')) return state.subscriptions;
+    if (!force) return coalesceLoad('subscriptions', () => loadSubscriptions(true));
     const query = {
       is_active: true,
       page_size: 100,
@@ -6709,13 +6748,27 @@
 
   function invalidateWalletCache() {
     state.loaded.delete('wallet');
+    state.loaded.delete('wallet-summary');
     state.wallet = null;
     state.walletTransactions = [];
     state.walletPreview = null;
   }
 
+  async function loadWalletSummary(force = false) {
+    if (!force && state.loaded.has('wallet-summary')) return state.wallet;
+    if (!force) return coalesceLoad('wallet-summary', () => loadWalletSummary(true));
+    const result = await apiCall('misc', ['wallet', 'getCustomerWallet'], { id: state.customerId, customerId: state.customerId }, {
+      path: ({ id, customerId }) => (id || customerId) ? `/customers/customer-wallet/${id || customerId}/` : null,
+      method: 'GET'
+    });
+    state.wallet = responseData(result);
+    state.loaded.add('wallet-summary');
+    return state.wallet;
+  }
+
   async function loadWallet(force = false) {
     if (!force && state.loaded.has('wallet')) return state.wallet;
+    if (!force) return coalesceLoad('wallet', () => loadWallet(true));
     const [walletResult, transactionsResult, optionsResult] = await Promise.allSettled([
       apiCall('misc', ['wallet', 'getCustomerWallet'], { id: state.customerId, customerId: state.customerId }, {
         path: ({ id, customerId }) => (id || customerId) ? `/customers/customer-wallet/${id || customerId}/` : null,
@@ -6734,6 +6787,7 @@
     ]);
     if (walletResult.status === 'rejected') throw walletResult.reason;
     state.wallet = responseData(walletResult.value);
+    state.loaded.add('wallet-summary');
     state.walletTransactions = transactionsResult.status === 'fulfilled' ? responseList(transactionsResult.value) : [];
     state.rechargeOptionsData = optionsResult.status === 'fulfilled' ? responseList(optionsResult.value) : [];
     state.loaded.add('wallet');
@@ -6970,10 +7024,10 @@
     }, 80);
   }
 
-  function walletRechargeRequestPayload(amount) {
+  function walletRechargeRequestPayload(amount, cartIdOverride = null) {
     const payload = { amount: Math.max(1, Math.ceil(numberFrom(amount))) };
     const activeSession = client()?.getSession?.() || {};
-    const cartId = firstValue(activeSession.cartId, activeSession.cart_id);
+    const cartId = firstValue(cartIdOverride, activeSession.cartId, activeSession.cart_id);
     if (cartId != null && cartId !== '') payload.cart_id = cartId;
     const activeSubscription = state.subscriptions.find((subscription) => (
       subscription && subscription.is_active !== false
@@ -6983,6 +7037,31 @@
       payload.subscription_plan_id = subscriptionPlanId;
     }
     return payload;
+  }
+
+  async function ensureWalletCartId() {
+    const activeSession = client()?.getSession?.() || {};
+    const rememberedCartId = firstValue(activeSession.cartId, activeSession.cart_id);
+    if (rememberedCartId != null && rememberedCartId !== '') return rememberedCartId;
+
+    const ensureActiveCart = methodFrom('cart', ['ensureActive']);
+    if (!ensureActiveCart) {
+      throw new Error('Your secure cart could not be identified. Please sign in again.');
+    }
+    const cartPayload = await ensureActiveCart(state.mobile);
+    const refreshedSession = client()?.getSession?.() || {};
+    const data = responseData(cartPayload);
+    const cartId = firstValue(
+      refreshedSession.cartId,
+      refreshedSession.cart_id,
+      data?.cart_id,
+      data?.cartId,
+      data?.id
+    );
+    if (cartId == null || cartId === '') {
+      throw new Error('Your secure cart could not be identified. Please try again.');
+    }
+    return cartId;
   }
 
   function authoritativeRechargeAmount(payload, fallback) {
@@ -7056,7 +7135,8 @@
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.previewRechargeButton, true, 'Preparing preview…');
     try {
-      const request = walletRechargeRequestPayload(amount);
+      const cartId = await ensureWalletCartId();
+      const request = walletRechargeRequestPayload(amount, cartId);
       const result = await apiCall('misc', ['rechargePreview', 'previewRecharge'], request, {
         path: '/customers/customer-wallet/recharge/preview/',
         method: 'POST',
@@ -7152,7 +7232,8 @@
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.initiateRechargeButton, true, 'Starting payment…');
     try {
-      const request = walletRechargeRequestPayload(amount);
+      const cartId = await ensureWalletCartId();
+      const request = walletRechargeRequestPayload(amount, cartId);
       const result = await apiCall('misc', ['rechargeInitiate', 'initiateRecharge'], request, {
         path: '/customers/customer-wallet/recharge/initiate/',
         method: 'POST',
@@ -7503,10 +7584,9 @@
 
   async function renderOverview(force = false) {
     const tasks = await Promise.allSettled([
-      loadProfile(force),
       getOrders({ page: 1, force }),
       loadSubscriptions(force),
-      loadWallet(force),
+      loadWalletSummary(force),
       loadUnread(force)
     ]);
     const unauthorized = tasks.find((result) => result.status === 'rejected' && isUnauthorized(result.reason));
@@ -7644,7 +7724,9 @@
     elements.accountPackSelector.disabled = state.quickProductPacks.length === 0;
   }
 
-  async function loadQuickOrderProducts() {
+  async function loadQuickOrderProducts(force = false) {
+    if (!force && state.quickProductCatalogStatus === 'ready') return state.quickProductPacks;
+    if (!force) return coalesceLoad('quick-product-catalog', () => loadQuickOrderProducts(true));
     state.quickProductCatalogStatus = 'loading';
     state.quickProductPacks = [];
     if (elements.accountPackSelector) {
@@ -7718,7 +7800,9 @@
     }
   }
 
-  async function loadQuickOrderWeeklyPlans() {
+  async function loadQuickOrderWeeklyPlans(force = false) {
+    if (!force && state.weeklyCatalogStatus === 'ready') return state.weeklyPlans;
+    if (!force) return coalesceLoad('quick-weekly-catalog', () => loadQuickOrderWeeklyPlans(true));
     state.weeklyCatalogStatus = 'loading';
     setQuickWeeklyCatalogPlaceholder('Loading live weekly plans…');
     try {
@@ -8107,7 +8191,13 @@
   }
 
   const viewLoaders = {
-    shop: renderQuickOrder,
+    shop: () => {
+      renderQuickOrder();
+      // The public product and weekly-plan catalogues belong to the shop,
+      // not to every authenticated account route.
+      if (state.quickProductCatalogStatus !== 'ready') void loadQuickOrderProducts();
+      if (!['ready', 'empty'].includes(state.weeklyCatalogStatus)) void loadQuickOrderWeeklyPlans();
+    },
     overview: renderOverview,
     orders: () => renderOrders({ page: 1 }),
     subscriptions: renderSubscriptions,
@@ -8260,7 +8350,7 @@
       showToast('Welcome to My Atulyash.');
     } catch (error) {
       elements.otpError.textContent = mobileVerified
-        ? 'Your mobile is verified, but we could not connect your customer account yet. Please refresh and try again.'
+        ? (error?.message || 'The login response did not include a complete account session. Please try again.')
         : friendlyError(error, 'That code could not be verified. Please try again.');
       if (!mobileVerified) elements.otpCode.select();
     } finally {
@@ -8444,8 +8534,6 @@
       return;
     }
     updateAuthReturnNotice();
-    void loadQuickOrderProducts();
-    void loadQuickOrderWeeklyPlans();
     const authenticated = await restoreSession();
     if (authenticated) enterAccount();
     else {

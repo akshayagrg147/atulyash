@@ -1,6 +1,13 @@
 (() => {
   'use strict';
 
+  // The public-catalogue branch intentionally has no account or login route.
+  // The page metadata also redirects when JavaScript is unavailable.
+  if (document.body?.dataset.publicCatalog === 'true') {
+    window.location.replace('index.html#shop');
+    return;
+  }
+
   const SESSION_META_KEY = 'atulyash-account-meta-v1';
   const STOREFRONT_INTENT_KEY = 'atulyash-storefront-intent-v1';
   const CHECKOUT_CONTEXT_KEY = 'atulyash-checkout-context-v1';
@@ -201,6 +208,7 @@
     vacations: [],
     wallet: null,
     walletPreview: null,
+    pendingPlanChange: null,
     notifications: [],
     unreadCount: 0,
     // Delivery details are loaded on demand from the order journey. Keep the
@@ -562,6 +570,12 @@
     if (Array.isArray(data.items)) return data.items;
     if (Array.isArray(data.list)) return data.list;
     if (Array.isArray(data.skippable)) return data.skippable;
+    // Delivery endpoints have used a few equivalent collection keys over
+    // time. Accept each documented shape so eligible dates are not silently
+    // dropped before the manage-deliveries merge runs.
+    if (Array.isArray(data.skippable_deliveries)) return data.skippable_deliveries;
+    if (Array.isArray(data.scheduled_deliveries)) return data.scheduled_deliveries;
+    if (Array.isArray(data.deliveries)) return data.deliveries;
     if (Array.isArray(data.notifications)) return data.notifications;
     if (Array.isArray(data.orders)) return data.orders;
     if (Array.isArray(data.addresses)) return data.addresses;
@@ -1927,6 +1941,7 @@
     state.cartId = null;
     state.user = null;
     state.customer = null;
+    state.pendingPlanChange = null;
     elements.accountShell.hidden = true;
     elements.authShell.hidden = false;
     elements.skipLink.href = '#authTitle';
@@ -5142,7 +5157,7 @@
           );
           if (shortfall !== null && shortfall > 0.005) {
             const rechargeActions = create('div', 'dialog-actions');
-            rechargeActions.append(button(`Recharge ${formatMoney(shortfall)} →`, 'primary-button', () => openWalletRecharge(shortfall)));
+            rechargeActions.append(button(`Recharge ${formatMoney(shortfall)} →`, 'primary-button', () => beginPlanChangeRecharge(shortfall)));
             previewPanel.append(rechargeActions);
           }
         }
@@ -5227,40 +5242,110 @@
         }
       };
 
-      const showPackChangeConfirmation = (updateData) => {
-        const paymentAmount = finiteMoney(
-          updateData?.payment_amount,
-          updateData?.amount_to_debit,
-          updateData?.wallet_debit,
-          latestPreview?.wallet_funding?.pack_change_amount_due,
-          latestPreview?.amount_to_debit,
-          latestPreview?.payment_summary?.balance_due
-        );
-        /*
-         * Plan changes have their own confirmation contract. Keep the payload
-         * deliberately narrow even if an older backend response includes
-         * checkout-only fields such as address_id or payment_method.
-         */
+      const planChangePaymentAmount = (updateData) => finiteMoney(
+        updateData?.payment_amount,
+        updateData?.amount_to_debit,
+        updateData?.wallet_debit,
+        latestPreview?.wallet_funding?.pack_change_amount_due,
+        latestPreview?.amount_to_debit,
+        latestPreview?.payment_summary?.balance_due
+      );
+
+      /*
+       * Plan changes have their own confirmation contract. Keep the payload
+       * deliberately narrow even if an older backend response includes
+       * checkout-only fields such as address_id or payment_method.
+       */
+      const planChangeConfirmation = (updateData) => {
         const rawConfirmationPayload = updateData?.confirmation_payload;
-        const confirmationPayload = rawConfirmationPayload && typeof rawConfirmationPayload === 'object'
+        const payload = rawConfirmationPayload && typeof rawConfirmationPayload === 'object'
           ? {
               new_pack_id: rawConfirmationPayload.new_pack_id,
               confirmation_id: rawConfirmationPayload.confirmation_id
             }
           : null;
-        const confirmationEndpoint = String(firstValue(
+        const endpoint = String(firstValue(
           updateData?.confirmation_endpoint,
           updateData?.confirmationEndpoint
         ) || '').trim();
-        const isOneTimeOrderEndpoint = /\/orders\/order\/place\/?$/i.test(confirmationEndpoint);
-        const hasConfirmationPayload = Boolean(
-          confirmationEndpoint
-          && !isOneTimeOrderEndpoint
-          && confirmationPayload
-          && confirmationPayload.new_pack_id !== null
-          && typeof confirmationPayload.new_pack_id !== 'undefined'
-          && String(confirmationPayload.confirmation_id || '').trim()
-        );
+        const isOneTimeOrderEndpoint = /\/orders\/order\/place\/?$/i.test(endpoint);
+        return {
+          endpoint,
+          payload,
+          isOneTimeOrderEndpoint,
+          valid: Boolean(
+            endpoint
+            && !isOneTimeOrderEndpoint
+            && payload
+            && payload.new_pack_id !== null
+            && typeof payload.new_pack_id !== 'undefined'
+            && String(payload.confirmation_id || '').trim()
+          )
+        };
+      };
+
+      const confirmPackChange = async (updateData) => {
+        const confirmation = planChangeConfirmation(updateData);
+        if (!confirmation.valid) {
+          throw new Error('The payment confirmation details were not returned. Please try again or contact Atulyash care.');
+        }
+        const api = client();
+        if (!api || typeof api.request !== 'function') {
+          throw new Error('The secure Atulyash service is not available on this page.');
+        }
+        const result = await api.request(confirmation.endpoint, {
+          method: 'POST',
+          body: confirmation.payload,
+          form: true,
+          auth: true
+        });
+        const data = responseData(result);
+        const confirmationSucceeded = data?.success === true
+          || String(data?.success || '').toLowerCase() === 'true';
+        const appliedImmediately = data?.applied_immediately === true
+          || String(data?.applied_immediately || '').toLowerCase() === 'true';
+        const appliedPackId = firstValue(data?.new_pack_id, data?.subscription_pack_id, data?.pack_id);
+        if (data?.success === false
+          || String(data?.success || '').toLowerCase() === 'false'
+          || (!confirmationSucceeded && !appliedImmediately)
+          || (appliedPackId != null && String(appliedPackId) !== String(select.value))) {
+          throw new Error(firstValue(data?.message, 'Payment was not confirmed. Your current plan was not changed.'));
+        }
+        return data;
+      };
+
+      const finishPackChange = async (data, paymentAmount = null, { showSubscriptions = false, automatic = false } = {}) => {
+        state.loaded.delete('subscriptions');
+        state.loaded.forEach((key) => {
+          if (String(key).startsWith('orders:')) state.loaded.delete(key);
+        });
+        invalidateWalletCache();
+        await loadSubscriptions(true);
+        const refreshedSubscription = state.subscriptions.find((candidate) => (
+          String(subscriptionId(candidate)) === String(id)
+        ));
+        const refreshedPackId = subscriptionCurrentPackId(refreshedSubscription);
+        if (!refreshedSubscription || String(refreshedPackId) !== String(select.value)) {
+          const replayed = data?.idempotent_replay === true
+            || String(data?.idempotent_replay || '').toLowerCase() === 'true';
+          throw new Error(replayed
+            ? 'An earlier confirmation was replayed, but this new plan change was not applied. Please try again after the service creates a new confirmation.'
+            : 'The confirmation completed, but the active plan still has the previous quantity. Please try again or contact Atulyash care.');
+        }
+        submitBusy = false;
+        setButtonBusy(submit, false);
+        closeDialog();
+        await renderSubscriptions(false);
+        if (showSubscriptions) showView('subscriptions');
+        const debit = finiteMoney(data?.amount_debited, paymentAmount);
+        showToast(debit !== null && debit > 0.005
+          ? `Your weekly plan was updated. ${formatMoney(debit)} was debited.`
+          : automatic ? 'Your weekly plan was updated automatically.' : 'Your weekly plan was updated.');
+      };
+
+      const showPackChangeConfirmation = (updateData) => {
+        const paymentAmount = planChangePaymentAmount(updateData);
+        const confirmation = planChangeConfirmation(updateData);
 
         submitBusy = false;
         setButtonBusy(submit, false);
@@ -5278,7 +5363,7 @@
           create('small', '', 'Your current plan remains active until the payment is confirmed.')
         );
         const actions = create('div', 'dialog-actions');
-        if (hasConfirmationPayload) {
+        if (confirmation.valid) {
           const confirm = button(
             paymentAmount !== null && paymentAmount > 0.005
               ? `Confirm plan change · ${formatMoney(paymentAmount)} →`
@@ -5290,51 +5375,8 @@
               confirmationBusy = true;
               setButtonBusy(control, true, 'Confirming payment…');
               try {
-                const api = client();
-                if (!api || typeof api.request !== 'function') {
-                  throw new Error('The secure Atulyash service is not available on this page.');
-                }
-                const result = await api.request(confirmationEndpoint, {
-                  method: 'POST',
-                  body: confirmationPayload,
-                  form: true,
-                  auth: true
-                });
-                const data = responseData(result);
-                const confirmationSucceeded = data?.success === true
-                  || String(data?.success || '').toLowerCase() === 'true';
-                const appliedImmediately = data?.applied_immediately === true
-                  || String(data?.applied_immediately || '').toLowerCase() === 'true';
-                const appliedPackId = firstValue(data?.new_pack_id, data?.subscription_pack_id, data?.pack_id);
-                if (data?.success === false
-                  || String(data?.success || '').toLowerCase() === 'false'
-                  || (!confirmationSucceeded && !appliedImmediately)
-                  || (appliedPackId != null && String(appliedPackId) !== String(select.value))) {
-                  throw new Error(firstValue(data?.message, 'Payment was not confirmed. Your current plan was not changed.'));
-                }
-                state.loaded.delete('subscriptions');
-                state.loaded.forEach((key) => {
-                  if (String(key).startsWith('orders:')) state.loaded.delete(key);
-                });
-                invalidateWalletCache();
-                await loadSubscriptions(true);
-                const refreshedSubscription = state.subscriptions.find((candidate) => (
-                  String(subscriptionId(candidate)) === String(id)
-                ));
-                const refreshedPackId = subscriptionCurrentPackId(refreshedSubscription);
-                if (!refreshedSubscription || String(refreshedPackId) !== String(select.value)) {
-                  const replayed = data?.idempotent_replay === true
-                    || String(data?.idempotent_replay || '').toLowerCase() === 'true';
-                  throw new Error(replayed
-                    ? 'An earlier confirmation was replayed, but this new plan change was not applied. Please try again after the service creates a new confirmation.'
-                    : 'The confirmation completed, but the active plan still has the previous quantity. Please try again or contact Atulyash care.');
-                }
-                closeDialog();
-                await renderSubscriptions(false);
-                const debit = finiteMoney(data?.amount_debited, paymentAmount);
-                showToast(debit !== null && debit > 0.005
-                  ? `Your weekly plan was updated. ${formatMoney(debit)} was debited.`
-                  : 'Your weekly plan was updated.');
+                const data = await confirmPackChange(updateData);
+                await finishPackChange(data, paymentAmount);
               } catch (error) {
                 const lock = planChangeLockDetails(error);
                 if (lock) {
@@ -5391,12 +5433,57 @@
           );
           actions.append(confirm);
         } else {
-          actions.append(create('small', '', isOneTimeOrderEndpoint
+          actions.append(create('small', '', confirmation.isOneTimeOrderEndpoint
             ? 'The service returned a new-order endpoint for this plan change. Please try again or contact Atulyash care.'
             : 'The payment confirmation details were not returned. Please try again or contact Atulyash care.'));
         }
         panel.append(actions);
         previewPanel.append(panel);
+      };
+
+      const applyPackChange = async ({ autoConfirm = false, showSubscriptions = false } = {}) => {
+        const new_pack_id = select.value;
+        const updateResult = await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
+          path: `/subscription/subscription_plan/${id}/update-pack/`,
+          method: 'POST',
+          form: { new_pack_id }
+        });
+        const updateData = responseData(updateResult);
+        const requiresConfirmation = updateData?.requires_confirmation === true
+          || String(updateData?.requires_confirmation || '').toLowerCase() === 'true';
+        const appliedImmediately = updateData?.applied_immediately === true
+          || String(updateData?.applied_immediately || '').toLowerCase() === 'true';
+        if (requiresConfirmation && !appliedImmediately) {
+          if (!autoConfirm) {
+            showPackChangeConfirmation(updateData);
+            return { pending: true, data: updateData };
+          }
+          const confirmationData = await confirmPackChange(updateData);
+          await finishPackChange(confirmationData, planChangePaymentAmount(updateData), { showSubscriptions, automatic: true });
+          return { pending: false, data: confirmationData };
+        }
+        if (updateData?.success === false) {
+          throw new Error(firstValue(updateData.message, 'The plan change was not applied.'));
+        }
+        await finishPackChange(updateData, planChangePaymentAmount(updateData), { showSubscriptions });
+        return { pending: false, data: updateData };
+      };
+
+      const beginPlanChangeRecharge = (amount) => {
+        state.pendingPlanChange = {
+          subscriptionId: id,
+          newPackId: String(select.value),
+          rechargeAmount: Math.ceil(numberFrom(amount)),
+          complete: async () => {
+            const pending = state.pendingPlanChange;
+            if (!pending || String(pending.subscriptionId) !== String(id) || pending.newPackId !== String(select.value)) {
+              throw new Error('The selected weekly plan changed. Please choose the plan again.');
+            }
+            await applyPackChange({ autoConfirm: true, showSubscriptions: true });
+          }
+        };
+        openWalletRecharge(amount);
+        showToast('After this payment succeeds, your weekly plan will update automatically.');
       };
 
       select.addEventListener('change', () => {
@@ -5442,28 +5529,7 @@
             return;
           }
           setButtonBusy(submit, true, 'Updating…');
-          const updateResult = await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
-            path: `/subscription/subscription_plan/${id}/update-pack/`,
-            method: 'POST',
-            form: { new_pack_id }
-          });
-          const updateData = responseData(updateResult);
-          const requiresConfirmation = updateData?.requires_confirmation === true
-            || String(updateData?.requires_confirmation || '').toLowerCase() === 'true';
-          const appliedImmediately = updateData?.applied_immediately === true
-            || String(updateData?.applied_immediately || '').toLowerCase() === 'true';
-          if (requiresConfirmation && !appliedImmediately) {
-            showPackChangeConfirmation(updateData);
-            return;
-          }
-          if (updateData?.success === false) {
-            throw new Error(firstValue(updateData.message, 'The plan change was not applied.'));
-          }
-          closeDialog();
-          state.loaded.delete('subscriptions');
-          invalidateWalletCache();
-          showToast('Your weekly plan has been updated.');
-          await renderSubscriptions(true);
+          await applyPackChange();
         } catch (error) {
           const lock = planChangeLockDetails(error);
           if (lock) {
@@ -5625,9 +5691,6 @@
         'skips_consumed',
         'consumed_skips'
       );
-      const upcomingSkipLimit = remainingSkips === null
-        ? 4
-        : Math.max(0, Math.min(4, Math.floor(remainingSkips)));
       const deliveriesByDate = new Map();
       [
         ...responseList(deliveriesResult.value),
@@ -5670,18 +5733,18 @@
         delivery.skipped,
         /skip/i.test(String(delivery.delivery_status || delivery.status || ''))
       )));
+      // The API can return both currently skipped dates and eligible future
+      // deliveries. Keep every returned date in one chronological list; do
+      // not hide eligible rows based on the remaining skip counter.
       const scheduledDeliveries = deliveries
-        .filter((delivery) => !skippedDeliveries.includes(delivery))
-        .slice(0, upcomingSkipLimit);
+        .filter((delivery) => !skippedDeliveries.includes(delivery));
       const visibleDeliveries = [...skippedDeliveries, ...scheduledDeliveries].sort((a, b) =>
         String(firstValue(a.delivery_date, a.date, '')).localeCompare(
           String(firstValue(b.delivery_date, b.date, ''))
         )
       );
       const body = create('div');
-      body.append(create('p', 'dialog-copy', remainingSkips === null
-        ? 'Skip or restore an eligible upcoming delivery here. Showing the next four available dates; dates covered by vacation are managed from your vacation settings.'
-        : `Skip or restore an eligible upcoming delivery here. Showing the next ${upcomingSkipLimit} available date${upcomingSkipLimit === 1 ? '' : 's'} based on your remaining skips; dates covered by vacation are managed from your vacation settings.`));
+      body.append(create('p', 'dialog-copy', 'Skip or restore an eligible upcoming delivery here. All eligible and currently skipped dates are shown together; dates covered by vacation are managed from your vacation settings.'));
       if (Object.keys(summary).length) {
         const summaryBox = create('div', 'dialog-summary');
         [
@@ -7230,6 +7293,11 @@
   async function initiateRecharge() {
     const amount = authoritativeRechargeAmount(state.walletPreview, elements.rechargeAmount.value);
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
+    if (state.pendingPlanChange && Number(state.pendingPlanChange.rechargeAmount) !== amount) {
+      // A different manual top-up must never trigger an old plan-change
+      // continuation accidentally.
+      state.pendingPlanChange = null;
+    }
     setButtonBusy(elements.initiateRechargeButton, true, 'Starting payment…');
     try {
       const cartId = await ensureWalletCartId();
@@ -7263,6 +7331,7 @@
       }
 
       const Razorpay = await loadRazorpayCheckout();
+      let paymentVerificationStarted = false;
       const checkout = new Razorpay({
         key: config.key,
         order_id: config.orderId,
@@ -7277,7 +7346,16 @@
           contact: state.mobile
         },
         theme: { color: '#0d342a' },
+        modal: {
+          ondismiss: () => {
+            if (!paymentVerificationStarted && state.pendingPlanChange) {
+              state.pendingPlanChange = null;
+              showToast('Payment cancelled. Your current weekly plan is unchanged.', 'error');
+            }
+          }
+        },
         handler: async (payment) => {
+          paymentVerificationStarted = true;
           try {
             await apiCall('misc', ['rechargeVerify', 'verifyRecharge'], payment, {
               path: '/customers/customer-wallet/recharge/verify/',
@@ -7286,15 +7364,33 @@
             });
             state.loaded.delete('wallet');
             resetRechargePreview();
-            showToast('Recharge successful. Your wallet is being refreshed.');
-            renderWallet(true);
+            const pendingPlanChange = state.pendingPlanChange;
+            if (pendingPlanChange?.complete) {
+              showToast('Recharge successful. Applying your weekly plan automatically…');
+              try {
+                await pendingPlanChange.complete();
+                state.pendingPlanChange = null;
+              } catch (planChangeError) {
+                state.pendingPlanChange = null;
+                await renderWallet(true);
+                showToast(
+                  `Recharge succeeded, but the weekly plan could not be applied: ${friendlyError(planChangeError, 'please try again from Weekly plan.')}`,
+                  'error'
+                );
+              }
+            } else {
+              showToast('Recharge successful. Your wallet is being refreshed.');
+              await renderWallet(true);
+            }
           } catch (error) {
+            if (state.pendingPlanChange?.complete) state.pendingPlanChange = null;
             showToast(friendlyError(error, 'Payment completed, but verification is still pending. Please contact support.'), 'error');
           }
         }
       });
       checkout.open();
     } catch (error) {
+      state.pendingPlanChange = null;
       showToast(friendlyError(error), 'error');
     } finally {
       setButtonBusy(elements.initiateRechargeButton, false);
@@ -8251,6 +8347,11 @@
   function showView(viewName, { focus = true, updateHash = true } = {}) {
     const panel = document.querySelector(`[data-view-panel="${viewName}"]`);
     if (!panel) return;
+    if (viewName !== 'wallet' && state.pendingPlanChange) {
+      // A plan-change recharge is a one-time continuation. Do not apply it
+      // later to an unrelated wallet top-up if the customer leaves Wallet.
+      state.pendingPlanChange = null;
+    }
     state.activeView = viewName;
     document.querySelectorAll('[data-view-panel]').forEach((view) => {
       const active = view === panel;

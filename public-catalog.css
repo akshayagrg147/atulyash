@@ -1,0 +1,59 @@
+/*
+ * Public catalogue branch
+ *
+ * This branch intentionally exposes product and weekly-plan information only.
+ * Ordering controls are removed from the visual tree as a second line of
+ * defence; ecommerce.js also guards every cart/checkout mutation.
+ */
+body.public-catalog-mode #headerAccountLink,
+body.public-catalog-mode #headerCartButton,
+body.public-catalog-mode #heroWeeklyButton,
+body.public-catalog-mode #startWeeklyButton,
+body.public-catalog-mode #addToCartButton,
+body.public-catalog-mode #buyNowButton,
+body.public-catalog-mode #mobileBuyBar,
+body.public-catalog-mode #cartDrawer,
+body.public-catalog-mode #checkoutHandoff,
+body.public-catalog-mode #calculatorCta,
+body.public-catalog-mode #weeklyCalculatorApplyButton,
+body.public-catalog-mode .product-purchase-row,
+body.public-catalog-mode .mobile-buy-bar,
+body.public-catalog-mode .start-cart-action {
+  display: none !important;
+}
+
+/* Both purchase models stay visible as catalogue information. */
+body.public-catalog-mode #packSelector,
+body.public-catalog-mode #weeklyPlanPanel {
+  display: block !important;
+}
+
+body.public-catalog-mode .public-catalog-notice {
+  margin: 1.5rem 0 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgba(59, 123, 59, 0.35);
+  border-left: 4px solid #3B7B3B;
+  background: rgba(59, 123, 59, 0.08);
+  color: #123b2a;
+}
+
+body.public-catalog-mode .public-catalog-notice strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #3B7B3B;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.public-catalog-mode .public-catalog-notice p {
+  margin: 0;
+  color: #52665d;
+}
+
+/* Direct visits to gated routes are redirected by the page metadata/script. */
+body[data-public-catalog="true"] .auth-shell,
+body[data-public-catalog="true"] .account-shell,
+body[data-public-catalog="true"] .checkout-route-main {
+  display: none !important;
+}

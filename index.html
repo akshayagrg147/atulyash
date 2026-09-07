@@ -26,8 +26,9 @@
   <link rel="stylesheet" href="styles.css?v=20260902-4">
   <link rel="stylesheet" href="ecommerce.css?v=20260902-14">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
+  <link rel="stylesheet" href="public-catalog.css?v=20260907-1">
 </head>
-<body data-commerce-page="storefront">
+<body data-commerce-page="storefront" data-public-catalog="true">
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <div class="checkout-handoff" id="checkoutHandoff" role="status" aria-live="polite" aria-atomic="true" hidden>
@@ -253,6 +254,11 @@
           </div>
 
           <p class="product-description">Made from one carefully selected wheat and milled slowly for homes that want to know what goes into their everyday roti.</p>
+
+          <aside class="public-catalog-notice" role="status" aria-live="polite">
+            <strong>Catalogue preview</strong>
+            <p>Explore one-time packs and fresh weekly plans. Online ordering is temporarily unavailable.</p>
+          </aside>
 
           <fieldset class="purchase-selector" id="purchaseSelector">
             <legend>How would you like it?</legend>
@@ -781,6 +787,6 @@
 
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
-  <script src="ecommerce.js?v=20260906-4"></script>
+  <script src="ecommerce.js?v=20260907-1"></script>
 </body>
 </html>

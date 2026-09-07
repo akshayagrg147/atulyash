@@ -251,7 +251,9 @@
 
   const IS_CHECKOUT_PAGE = document.body?.dataset.commercePage === 'checkout';
   const IS_STOREFRONT_PAGE = Boolean(elements.productShowcase);
+  const PUBLIC_CATALOG_MODE = document.body?.dataset.publicCatalog === 'true';
   if (!IS_STOREFRONT_PAGE && !IS_CHECKOUT_PAGE) return;
+  if (PUBLIC_CATALOG_MODE) document.body.classList.add('public-catalog-mode');
 
   let selectedWeight = 2;
   let selectedPurchaseType = 'once';
@@ -598,6 +600,42 @@
     syncPurchaseAvailability();
   }
 
+  function publicCatalogActionBlocked() {
+    if (!PUBLIC_CATALOG_MODE) return false;
+    announce('Ordering is temporarily unavailable. You can browse the Atulyash catalogue here.');
+    return true;
+  }
+
+  function configurePublicCatalogMode() {
+    if (!PUBLIC_CATALOG_MODE) return;
+    // Keep catalogue content and live plan data visible, but remove every
+    // route that could create or modify a cart, checkout, or account.
+    [
+      elements.headerAccountLink,
+      elements.headerCartButton,
+      elements.heroWeeklyButton,
+      elements.startWeeklyButton,
+      elements.addToCartButton,
+      elements.buyNowButton,
+      elements.mobileBuyBar,
+      elements.cartDrawer,
+      elements.checkoutHandoff,
+      document.querySelector('.product-purchase-row'),
+      document.querySelector('.start-cart-action')
+    ].forEach((control) => {
+      if (!control) return;
+      control.hidden = true;
+      control.inert = true;
+    });
+    document.querySelectorAll('input[name="purchaseType"]').forEach((input) => {
+      input.disabled = true;
+    });
+    if (elements.checkoutModal) {
+      elements.checkoutModal.hidden = true;
+      elements.checkoutModal.inert = true;
+    }
+  }
+
   function currentSelectionHasLiveCatalog() {
     if (selectedPurchaseType === 'weekly') {
       return catalogReadiness.subscriptions && getWeeklyPlan()?.apiId != null;
@@ -655,7 +693,7 @@
   function setWeeklyCatalogControls(available, message = 'Loading live weekly plans…') {
     const weeklyRadio = document.querySelector('input[name="purchaseType"][value="weekly"]');
     const weeklyLabel = weeklyRadio?.closest('.purchase-option');
-    if (weeklyRadio) weeklyRadio.disabled = !available;
+    if (weeklyRadio) weeklyRadio.disabled = PUBLIC_CATALOG_MODE || !available;
     if (weeklyLabel) weeklyLabel.setAttribute('aria-disabled', String(!available));
     if (elements.weeklyPlanSelect) elements.weeklyPlanSelect.disabled = !available;
     if (elements.calculatorCta) {
@@ -2149,6 +2187,18 @@
       elements.weeklyPlanPanel.hidden = !isWeekly;
       elements.weeklyPlanPanel.inert = !isWeekly;
     }
+    if (PUBLIC_CATALOG_MODE) {
+      // A catalogue visitor can compare one-time packs and weekly plans in a
+      // single view, without an enabled purchase control.
+      if (elements.packSelector) {
+        elements.packSelector.hidden = false;
+        elements.packSelector.inert = false;
+      }
+      if (elements.weeklyPlanPanel) {
+        elements.weeklyPlanPanel.hidden = false;
+        elements.weeklyPlanPanel.inert = false;
+      }
+    }
     if (elements.productPrice) elements.productPrice.textContent = formatPrice(quote.price);
     if (elements.productUnitPrice) {
       elements.productUnitPrice.textContent = isWeekly
@@ -2224,6 +2274,7 @@
   }
 
   async function addSelectionToCart({ openAfter = false, openBagAfter = !openAfter } = {}) {
+    if (publicCatalogActionBlocked()) return false;
     lastCartFailureMessage = '';
     if (pendingOrder) {
       lastCartFailureMessage = 'Complete the pending order payment before changing your bag.';
@@ -2728,6 +2779,7 @@
   }
 
   async function changeCoupon(action, couponId) {
+    if (publicCatalogActionBlocked()) return;
     if (couponBusy || pendingOrder) return;
     const candidate = couponData.valid
       .find((coupon) => String(coupon.id) === String(couponId));
@@ -2889,6 +2941,7 @@
   }
 
   async function updateCartItem(id, action) {
+    if (publicCatalogActionBlocked()) return;
     if (pendingOrder) {
       announce('Complete the pending order payment before changing your bag.');
       return;
@@ -3012,6 +3065,7 @@
   }
 
   function openCart() {
+    if (publicCatalogActionBlocked()) return;
     if (!elements.cartDrawer) return;
     closePrimaryNavigation();
     previousFocus = document.activeElement;
@@ -3097,6 +3151,7 @@
   }
 
   function openCheckout() {
+    if (publicCatalogActionBlocked()) return false;
     if (!cart.length && !pendingOrder) {
       announce('Choose a pack before continuing to delivery.');
       return false;
@@ -5205,13 +5260,34 @@
       walletRechargeVerificationPending = false;
       resetWalletRechargePreview();
       const refreshedBalance = await loadWalletBalance();
-      if (Number.isFinite(refreshedBalance) && walletShortfall() === 0) {
+      const remainingShortfall = walletShortfall();
+      if (Number.isFinite(refreshedBalance)
+        && Number.isFinite(remainingShortfall)
+        && remainingShortfall <= 0.005) {
+        // The recharge was initiated from the review step. Once Razorpay has
+        // verified the credit and all order confirmations are already present,
+        // finish the same checkout request automatically instead of making the
+        // customer click “Start weekly plan” a second time.
+        const readyToPlace = Boolean(
+          elements.checkoutConsent?.checked
+          && selectedAddressId
+          && selectedDeliveryDate
+        );
+        const startsWeeklyPlan = cart.some((item) => item.purchaseType === 'weekly');
+        if (readyToPlace && startsWeeklyPlan) {
+          elements.checkoutPaymentStatus.textContent = 'Money added successfully. Completing your order…';
+          announce('Money added successfully. Completing your order automatically.');
+          await completeOrderRequest({ walletAlreadyVerified: true });
+          return;
+        }
         const message = 'Money added successfully. Your wallet is ready for this order.';
         elements.checkoutPaymentStatus.textContent = message;
         announce(message);
         elements.placeOrderButton?.focus({ preventScroll: true });
       } else if (Number.isFinite(refreshedBalance)) {
-        const message = `Wallet updated. Add ${formatPrice(Math.ceil(walletShortfall()))} more before placing this order.`;
+        const message = Number.isFinite(remainingShortfall)
+          ? `Wallet updated. Add ${formatPrice(Math.ceil(remainingShortfall))} more before placing this order.`
+          : 'Wallet updated. Refresh the balance before placing this order.';
         elements.checkoutPaymentStatus.textContent = message;
         announce(message);
       } else {
@@ -5439,7 +5515,7 @@
     return true;
   }
 
-  async function completeOrderRequest() {
+  async function completeOrderRequest({ walletAlreadyVerified = false } = {}) {
     if (orderInFlight) return;
     if (!cart.length && !pendingOrder) {
       announce('Your bag is empty. Choose a fresh-batch pack before placing your order.');
@@ -5518,7 +5594,9 @@
     if (elements.checkoutPlaceOrderStatus) elements.checkoutPlaceOrderStatus.hidden = false;
     if (elements.checkoutPlaceOrderStatusLabel) elements.checkoutPlaceOrderStatusLabel.textContent = 'Confirming your live wallet balance…';
     try {
-      const latestBalance = await loadWalletBalance();
+      const latestBalance = walletAlreadyVerified
+        ? checkoutWalletBalanceAmount
+        : await loadWalletBalance();
       if (!Number.isFinite(latestBalance)) {
         throw new Error('Your live wallet balance could not be confirmed. Refresh it before placing the order.');
       }
@@ -6462,12 +6540,14 @@
   }
 
   async function initializeCommerce() {
+    configurePublicCatalogMode();
     updateAccountHeader();
     updateProductUI();
     updateRotiCalculator();
     renderCart();
     updateMobileBuyBar();
     await hydratePublicCommerce();
+    if (PUBLIC_CATALOG_MODE) return;
     if (await resumeStorefrontIntent()) return;
     closeCheckoutHandoff();
     if (!isApiAuthenticated()) return;
@@ -6486,6 +6566,10 @@
   }
 
   async function initializeDedicatedCheckout() {
+    if (PUBLIC_CATALOG_MODE) {
+      window.location.replace('index.html#shop');
+      return;
+    }
     const context = readCheckoutContext();
     checkoutReturnUrl = checkoutReturnForOrigin(context.origin);
     updateCheckoutContextUI(context.origin);

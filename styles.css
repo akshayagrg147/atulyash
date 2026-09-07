@@ -2663,7 +2663,7 @@ h3 {
 
 .footer-top {
   display: grid;
-  grid-template-columns: minmax(260px, 1.25fr) 0.55fr 0.8fr 1fr;
+  grid-template-columns: minmax(260px, 1.25fr) 0.55fr 0.8fr 0.8fr 1fr;
   gap: 50px;
   padding-top: 84px;
   padding-bottom: 70px;

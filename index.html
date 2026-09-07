@@ -23,7 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="images/atta-packet-2026.webp" fetchpriority="high">
   <link rel="preload" as="image" href="images/natural-stone-hero.webp" fetchpriority="high">
-  <link rel="stylesheet" href="styles.css?v=20260902-4">
+  <link rel="stylesheet" href="styles.css?v=20260907-5">
   <link rel="stylesheet" href="ecommerce.css?v=20260902-14">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
 </head>
@@ -315,7 +315,7 @@
             </div>
             <div class="weekly-plan-controls">
               <label class="weekly-plan-field weekly-plan-field-wide">
-                <span>Monthly household use</span>
+                <span>Weekly household use</span>
                 <select id="weeklyPlanSelect" name="weeklyPlan" disabled>
                   <option value="" selected disabled>Loading live weekly plans…</option>
                 </select>
@@ -400,9 +400,9 @@
         </div>
 
         <div class="calculator reveal" aria-labelledby="calculator-title">
-          <p class="calculator-tag">Let us help you estimate your weekly &amp; monthly atta requirement</p>
+          <p class="calculator-tag">Let us help you estimate your weekly atta requirement</p>
           <h3 id="calculator-title">How many rotis does your family usually consume in a day?</h3>
-          <p class="calculator-intro">Enter the total number of rotis your family usually consumes each day, and we’ll recommend the right weekly and monthly quantity of Atulyash Atta.</p>
+          <p class="calculator-intro">Enter the total number of rotis your family usually consumes each day, and we’ll recommend the right weekly quantity of Atulyash Atta.</p>
 
           <div class="calculator-roti-control">
             <div class="calculator-roti-copy">
@@ -452,7 +452,7 @@
                   <em>kg / week</em>
                 </div>
               </div>
-              <output class="calculator-monthly-output" id="monthlyOutput" for="dailyRotis">7.73 kg across 4 weeks</output>
+              <output class="calculator-wallet-output" id="weeklyWalletOutput" for="dailyRotis">Select a live weekly plan</output>
             </div>
             <div class="calculator-result-method">
               <div class="calculator-formula-card">
@@ -781,6 +781,6 @@
 
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
-  <script src="ecommerce.js?v=20260906-4"></script>
+  <script src="ecommerce.js?v=20260907-2"></script>
 </body>
 </html>

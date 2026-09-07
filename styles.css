@@ -5348,7 +5348,7 @@ h3 {
   outline-offset: 2px;
 }
 
-.calculator-monthly-output {
+.calculator-wallet-output {
   display: block;
   max-width: 154px;
   padding: 10px 12px;
@@ -5689,7 +5689,7 @@ h3 {
     gap: 16px;
   }
 
-  .calculator-monthly-output {
+  .calculator-wallet-output {
     max-width: none;
     width: fit-content;
     text-align: left;

@@ -104,6 +104,112 @@
   border-bottom-color: rgba(255, 253, 248, 0.5);
 }
 
+.app-ribbon {
+  position: relative;
+  z-index: 2;
+  color: var(--forest-950);
+  background: var(--accent-lime);
+  border-bottom: 1px solid rgba(11, 39, 33, 0.14);
+}
+
+.app-ribbon-inner {
+  min-height: 108px;
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) auto auto;
+  align-items: center;
+  gap: clamp(22px, 4vw, 58px);
+  padding-block: 18px;
+}
+
+.app-ribbon-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.app-ribbon-icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  flex: 0 0 54px;
+  place-items: center;
+  background: var(--cream-50);
+  border: 1px solid rgba(11, 39, 33, 0.14);
+}
+
+.app-ribbon-icon img {
+  width: 37px;
+  height: 37px;
+  object-fit: contain;
+}
+
+.app-ribbon-brand p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.app-ribbon-brand small {
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.app-ribbon-brand strong {
+  font-family: var(--serif);
+  font-size: clamp(1.25rem, 2vw, 1.72rem);
+  font-weight: 500;
+}
+
+.app-ribbon-benefits {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.app-ribbon-benefits span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.69rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-ribbon-benefits span::before {
+  width: 5px;
+  height: 5px;
+  content: "";
+  background: var(--forest-950);
+  border-radius: 50%;
+  opacity: 0.52;
+}
+
+.app-ribbon-link {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 11px 18px;
+  color: var(--cream-50);
+  background: var(--forest-950);
+  font-size: 0.73rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.app-ribbon-link:hover {
+  background: var(--forest-800);
+}
+
+.app-ribbon-link span {
+  font-size: 1rem;
+}
+
 .section-index {
   display: none;
 }
@@ -241,6 +347,362 @@
 
 .awareness-body > p {
   margin: 0;
+}
+
+.app-showcase {
+  padding-block: clamp(76px, 9vw, 132px);
+  background: var(--cream-50);
+}
+
+.app-showcase-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: 0 32px 90px rgba(11, 39, 33, 0.1);
+}
+
+.app-showcase-copy {
+  align-self: center;
+  padding: clamp(42px, 6vw, 88px);
+  background: var(--cream-100);
+}
+
+.app-showcase-copy h2 {
+  max-width: 760px;
+  margin: 0 0 24px;
+  font-size: clamp(3rem, 5.3vw, 5.6rem);
+}
+
+.app-showcase-copy > p:not(.eyebrow) {
+  max-width: 670px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.5vw, 1.16rem);
+}
+
+.app-feature-list {
+  display: grid;
+  gap: 0;
+  margin: 34px 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.app-feature-list li {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 15px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-feature-list > li > span {
+  color: var(--forest-700);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.app-feature-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.app-feature-list strong {
+  color: var(--forest-950);
+  font-size: 0.9rem;
+}
+
+.app-feature-list small {
+  color: var(--muted);
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.app-showcase-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 20px;
+}
+
+.app-showcase-actions > small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.app-google-play-button {
+  min-width: 192px;
+  min-height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 10px 16px 10px 18px;
+  color: var(--cream-50);
+  background: var(--forest-950);
+  text-decoration: none;
+}
+
+.app-google-play-button:hover {
+  background: var(--forest-800);
+}
+
+.app-google-play-button > span {
+  display: grid;
+  gap: 1px;
+}
+
+.app-google-play-button small {
+  color: rgba(255, 253, 248, 0.66);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.app-google-play-button strong {
+  font-family: var(--serif);
+  font-size: 1.32rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.app-google-play-button em {
+  color: var(--accent-lime);
+  font-size: 1.2rem;
+  font-style: normal;
+}
+
+.app-device-stage {
+  position: relative;
+  min-height: 720px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 55% 45%, rgba(174, 243, 46, 0.16), transparent 34%),
+    var(--forest-950);
+}
+
+.app-device-orbit {
+  position: absolute;
+  border: 1px solid rgba(174, 243, 46, 0.18);
+  border-radius: 50%;
+}
+
+.app-device-orbit-one {
+  width: 72%;
+  aspect-ratio: 1;
+}
+
+.app-device-orbit-two {
+  width: 104%;
+  aspect-ratio: 1;
+}
+
+.app-phone {
+  position: relative;
+  z-index: 2;
+  width: min(72%, 330px);
+  padding: 10px;
+  background: #061611;
+  border: 1px solid rgba(255, 253, 248, 0.28);
+  border-radius: 42px;
+  box-shadow: 0 42px 90px rgba(0, 0, 0, 0.42);
+  transform: rotate(2deg);
+}
+
+.app-phone-speaker {
+  position: absolute;
+  z-index: 3;
+  top: 17px;
+  left: 50%;
+  width: 72px;
+  height: 17px;
+  background: #061611;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.app-phone-screen {
+  min-height: 600px;
+  padding: 42px 20px 22px;
+  overflow: hidden;
+  background: var(--cream-50);
+  border-radius: 33px;
+}
+
+.app-phone-header {
+  display: grid;
+  grid-template-columns: 34px 1fr 8px;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-phone-header img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.app-phone-header > span {
+  display: grid;
+  line-height: 1.1;
+}
+
+.app-phone-header small,
+.app-phone-card small,
+.app-phone-note small {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.app-phone-header strong {
+  color: var(--forest-950);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.app-phone-header i {
+  width: 7px;
+  height: 7px;
+  background: var(--accent-lime);
+  border-radius: 50%;
+}
+
+.app-phone-label {
+  margin: 23px 0 9px;
+  color: var(--forest-700);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.app-phone-card {
+  padding: 20px;
+  color: var(--cream-50);
+  background: #3b7b3b;
+}
+
+.app-phone-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.app-phone-card header span {
+  color: rgba(255, 253, 248, 0.72);
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.app-phone-card header em {
+  padding: 4px 7px;
+  color: var(--forest-950);
+  background: var(--accent-lime);
+  font-size: 0.5rem;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.app-phone-card > strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--cream-50);
+  font-family: var(--serif);
+  font-size: 1.55rem;
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.app-phone-card > small {
+  color: rgba(255, 253, 248, 0.68);
+}
+
+.app-phone-progress {
+  height: 3px;
+  margin: 28px 0 8px;
+  background: rgba(255, 253, 248, 0.2);
+}
+
+.app-phone-progress i {
+  width: 62%;
+  height: 100%;
+  display: block;
+  background: var(--accent-lime);
+}
+
+.app-phone-steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(255, 253, 248, 0.58);
+  font-size: 0.48rem;
+}
+
+.app-phone-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.app-phone-actions > span {
+  min-height: 72px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 5px;
+  padding: 12px;
+  color: var(--forest-950);
+  background: var(--cream-100);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.app-phone-actions b {
+  color: var(--forest-700);
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.app-phone-note {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+}
+
+.app-phone-note > i {
+  width: 32px;
+  height: 32px;
+  background: var(--accent-lime);
+  border-radius: 50%;
+}
+
+.app-phone-note > span {
+  display: grid;
+  line-height: 1.2;
+}
+
+.app-phone-note strong {
+  color: var(--forest-950);
+  font-size: 0.68rem;
 }
 
 .app-promo {
@@ -388,6 +850,21 @@
     max-width: none;
   }
 
+  .app-ribbon-inner {
+    grid-template-columns: minmax(300px, 1fr) auto;
+  }
+
+  .app-ribbon-benefits {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-top: 12px;
+    border-top: 1px solid rgba(11, 39, 33, 0.14);
+  }
+
+  .app-showcase-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(390px, 0.8fr);
+  }
+
   .footer-top-client {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -395,6 +872,7 @@
 
 @media (max-width: 780px) {
   .hero-journey-inner,
+  .app-showcase-layout,
   .app-promo-card {
     grid-template-columns: 1fr;
   }
@@ -409,6 +887,26 @@
 
   .calculator-buffer-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-ribbon-inner {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding-block: 22px;
+  }
+
+  .app-ribbon-benefits {
+    grid-column: auto;
+    grid-row: auto;
+    justify-content: space-between;
+  }
+
+  .app-ribbon-link {
+    width: 100%;
+  }
+
+  .app-device-stage {
+    min-height: 640px;
   }
 }
 
@@ -433,6 +931,30 @@
 
   .hero-service-facts {
     display: grid;
+  }
+
+  .app-showcase {
+    padding-block: 56px;
+  }
+
+  .app-showcase-layout {
+    width: min(calc(100% - 28px), var(--container));
+  }
+
+  .app-showcase-copy {
+    padding: 34px 24px 42px;
+  }
+
+  .app-device-stage {
+    min-height: 590px;
+  }
+
+  .app-phone {
+    width: min(76%, 300px);
+  }
+
+  .app-phone-screen {
+    min-height: 548px;
   }
 
   .film-copy-client h2,
@@ -460,5 +982,24 @@
 
   .calculator-buffer-options label:last-child {
     grid-column: auto;
+  }
+
+  .app-ribbon-benefits {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .app-device-stage {
+    min-height: 540px;
+  }
+
+  .app-phone {
+    width: min(82%, 280px);
+  }
+
+  .app-phone-screen {
+    min-height: 500px;
+    padding-inline: 16px;
   }
 }

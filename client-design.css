@@ -297,6 +297,28 @@
   line-height: 1;
 }
 
+.app-promo-store-link {
+  width: fit-content;
+  padding-bottom: 4px;
+  color: var(--forest-950);
+  border-bottom: 1px solid rgba(11, 39, 33, 0.55);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.app-promo-store-link:hover {
+  border-bottom-color: var(--forest-950);
+}
+
+.app-promo-store-link span {
+  display: inline;
+  margin-left: 4px;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+}
+
 .app-promo-action small {
   color: rgba(11, 39, 33, 0.72);
 }

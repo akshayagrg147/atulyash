@@ -17,7 +17,7 @@
   let WEEKLY_PLAN_BY_ID = new Map(WEEKLY_PLANS.map((plan) => [plan.id, plan]));
   const DELIVERY_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const ROTI_ATTA_GRAMS = 30;
-  const MIN_DAILY_ROTIS = 8;
+  const MIN_DAILY_ROTIS = 1;
   const CART_STORAGE_KEY = 'atulyash-cart-v1';
   const CART_SYNC_STORAGE_KEY = 'atulyash-cart-sync-v1';
   const PENDING_ORDER_STORAGE_KEY = 'atulyash-pending-order-v1';
@@ -43,6 +43,7 @@
     checkoutHandoffReturn: document.getElementById('checkoutHandoffReturn'),
     headerCartButton: document.getElementById('headerCartButton'),
     headerCartCount: document.getElementById('headerCartCount'),
+    heroUnitPrice: document.getElementById('heroUnitPrice'),
     heroWeeklyButton: document.getElementById('heroWeeklyButton'),
     startWeeklyButton: document.getElementById('startWeeklyButton'),
     productShowcase: document.getElementById('productShowcase'),
@@ -259,7 +260,7 @@
   let selectedQuantity = 1;
   let calculatorRecommendation = null;
   let calculatorHasUserInput = false;
-  let weeklyCatalogMessage = 'Loading live weekly plans…';
+  let weeklyCatalogMessage = 'Loading weekly plans…';
   let cart = loadCart();
   let checkoutStep = 1;
   let checkoutProfilePhone = '';
@@ -643,7 +644,11 @@
       const note = document.createElement('small');
       const price = document.createElement('b');
       title.textContent = `${formatWeight(variant.weight)} kg`;
-      note.textContent = index === 0 ? 'Compact fresh batch' : index === variants.length - 1 ? 'Family fresh batch' : 'Fresh-batch pack';
+      note.textContent = index === 0
+        ? 'Total quantity · compact need'
+        : index === variants.length - 1
+          ? 'Total quantity · larger household'
+          : 'Total quantity';
       price.textContent = formatPrice(variant.price);
       copy.append(title, note);
       label.append(input, copy, price);
@@ -652,7 +657,7 @@
     host.replaceChildren(fragment);
   }
 
-  function setWeeklyCatalogControls(available, message = 'Loading live weekly plans…') {
+  function setWeeklyCatalogControls(available, message = 'Loading weekly plans…') {
     const weeklyRadio = document.querySelector('input[name="purchaseType"][value="weekly"]');
     const weeklyLabel = weeklyRadio?.closest('.purchase-option');
     if (weeklyRadio) weeklyRadio.disabled = !available;
@@ -671,7 +676,7 @@
     });
   }
 
-  function clearWeeklyCatalog(message = 'Loading live weekly plans…') {
+  function clearWeeklyCatalog(message = 'Loading weekly plans…') {
     WEEKLY_PLANS = [];
     WEEKLY_PLAN_BY_ID = new Map();
     weeklyCatalogMessage = message;
@@ -695,7 +700,7 @@
 
   function renderCatalogWeeklyOptions() {
     if (!WEEKLY_PLANS.length) {
-      clearWeeklyCatalog('No live weekly plans are available.');
+      clearWeeklyCatalog('No weekly plans are currently available.');
       return;
     }
     const selectedPlan = WEEKLY_PLAN_BY_ID.get(selectedWeeklyPlanId) || WEEKLY_PLANS[0];
@@ -720,7 +725,7 @@
 
   async function hydratePublicCommerce() {
     if (!API) {
-      clearWeeklyCatalog('Live weekly plan service is unavailable.');
+      clearWeeklyCatalog('Weekly plan service is unavailable.');
       if (elements.catalogApiStatus) elements.catalogApiStatus.hidden = false;
       if (elements.catalogApiStatusLabel) {
         elements.catalogApiStatusLabel.textContent = 'Live catalogue service is unavailable. Ordering is disabled.';
@@ -730,7 +735,7 @@
     }
     const stockLabel = document.querySelector('.product-stock');
     catalogReadiness = { products: false, subscriptions: false };
-    clearWeeklyCatalog('Loading live weekly plans…');
+    clearWeeklyCatalog('Loading weekly plans…');
     syncPurchaseAvailability();
     if (elements.storeServiceStatus) {
       elements.storeServiceStatus.hidden = false;
@@ -848,8 +853,8 @@
       } else {
         clearWeeklyCatalog(
           plansResult.status === 'rejected'
-            ? 'Live weekly plans could not be loaded.'
-            : 'No live weekly plans are available.'
+            ? 'Weekly plans could not be loaded.'
+            : 'No weekly plans are currently available.'
         );
       }
 
@@ -891,7 +896,7 @@
       }
     } catch (error) {
       catalogReadiness = { products: false, subscriptions: false };
-      clearWeeklyCatalog('Live weekly plans could not be loaded.');
+      clearWeeklyCatalog('Weekly plans could not be loaded.');
       syncPurchaseAvailability();
       if (stockLabel) stockLabel.lastChild.textContent = ' Ordering temporarily unavailable';
       if (elements.storeServiceStatus) elements.storeServiceStatus.dataset.state = 'error';
@@ -2184,6 +2189,9 @@
         ? `${weeklyLabel} · ${formatPrice(quote.pricePerDelivery)} per delivery · ${formatPrice(quote.walletCover)} wallet funding for ${quote.minimumDeliveriesRequired} deliveries`
         : `${formatPrice(PRODUCT.unitPrice)} per kg`;
     }
+    if (elements.heroUnitPrice) {
+      elements.heroUnitPrice.textContent = `${formatPrice(PRODUCT.unitPrice)} per kg`;
+    }
     if (elements.addToCartPrice) elements.addToCartPrice.textContent = formatPrice(total);
     if (elements.productPackBadge) {
       elements.productPackBadge.textContent = isWeekly
@@ -2267,7 +2275,7 @@
     const isWeekly = selectedPurchaseType === 'weekly';
     const plan = getWeeklyPlan();
     if (isWeekly && !plan?.apiId) {
-      lastCartFailureMessage = 'Live weekly plans are not available right now.';
+      lastCartFailureMessage = 'Weekly plans are not available right now.';
       announce(lastCartFailureMessage);
       return false;
     }
@@ -5683,7 +5691,7 @@
     const currentDailyRotis = Number(elements.dailyRotis?.value);
     if (!Number.isInteger(currentDailyRotis) || currentDailyRotis < MIN_DAILY_ROTIS) {
       label.textContent = 'Calculator needs one detail';
-      title.textContent = `Enter at least ${MIN_DAILY_ROTIS} rotis per day.`;
+      title.textContent = 'Enter your household’s actual daily roti count.';
       text.textContent = 'Use the total number of rotis cooked for everyone in your household on a usual day.';
       applyButton.hidden = true;
       applyButton.disabled = true;
@@ -5693,11 +5701,11 @@
     if (!calculatorRecommendation?.plan) {
       label.textContent = 'Calculator update';
       title.textContent = WEEKLY_PLANS.length
-        ? 'No live weekly plan fully covers this estimate.'
-        : 'Your plan suggestion is waiting for live availability.';
+        ? 'No available weekly plan fully covers this estimate.'
+        : 'Your plan suggestion is waiting for availability.';
       text.textContent = WEEKLY_PLANS.length
         ? 'Adjust your calculation or speak with our team for the right household quantity.'
-        : (weeklyCatalogMessage || 'Live weekly plans are unavailable right now.');
+        : (weeklyCatalogMessage || 'Weekly plans are unavailable right now.');
       applyButton.hidden = true;
       applyButton.disabled = true;
       return;
@@ -5710,7 +5718,7 @@
     );
     label.textContent = 'Your calculator suggestion';
     title.textContent = `${weeklyPlanSelectionLabel(plan)} · ${formatPrice(plan.pricePerDelivery)} per delivery`;
-    text.textContent = `Covers your ${weeklyKg.toFixed(2)} kg/week estimate from ${dailyRotis} rotis a day${buffer ? ` with ${buffer}% extra` : ''}. ${formatPrice(plan.minimumWalletRequired)} wallet funding for ${plan.minimumDeliveriesRequired} deliveries.`;
+    text.textContent = `Covers your ${weeklyKg.toFixed(2)} kg/week estimate from ${dailyRotis} rotis a day${buffer ? ` with ${buffer}% extra` : ''}.`;
     applyButton.hidden = false;
     applyButton.disabled = suggestionIsSelected;
     applyButton.firstChild.textContent = suggestionIsSelected
@@ -5758,12 +5766,12 @@
     if (!validRotiCount) {
       calculatorRecommendation = null;
       if (elements.weeklyOutput) elements.weeklyOutput.textContent = '—';
-      if (elements.weeklyWalletOutput) elements.weeklyWalletOutput.textContent = 'Select a live weekly plan';
+      if (elements.weeklyWalletOutput) elements.weeklyWalletOutput.textContent = 'Enter your daily count';
       if (elements.calculatorFormulaSummary) {
-        elements.calculatorFormulaSummary.textContent = 'The daily roti count starts at 8.';
+        elements.calculatorFormulaSummary.textContent = 'Enter a whole number of rotis eaten by your household in a usual day.';
       }
       if (elements.closestPackOutput) {
-        elements.closestPackOutput.textContent = 'Enter a valid daily count to see your live weekly plan.';
+        elements.closestPackOutput.textContent = 'Enter a valid daily count to see your recommended weekly plan.';
       }
       setCalculatorCta(null);
       return null;
@@ -5773,7 +5781,7 @@
     const weeklyKg = (dailyRotis * ROTI_ATTA_GRAMS * 7 * (1 + (buffer / 100))) / 1000;
 
     if (elements.weeklyOutput) elements.weeklyOutput.textContent = weeklyKg.toFixed(2);
-    if (elements.weeklyWalletOutput) elements.weeklyWalletOutput.textContent = 'Finding the closest live plan…';
+    if (elements.weeklyWalletOutput) elements.weeklyWalletOutput.textContent = `Approx. ${(weeklyKg * 4).toFixed(1)} kg over 4 weeks`;
     if (elements.calculatorFormulaSummary) {
       elements.calculatorFormulaSummary.textContent = `${dailyRotis} rotis/day × ${ROTI_ATTA_GRAMS} g/roti × 7 days${buffer ? ` + ${buffer}% buffer` : ''}`;
     }
@@ -5784,7 +5792,7 @@
       if (elements.closestPackOutput) {
         elements.closestPackOutput.textContent = WEEKLY_PLANS.length
           ? 'Your estimate is above the currently available weekly plans. Please speak with our team for the right quantity.'
-          : weeklyCatalogMessage || 'Live weekly plans are unavailable right now.';
+          : weeklyCatalogMessage || 'Weekly plans are unavailable right now.';
       }
       setCalculatorCta(null);
       return null;
@@ -5792,10 +5800,11 @@
 
     calculatorRecommendation = { plan, dailyRotis, buffer, weeklyKg };
     if (elements.closestPackOutput) {
-      elements.closestPackOutput.textContent = `Recommended live plan: ${weeklyPlanSelectionLabel(plan)} · ${formatPrice(plan.pricePerDelivery)} per delivery.`;
-    }
-    if (elements.weeklyWalletOutput) {
-      elements.weeklyWalletOutput.textContent = `${formatPrice(plan.minimumWalletRequired)} wallet funding for ${plan.minimumDeliveriesRequired} deliveries`;
+      const minimumAvailableKg = WEEKLY_PLANS.reduce((minimum, item) => Math.min(minimum, item.weeklyKg), Infinity);
+      const belowMinimum = Number.isFinite(minimumAvailableKg) && weeklyKg < minimumAvailableKg;
+      elements.closestPackOutput.textContent = belowMinimum
+        ? `Your estimated need is ${weeklyKg.toFixed(2)} kg/week. Atulyash weekly plans start from ${formatWeight(minimumAvailableKg)} kg per delivery. Recommended Weekly Plan: ${weeklyPlanSelectionLabel(plan)} · ${formatPrice(plan.pricePerDelivery)} per delivery.`
+        : `Recommended Weekly Plan: ${weeklyPlanSelectionLabel(plan)} · ${formatPrice(plan.pricePerDelivery)} per delivery.`;
     }
     setCalculatorCta(calculatorRecommendation);
     return calculatorRecommendation;
@@ -5848,7 +5857,7 @@
     if (event.target.value === 'weekly' && !catalogReadiness.subscriptions) {
       event.target.checked = false;
       selectedPurchaseType = 'once';
-      announce('Live weekly plans are not available right now.');
+      announce('Weekly plans are not available right now.');
       updateProductUI();
       return;
     }
@@ -5878,7 +5887,7 @@
       announce(
         WEEKLY_PLANS.length
           ? 'No current weekly plan fully covers this estimate.'
-          : 'Live weekly plans are not available right now.'
+          : 'Weekly plans are not available right now.'
       );
       return;
     }
@@ -5915,7 +5924,7 @@
     button?.addEventListener('click', (event) => {
       event.preventDefault();
       if (!selectedWeeklyPlanId || !catalogReadiness.subscriptions) {
-        announce('Live weekly plans are not available right now.');
+        announce('Weekly plans are not available right now.');
         return;
       }
       selectWeeklyPlan(selectedWeeklyPlanId, { scroll: true, notify: true });
@@ -6274,7 +6283,7 @@
       announce(
         WEEKLY_PLANS.length
           ? 'No current weekly plan fully covers this estimate.'
-          : 'Live weekly plans are not available right now.'
+          : 'Weekly plans are not available right now.'
       );
       return;
     }

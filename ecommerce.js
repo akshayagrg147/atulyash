@@ -4,12 +4,12 @@
   let PRODUCT = {
     name: 'Atulyash Whole Wheat Atta',
     image: 'images/sack5g.webp',
-    unitPrice: 90,
+    unitPrice: 120,
     variants: {
-      2: { weight: 2, price: 180, apiId: null, available: true },
-      4: { weight: 4, price: 360, apiId: null, available: true },
-      6: { weight: 6, price: 540, apiId: null, available: true },
-      8: { weight: 8, price: 720, apiId: null, available: true }
+      2: { weight: 2, price: 240, apiId: null, available: true },
+      4: { weight: 4, price: 480, apiId: null, available: true },
+      6: { weight: 6, price: 720, apiId: null, available: true },
+      8: { weight: 8, price: 960, apiId: null, available: true }
     }
   };
 
@@ -44,6 +44,7 @@
     headerCartButton: document.getElementById('headerCartButton'),
     headerCartCount: document.getElementById('headerCartCount'),
     heroUnitPrice: document.getElementById('heroUnitPrice'),
+    heroVisualUnitPrice: document.getElementById('heroVisualUnitPrice'),
     heroWeeklyButton: document.getElementById('heroWeeklyButton'),
     startWeeklyButton: document.getElementById('startWeeklyButton'),
     productShowcase: document.getElementById('productShowcase'),
@@ -55,7 +56,6 @@
     catalogRetryButton: document.getElementById('catalogRetryButton'),
     productGallery: document.querySelector('.product-gallery'),
     productImage: document.getElementById('shopProductImage'),
-    productPackBadge: document.getElementById('productPackBadge'),
     packFillAnimation: document.getElementById('packFillAnimation'),
     packSelectionScene: document.getElementById('packSelectionScene'),
     packSelectionSceneWeight: document.getElementById('packSelectionSceneWeight'),
@@ -2130,7 +2130,6 @@
     clearTimeout(variantAnimationTimer);
     elements.productGallery?.classList.remove('is-filling');
     elements.packSelectionScene?.classList.remove('is-filling');
-    elements.productPackBadge?.classList.remove('is-changing');
     elements.packFillAnimation?.replaceChildren();
     elements.packSelectionMiniFill?.replaceChildren();
   }
@@ -2154,7 +2153,6 @@
     buildChapatiTokens(animationLayer, count, compact);
     void animationHost?.offsetWidth;
     animationHost?.classList.add('is-filling');
-    elements.productPackBadge?.classList.add('is-changing');
 
     variantAnimationTimer = window.setTimeout(() => {
       if (generation !== variantAnimationGeneration) return;
@@ -2192,12 +2190,10 @@
     if (elements.heroUnitPrice) {
       elements.heroUnitPrice.textContent = `${formatPrice(PRODUCT.unitPrice)} per kg`;
     }
-    if (elements.addToCartPrice) elements.addToCartPrice.textContent = formatPrice(total);
-    if (elements.productPackBadge) {
-      elements.productPackBadge.textContent = isWeekly
-        ? `${formatWeight(quote.weightKg)} kg / week`
-        : `${weightLabel} kg`;
+    if (elements.heroVisualUnitPrice) {
+      elements.heroVisualUnitPrice.textContent = formatPrice(PRODUCT.unitPrice);
     }
+    if (elements.addToCartPrice) elements.addToCartPrice.textContent = formatPrice(total);
     if (elements.productQuantity) elements.productQuantity.textContent = selectedQuantity;
     if (elements.mobilePackLabel) {
       elements.mobilePackLabel.textContent = isWeekly

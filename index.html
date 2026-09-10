@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="styles.css?v=20260907-5">
   <link rel="stylesheet" href="ecommerce.css?v=20260902-14">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
-  <link rel="stylesheet" href="client-design.css?v=20260909-7">
+  <link rel="stylesheet" href="client-design.css?v=20260910-8">
 </head>
 <body data-commerce-page="storefront">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -148,24 +148,28 @@
               </div>
             </div>
           </div>
+          <aside class="hero-price-story" aria-label="Atulyash atta price">
+            <span class="hero-price-kicker">Our price</span>
+            <p class="hero-price-value"><strong id="heroVisualUnitPrice">₹120</strong><span>per kg</span></p>
+          </aside>
         </div>
       </div>
     </section>
 
     <section class="hero-journey" aria-label="Start your Atulyash journey">
       <div class="container hero-journey-inner">
-        <div>
+        <div class="hero-journey-copy">
           <p>Atulyash brings that seriousness back.</p>
           <small>Single-origin MP Sharbati. Natural stone slow milling. Freshly milled for weekly delivery.</small>
-          <div class="hero-service-facts" aria-label="Price and customer care">
-            <span>Atta price <strong id="heroUnitPrice">₹90 per kg</strong></span>
-            <a href="tel:+919818588996">Customer care <strong>98185 88996</strong></a>
-          </div>
         </div>
         <div class="hero-actions hero-actions-client">
           <a class="button button-primary" href="#packSelector">Your First Atulyash Experience <span aria-hidden="true">↓</span></a>
           <a class="text-action hero-subscribe" id="heroWeeklyButton" href="#shop">Subscribe Weekly <span aria-hidden="true">→</span></a>
           <a class="text-action" href="#weekly">Estimate Your Weekly Requirement <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-service-facts" aria-label="Price and customer care">
+          <span>Atta price <strong id="heroUnitPrice">₹120 per kg</strong></span>
+          <a href="tel:+919818588996">Customer care <strong>98185 88996</strong></a>
         </div>
       </div>
     </section>
@@ -269,7 +273,6 @@
             <div class="product-image-halo" aria-hidden="true"></div>
             <div class="pack-fill-animation" id="packFillAnimation" aria-hidden="true"></div>
             <img id="shopProductImage" src="images/sack5g.webp" width="490" height="512" alt="Atulyash 2 kg natural-stone milled whole wheat atta pack artwork">
-            <span class="product-pack-badge" id="productPackBadge" aria-hidden="true">2 kg</span>
           </div>
           <div class="product-gallery-foot">
             <span>2 kg pack shown</span>
@@ -303,7 +306,6 @@
             <label class="purchase-option">
               <input type="radio" name="purchaseType" value="weekly" disabled>
               <span><strong>Subscribe Weekly</strong><small>Freshly milled for your chosen weekly delivery day.</small></span>
-              <em>Fresh weekly atta · No automatic billing</em>
               <i aria-hidden="true"></i>
             </label>
           </fieldset>
@@ -315,22 +317,22 @@
               <label class="pack-option is-selected">
                 <input type="radio" name="packSize" value="2" checked>
                 <span><strong>2 kg</strong><small>Total quantity · compact need</small></span>
-                <b>₹180</b>
+                <b>₹240</b>
               </label>
               <label class="pack-option">
                 <input type="radio" name="packSize" value="4">
                 <span><strong>4 kg</strong><small>Total quantity</small></span>
-                <b>₹360</b>
+                <b>₹480</b>
               </label>
               <label class="pack-option">
                 <input type="radio" name="packSize" value="6">
                 <span><strong>6 kg</strong><small>Large pack</small></span>
-                <b>₹540</b>
+                <b>₹720</b>
               </label>
               <label class="pack-option">
                 <input type="radio" name="packSize" value="8">
                 <span><strong>8 kg</strong><small>Extra-large pack</small></span>
-                <b>₹720</b>
+                <b>₹960</b>
               </label>
             </div>
             <div class="pack-selection-scene" id="packSelectionScene" aria-hidden="true">
@@ -381,8 +383,8 @@
           </section>
 
           <div class="product-price-line" aria-live="polite">
-            <strong id="productPrice">₹180</strong>
-            <span id="productUnitPrice">₹90 per kg</span>
+            <strong id="productPrice">₹240</strong>
+            <span id="productUnitPrice">₹120 per kg</span>
             <small>Delivery charges, if applicable, are shown clearly in your bag before checkout.</small>
           </div>
 
@@ -394,7 +396,7 @@
             </div>
             <button class="button button-primary product-add-button" id="addToCartButton" type="button">
               <span class="product-add-label" id="addToCartLabel">Add to bag</span>
-              <span id="addToCartPrice">₹180</span>
+              <span id="addToCartPrice">₹240</span>
             </button>
           </div>
 
@@ -427,7 +429,6 @@
     <section class="weekly-section section" id="weekly" aria-labelledby="weekly-title">
       <div class="container weekly-layout">
         <div class="weekly-copy reveal">
-          <p class="eyebrow"><span></span>The Atulyash Way</p>
           <h2 id="weekly-title">You buy milk fresh. Why store atta for a month or more?</h2>
           <p>Atta is eaten every day, yet often bought and stored for weeks. Atulyash changes that routine with freshly milled weekly delivery.</p>
           <ol class="weekly-steps weekly-steps-four" data-motion-sequence>
@@ -440,8 +441,7 @@
 
         <div class="calculator reveal" aria-labelledby="calculator-title">
           <p class="calculator-tag">Let us help you estimate your weekly atta requirement</p>
-          <h3 id="calculator-title">How many rotis does your family usually consume in a day?</h3>
-          <p class="calculator-intro">Enter the total number of rotis your family usually consumes each day, and we’ll recommend the right weekly quantity of Atulyash Atta.</p>
+          <h3 id="calculator-title">Enter the total number of rotis your family usually consumes each day, and we’ll recommend the right weekly quantity of Atulyash Atta.</h3>
 
           <div class="calculator-roti-control">
             <div class="calculator-roti-copy">
@@ -815,8 +815,8 @@
       </div>
     </div>
     <div class="container footer-policies" aria-label="Policies">
-      <a href="legal/atulyash-terms-and-conditions-27-aug.docx" target="_blank" rel="noopener">Terms &amp; Conditions</a>
-      <a href="legal/atulyash-privacy-policy-27-aug.docx" target="_blank" rel="noopener">Privacy Policy</a>
+      <a href="legal/terms.html" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+      <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
       <a href="legal/atulyash-cancellation-return-refund-policy-27-aug.docx" target="_blank" rel="noopener">Cancellation, Return &amp; Refund Policy</a>
       <a href="legal/atulyash-rider-app-terms-of-use-27-aug.docx" target="_blank" rel="noopener">Rider App Terms of Use</a>
       <a href="legal/atulyash-rider-privacy-notice-27-aug.docx" target="_blank" rel="noopener">Rider Privacy Notice</a>
@@ -829,6 +829,6 @@
 
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
-  <script src="ecommerce.js?v=20260907-2"></script>
+  <script src="ecommerce.js?v=20260910-2"></script>
 </body>
 </html>

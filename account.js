@@ -1892,7 +1892,7 @@
 
   function storefrontReturnMode() {
     const mode = new URLSearchParams(window.location.search).get('return');
-    return mode === 'checkout' ? 'checkout' : mode === 'cart' ? 'cart' : '';
+    return mode === 'checkout' ? 'checkout' : mode === 'cart' ? 'cart' : mode === 'launch' ? 'launch' : '';
   }
 
   function updateAuthReturnNotice() {
@@ -1902,12 +1902,16 @@
     const title = elements.authReturnNotice.querySelector('strong');
     const copy = elements.authReturnNotice.querySelector('span');
     if (title) {
-      title.textContent = mode === 'checkout'
+      title.textContent = mode === 'launch'
+        ? 'Your Launch Experience is ready to reserve.'
+        : mode === 'checkout'
         ? 'Your secure checkout is ready to continue.'
         : 'Your bag is ready to reopen.';
     }
     if (copy) {
-      copy.textContent = mode === 'checkout'
+      copy.textContent = mode === 'launch'
+        ? 'Sign in with your mobile number and we’ll take you back to the complimentary reservation.'
+        : mode === 'checkout'
         ? 'Sign in with your mobile number and we’ll take you straight back to delivery.'
         : 'Sign in with your mobile number and we’ll take you straight back to your bag.';
     }
@@ -1916,6 +1920,10 @@
   function returnToStorefrontAfterAuthentication() {
     const mode = storefrontReturnMode();
     if (!mode) return false;
+    if (mode === 'launch') {
+      window.location.assign('launch.html');
+      return true;
+    }
     if (mode === 'checkout') {
       rememberCheckoutOrigin('account');
       window.location.assign('checkout.html');

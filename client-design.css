@@ -1414,3 +1414,10 @@
     width: 100%;
   }
 }
+
+.launch-banner { background: #0b2721; color: #fffdf8; }
+.launch-banner-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 0; }
+.launch-banner .section-label { color: #c9e9a6; margin-bottom: 4px; }
+.launch-banner h2 { margin: 0; font: 500 clamp(1.8rem, 3vw, 2.7rem)/1 Newsreader, Georgia, serif; }
+.launch-banner p:not(.section-label) { margin: 6px 0 0; color: rgba(255,253,248,.78); }
+@media (max-width: 640px) { .launch-banner-inner { display: grid; } .launch-banner .button { width: 100%; } }

@@ -124,6 +124,13 @@
     <button id="storeServiceRetryButton" type="button" hidden>Try again</button>
   </div>
 
+  <aside class="launch-banner" id="launchBanner" hidden aria-label="Atulyash Launch Experience">
+    <div class="container launch-banner-inner">
+      <div><p class="section-label">Atulyash Launch Experience</p><h2>For our first 2,000 families</h2><p>Reserve one complimentary 1 kg pack. Deliveries commence from 12 October.</p></div>
+      <a class="button button-primary" href="launch.html">Reserve my launch experience <span aria-hidden="true">→</span></a>
+    </div>
+  </aside>
+
   <main id="main-content">
     <section class="hero" id="home" aria-labelledby="hero-title">
       <div class="container hero-layout">
@@ -830,5 +837,14 @@
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
   <script src="ecommerce.js?v=20260910-2"></script>
+  <script>
+    (function () {
+      var banner = document.getElementById('launchBanner');
+      if (!banner || !window.AtulyashAPI) return;
+      window.AtulyashAPI.request('/launch-experience/campaigns/current/', { method: 'GET', auth: false }).then(function (payload) {
+        if (payload && payload.campaign && payload.campaign.can_reserve) banner.hidden = false;
+      }).catch(function () {});
+    })();
+  </script>
 </body>
 </html>

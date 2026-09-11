@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atulyash Launch Experience</title>
+  <link rel="stylesheet" href="styles.css?v=20260907-5">
+  <link rel="stylesheet" href="launch.css?v=20260911-1">
+</head>
+<body class="launch-page">
+  <main class="launch-shell">
+    <a class="launch-back" href="index.html">← Back to Atulyash</a>
+    <section class="launch-intro" aria-labelledby="launchTitle">
+      <p class="section-label">A complimentary beginning</p>
+      <h1 id="launchTitle">Atulyash Launch Experience</h1>
+      <p>For our first 2,000 families: reserve one complimentary 1 kg pack, freshly milled for delivery from 12 October.</p>
+      <div class="launch-counter" id="launchCounter" role="status" aria-live="polite">Checking availability…</div>
+    </section>
+
+    <section class="launch-card" aria-labelledby="reservationHeading">
+      <div id="launchNotice" class="launch-notice" role="status" aria-live="polite"></div>
+      <div id="launchUnavailable" hidden>
+        <h2>Reservations are not open yet.</h2>
+        <p>The Launch Experience will appear here when the campaign is opened by Atulyash operations.</p>
+      </div>
+      <div id="launchExisting" class="launch-existing" hidden>
+        <p class="section-label">Your reservation</p>
+        <h2>Already reserved for your household.</h2>
+        <p>Reference <strong id="launchExistingReference"></strong></p>
+        <dl>
+          <div><dt>Status</dt><dd id="launchExistingStatus"></dd></div>
+          <div><dt>Delivery</dt><dd id="launchExistingDelivery"></dd></div>
+          <div><dt>Scheduled date</dt><dd id="launchExistingDate"></dd></div>
+        </dl>
+        <a class="button button-secondary" href="index.html#shop">Continue shopping <span aria-hidden="true">→</span></a>
+      </div>
+      <form id="launchReservationForm" novalidate hidden>
+        <h2 id="reservationHeading">Reserve my launch experience</h2>
+        <p class="launch-form-copy">Sign in with OTP so we can keep one complimentary pack per household.</p>
+        <div class="launch-grid">
+          <label>Full name<input name="full_name" required maxlength="255" autocomplete="name"></label>
+          <label>Monthly atta consumption<select name="monthly_consumption_band" required><option value="">Choose one</option><option value="UP_TO_5_KG">Up to 5 kg</option><option value="KG_6_TO_10">6–10 kg</option><option value="KG_11_TO_15">11–15 kg</option><option value="KG_16_TO_20">16–20 kg</option><option value="OVER_20_KG">More than 20 kg</option></select></label>
+          <label>PIN code<input id="launchPincode" name="pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}"></label>
+          <label>Area<select id="launchArea" name="area_id" required disabled><option value="">Enter a PIN code first</option></select></label>
+          <label class="launch-span-two">Complete delivery address<textarea name="address_line" rows="3" required maxlength="1000" placeholder="House number, building, street and landmark"></textarea></label>
+        </div>
+        <p id="launchServiceability" class="launch-field-note" aria-live="polite"></p>
+        <label class="launch-consent"><input type="checkbox" name="household_confirmed" required><span>I confirm that this complimentary launch experience is being reserved for my household and that the delivery details are correct.</span></label>
+        <button class="button button-primary" type="submit" id="launchSubmit">Reserve my launch experience <span aria-hidden="true">→</span></button>
+      </form>
+      <div id="launchLoginPrompt" hidden><h2>Sign in to reserve</h2><p>We use OTP verification to protect the one-pack-per-household limit.</p><a class="button button-primary" href="account.html?return=launch">Sign in with OTP <span aria-hidden="true">→</span></a></div>
+      <div id="launchSuccess" hidden><p class="section-label">Reserved</p><h2>Your Launch Experience is reserved.</h2><p>Deliveries commence from 12 October (second Navratra). Your reservation reference is <strong id="launchReference"></strong>.</p><a class="button button-primary" href="index.html#shop">Continue shopping <span aria-hidden="true">→</span></a></div>
+    </section>
+  </main>
+  <script src="api-client.js?v=20260906-3"></script>
+  <script src="launch.js?v=20260911-1"></script>
+</body>
+</html>

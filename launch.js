@@ -13,9 +13,17 @@
   var area = document.getElementById('launchArea');
   var serviceability = document.getElementById('launchServiceability');
   var submit = document.getElementById('launchSubmit');
+  var campaignDate = document.getElementById('launchCampaignDate');
+  var successDate = document.getElementById('launchSuccessDate');
 
   function setNotice(message, isSuccess) { notice.textContent = message || ''; notice.classList.toggle('success', Boolean(isSuccess)); }
   function session() { return api && api.getSession ? api.getSession() : {}; }
+  function formatCampaignDate(value) {
+    if (!value) return '';
+    var parsed = new Date(String(value) + 'T00:00:00+05:30');
+    if (Number.isNaN(parsed.getTime())) return '';
+    return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(parsed);
+  }
   function setCounter(value) {
     var c = value && value.campaign;
     if (!c) { counter.textContent = 'Launch Experience availability is being prepared.'; return; }
@@ -25,6 +33,9 @@
     return api.request('/launch-experience/campaigns/current/', { method: 'GET', auth: false }).then(function (payload) {
       campaign = payload && payload.campaign;
       setCounter(payload);
+      var formattedDate = formatCampaignDate(campaign && campaign.delivery_start_date);
+      if (formattedDate && campaignDate) campaignDate.textContent = formattedDate;
+      if (formattedDate && successDate) successDate.textContent = formattedDate;
       if (api.isAuthenticated()) loadExisting();
       if (campaign && campaign.can_reserve) {
         if (api.isAuthenticated()) form.hidden = false; else loginPrompt.hidden = false;

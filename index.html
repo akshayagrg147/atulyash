@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="styles.css?v=20260907-5">
   <link rel="stylesheet" href="ecommerce.css?v=20260902-14">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
-  <link rel="stylesheet" href="client-design.css?v=20260910-8">
+  <link rel="stylesheet" href="client-design.css?v=20260911-1">
 </head>
 <body data-commerce-page="storefront">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -126,8 +126,33 @@
 
   <aside class="launch-banner" id="launchBanner" hidden aria-label="Atulyash Launch Experience">
     <div class="container launch-banner-inner">
-      <div><p class="section-label">Atulyash Launch Experience</p><h2>For our first 2,000 families</h2><p>Reserve one complimentary 1 kg pack. Deliveries commence from 12 October.</p></div>
-      <a class="button button-primary" href="launch.html">Reserve my launch experience <span aria-hidden="true">→</span></a>
+      <div class="launch-banner-seal" aria-hidden="true">
+        <span>Complimentary</span>
+        <strong>1 kg</strong>
+        <small>launch pack</small>
+      </div>
+
+      <div class="launch-banner-copy">
+        <div class="launch-banner-eyebrow">
+          <span>Atulyash Launch Experience</span>
+          <span class="launch-banner-live"><i aria-hidden="true"></i><b id="launchBannerStatus">Reservations now open</b></span>
+        </div>
+        <h2><span>A first taste,</span> with our compliments.</h2>
+        <p>For our first 2,000 families. Reserve a complimentary 1 kg pack, freshly milled from single-origin MP Sharbati wheat. Deliveries begin <strong id="launchBannerDate">12 October</strong>.</p>
+        <ul class="launch-banner-facts" aria-label="Launch Experience details">
+          <li>₹0 payable</li>
+          <li>One per household</li>
+          <li id="launchBannerAvailability">Limited to 2,000 families</li>
+        </ul>
+      </div>
+
+      <div class="launch-banner-action">
+        <a class="button launch-banner-cta" href="launch.html">
+          <span>Reserve my launch experience</span>
+          <span class="launch-banner-arrow" aria-hidden="true">→</span>
+        </a>
+        <small>Available in select Delhi areas</small>
+      </div>
     </div>
   </aside>
 
@@ -842,7 +867,25 @@
       var banner = document.getElementById('launchBanner');
       if (!banner || !window.AtulyashAPI) return;
       window.AtulyashAPI.request('/launch-experience/campaigns/current/', { method: 'GET', auth: false }).then(function (payload) {
-        if (payload && payload.campaign && payload.campaign.can_reserve) banner.hidden = false;
+        var campaign = payload && payload.campaign;
+        if (!campaign || !campaign.can_reserve) return;
+
+        var availability = document.getElementById('launchBannerAvailability');
+        var status = document.getElementById('launchBannerStatus');
+        var deliveryDate = document.getElementById('launchBannerDate');
+
+        if (availability && Number.isFinite(Number(campaign.remaining_count))) {
+          availability.textContent = Number(campaign.remaining_count).toLocaleString('en-IN') + ' packs remaining';
+        }
+        if (status && campaign.status_message) status.textContent = campaign.status_message;
+        if (deliveryDate && campaign.delivery_start_date) {
+          var parsedDate = new Date(campaign.delivery_start_date + 'T00:00:00+05:30');
+          if (!Number.isNaN(parsedDate.getTime())) {
+            deliveryDate.textContent = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(parsedDate);
+          }
+        }
+
+        banner.hidden = false;
       }).catch(function () {});
     })();
   </script>

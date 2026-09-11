@@ -3,27 +3,87 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Atulyash Launch Experience</title>
+  <meta name="description" content="Reserve one complimentary 1 kg Atulyash launch pack—freshly milled from single-origin MP Sharbati wheat for our first 2,000 families.">
+  <meta name="theme-color" content="#0b2721">
+  <title>Atulyash Launch Experience | A First Taste, With Our Compliments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="images/natural-stone-hero.webp" fetchpriority="high">
   <link rel="stylesheet" href="styles.css?v=20260907-5">
-  <link rel="stylesheet" href="launch.css?v=20260911-1">
+  <link rel="stylesheet" href="launch.css?v=20260911-2">
 </head>
 <body class="launch-page">
-  <main class="launch-shell">
-    <a class="launch-back" href="index.html">← Back to Atulyash</a>
-    <section class="launch-intro" aria-labelledby="launchTitle">
-      <p class="section-label">A complimentary beginning</p>
-      <h1 id="launchTitle">Atulyash Launch Experience</h1>
-      <p>For our first 2,000 families: reserve one complimentary 1 kg pack, freshly milled for delivery from 12 October.</p>
-      <div class="launch-counter" id="launchCounter" role="status" aria-live="polite">Checking availability…</div>
+  <a class="skip-link" href="#reservation">Skip to reservation</a>
+
+  <header class="launch-header">
+    <div class="launch-container launch-header-inner">
+      <a class="launch-brand" href="index.html" aria-label="Atulyash home">
+        <img class="launch-brand-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+        <img class="launch-brand-wordmark" src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash — Incomparable Purity. No Compromise.">
+      </a>
+      <a class="launch-back" href="index.html"><span aria-hidden="true">←</span> Back to Atulyash</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="launch-hero" aria-labelledby="launchTitle">
+      <div class="launch-container launch-hero-grid">
+        <div class="launch-intro">
+          <div class="launch-eyebrow"><span aria-hidden="true"></span> Atulyash Launch Experience</div>
+          <h1 id="launchTitle">A first taste of atta, <em>as it should be.</em></h1>
+          <p class="launch-lead">For our first 2,000 families, one freshly milled pack is on us—a simple invitation to experience Atulyash before you choose what comes next.</p>
+
+          <dl class="launch-offer-summary" aria-label="Launch offer summary">
+            <div><dt>Your launch pack</dt><dd>1 kg complimentary</dd></div>
+            <div><dt>Delivery begins</dt><dd id="launchCampaignDate">12 October</dd></div>
+            <div><dt>Amount payable</dt><dd>₹0</dd></div>
+          </dl>
+
+          <div class="launch-counter-wrap">
+            <span class="launch-counter-dot" aria-hidden="true"></span>
+            <span class="launch-counter" id="launchCounter" role="status" aria-live="polite">Checking live availability…</span>
+          </div>
+          <a class="launch-jump" href="#reservation">Reserve my complimentary pack <span aria-hidden="true">↓</span></a>
+        </div>
+
+        <div class="launch-visual" aria-label="Atulyash natural-stone milling">
+          <img src="images/natural-stone-hero.webp" width="1672" height="941" alt="Natural stone chakki with wheat and freshly milled atta" fetchpriority="high">
+          <div class="launch-visual-shade" aria-hidden="true"></div>
+          <div class="launch-visual-copy">
+            <span>Single-origin MP Sharbati</span>
+            <strong>Slow-milled on natural stone.</strong>
+          </div>
+          <div class="launch-seal" aria-hidden="true">
+            <span>With our</span>
+            <strong>compliments</strong>
+            <small>1 kg</small>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="launch-card" aria-labelledby="reservationHeading">
+    <section class="launch-reservation" id="reservation" aria-label="Launch Experience reservation">
+      <div class="launch-container launch-reservation-layout">
+        <aside class="launch-guide" aria-label="How the reservation works">
+          <div class="launch-eyebrow"><span aria-hidden="true"></span> Your reservation</div>
+          <h2>Three small steps. One honest first experience.</h2>
+          <ol>
+            <li><span>01</span><div><strong>Sign in securely</strong><p>OTP verification keeps the offer to one pack per household.</p></div></li>
+            <li><span>02</span><div><strong>Confirm your area</strong><p>We check your Delhi PIN and locality against the live delivery network.</p></div></li>
+            <li><span>03</span><div><strong>Reserve at ₹0</strong><p>No card or wallet payment is required for this complimentary pack.</p></div></li>
+          </ol>
+          <p class="launch-guide-note">Reservation is subject to campaign availability and delivery serviceability.</p>
+        </aside>
+
+        <div class="launch-card">
       <div id="launchNotice" class="launch-notice" role="status" aria-live="polite"></div>
-      <div id="launchUnavailable" hidden>
+      <div id="launchUnavailable" class="launch-state" hidden>
+        <span class="launch-state-icon" aria-hidden="true">A</span>
         <h2>Reservations are not open yet.</h2>
         <p>The Launch Experience will appear here when the campaign is opened by Atulyash operations.</p>
       </div>
-      <div id="launchExisting" class="launch-existing" hidden>
+      <div id="launchExisting" class="launch-existing launch-state" hidden>
         <p class="section-label">Your reservation</p>
         <h2>Already reserved for your household.</h2>
         <p>Reference <strong id="launchExistingReference"></strong></p>
@@ -35,24 +95,48 @@
         <a class="button button-secondary" href="index.html#shop">Continue shopping <span aria-hidden="true">→</span></a>
       </div>
       <form id="launchReservationForm" novalidate hidden>
+        <p class="launch-card-kicker">Complimentary reservation</p>
         <h2 id="reservationHeading">Reserve my launch experience</h2>
-        <p class="launch-form-copy">Sign in with OTP so we can keep one complimentary pack per household.</p>
+        <p class="launch-form-copy">Tell us where your first pack should arrive. Every field below helps us keep this experience personal and reliably serviceable.</p>
         <div class="launch-grid">
-          <label>Full name<input name="full_name" required maxlength="255" autocomplete="name"></label>
-          <label>Monthly atta consumption<select name="monthly_consumption_band" required><option value="">Choose one</option><option value="UP_TO_5_KG">Up to 5 kg</option><option value="KG_6_TO_10">6–10 kg</option><option value="KG_11_TO_15">11–15 kg</option><option value="KG_16_TO_20">16–20 kg</option><option value="OVER_20_KG">More than 20 kg</option></select></label>
-          <label>PIN code<input id="launchPincode" name="pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}"></label>
+          <label>Full name<input name="full_name" required maxlength="255" autocomplete="name" placeholder="Your full name"></label>
+          <label>Monthly atta consumption<select name="monthly_consumption_band" required><option value="">Select your household range</option><option value="UP_TO_5_KG">Up to 5 kg</option><option value="KG_6_TO_10">6–10 kg</option><option value="KG_11_TO_15">11–15 kg</option><option value="KG_16_TO_20">16–20 kg</option><option value="OVER_20_KG">More than 20 kg</option></select></label>
+          <label>PIN code<input id="launchPincode" name="pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit delivery PIN"></label>
           <label>Area<select id="launchArea" name="area_id" required disabled><option value="">Enter a PIN code first</option></select></label>
-          <label class="launch-span-two">Complete delivery address<textarea name="address_line" rows="3" required maxlength="1000" placeholder="House number, building, street and landmark"></textarea></label>
+          <label class="launch-span-two">Complete delivery address<textarea name="address_line" rows="4" required maxlength="1000" placeholder="House number, building, street and nearby landmark"></textarea></label>
         </div>
         <p id="launchServiceability" class="launch-field-note" aria-live="polite"></p>
         <label class="launch-consent"><input type="checkbox" name="household_confirmed" required><span>I confirm that this complimentary launch experience is being reserved for my household and that the delivery details are correct.</span></label>
-        <button class="button button-primary" type="submit" id="launchSubmit">Reserve my launch experience <span aria-hidden="true">→</span></button>
+        <button class="button button-primary launch-submit" type="submit" id="launchSubmit">Reserve my launch experience <span aria-hidden="true">→</span></button>
+        <p class="launch-form-footnote">No payment details are requested. One complimentary reservation is permitted per eligible household.</p>
       </form>
-      <div id="launchLoginPrompt" hidden><h2>Sign in to reserve</h2><p>We use OTP verification to protect the one-pack-per-household limit.</p><a class="button button-primary" href="account.html?return=launch">Sign in with OTP <span aria-hidden="true">→</span></a></div>
-      <div id="launchSuccess" hidden><p class="section-label">Reserved</p><h2>Your Launch Experience is reserved.</h2><p>Deliveries commence from 12 October (second Navratra). Your reservation reference is <strong id="launchReference"></strong>.</p><a class="button button-primary" href="index.html#shop">Continue shopping <span aria-hidden="true">→</span></a></div>
+      <div id="launchLoginPrompt" class="launch-login-prompt launch-state" hidden>
+        <div class="launch-state-icon" aria-hidden="true">1</div>
+        <p class="launch-card-kicker">Begin your reservation</p>
+        <h2>Sign in to reserve your complimentary pack.</h2>
+        <p>We use a quick OTP verification to protect the one-pack-per-household limit. No password or payment details are required.</p>
+        <a class="button button-primary launch-submit" href="account.html?return=launch">Sign in with OTP <span aria-hidden="true">→</span></a>
+        <div class="launch-login-assurance"><span>Secure OTP</span><span>₹0 payable</span><span>About 2 minutes</span></div>
+      </div>
+      <div id="launchSuccess" class="launch-success launch-state" hidden>
+        <div class="launch-state-icon launch-state-icon-success" aria-hidden="true">✓</div>
+        <p class="section-label">Reserved</p>
+        <h2>Your Launch Experience is reserved.</h2>
+        <p>Deliveries commence from <span id="launchSuccessDate">12 October</span>. Your reservation reference is <strong id="launchReference"></strong>.</p>
+        <a class="button button-primary" href="index.html#shop">Continue shopping <span aria-hidden="true">→</span></a>
+      </div>
+        </div>
+      </div>
     </section>
   </main>
+
+  <footer class="launch-footer">
+    <div class="launch-container">
+      <p>Atulyash Foods Private Limited</p>
+      <span>Incomparable purity. No compromise.</span>
+    </div>
+  </footer>
   <script src="api-client.js?v=20260906-3"></script>
-  <script src="launch.js?v=20260911-1"></script>
+  <script src="launch.js?v=20260911-2"></script>
 </body>
 </html>

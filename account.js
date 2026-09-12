@@ -129,6 +129,8 @@
     overviewOrders: $('overviewOrders'),
     orderFilter: $('orderFilter'),
     ordersStatementButton: $('ordersStatementButton'),
+    launchReservationsRefresh: $('launchReservationsRefresh'),
+    launchReservationsList: $('launchReservationsList'),
     ordersList: $('ordersList'),
     ordersLoadMore: $('ordersLoadMore'),
     chooseWeeklyPlanButton: $('chooseWeeklyPlanButton'),
@@ -196,6 +198,7 @@
     orders: [],
     orderPage: 1,
     ordersHaveMore: false,
+    launchReservations: [],
     addresses: [],
     subscriptions: [],
     vacations: [],
@@ -2960,23 +2963,209 @@
     return card;
   }
 
+  function launchReservationRows(payload) {
+    const data = responseData(payload);
+    if (Array.isArray(data)) return data.filter((row) => row && typeof row === 'object');
+    if (Array.isArray(data?.results)) return data.results.filter((row) => row && typeof row === 'object');
+    if (data && typeof data === 'object' && (data.reference || data.reservation_reference || data.id)) return [data];
+    return [];
+  }
+
+  function launchReservationStatus(row) {
+    const status = String(firstValue(row?.status, row?.reservation_status, 'CONFIRMED')).toUpperCase();
+    return {
+      RESERVED: 'Reservation received',
+      PENDING: 'Reservation received',
+      CONFIRMED: 'Reservation confirmed',
+      CANCELLED: 'Reservation cancelled',
+      CANCELED: 'Reservation cancelled'
+    }[status] || status.replaceAll('_', ' ');
+  }
+
+  function launchDeliveryStatus(row) {
+    const status = String(firstValue(row?.delivery_status, row?.delivery?.status, 'UNSCHEDULED')).toUpperCase();
+    return {
+      UNSCHEDULED: 'Delivery date will be confirmed',
+      SCHEDULED: 'Delivery scheduled',
+      PREPARING: 'Preparing your pack',
+      OUT_FOR_DELIVERY: 'Out for delivery',
+      DELIVERED: 'Delivered',
+      FAILED: 'Delivery attempt unsuccessful',
+      CANCELLED: 'Delivery cancelled'
+    }[status] || status.replaceAll('_', ' ');
+  }
+
+  function formatLaunchDate(value, includeTime = false) {
+    const raw = String(value || '');
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+      ? new Date(`${raw}T00:00:00+05:30`)
+      : dateValue(value);
+    if (!parsed) return 'Date to be confirmed';
+    return includeTime ? dateTime.format(parsed) : shortDate.format(parsed);
+  }
+
+  function launchAddress(row) {
+    const address = firstValue(row?.delivery_address, row?.address, row?.customer_address);
+    if (address && typeof address === 'object') {
+      return {
+        area: firstValue(address.area, address.locality, address.area_name),
+        pincode: firstValue(address.pincode, address.pin_code),
+        full: firstValue(address.full_address, address.address_line, address.house_name)
+      };
+    }
+    return {
+      area: firstValue(row?.area, row?.locality, row?.area_name),
+      pincode: firstValue(row?.pincode, row?.pin_code),
+      full: firstValue(row?.full_address, row?.address_line)
+    };
+  }
+
+  function launchTrackingEvents(row) {
+    const value = firstValue(row?.tracking_events, row?.events, row?.history);
+    return Array.isArray(value) ? value.filter((event) => event && typeof event === 'object') : [];
+  }
+
+  function launchEventLabel(event) {
+    const status = String(firstValue(event?.status, event?.event_type, '')).toUpperCase();
+    return firstValue(event?.label, event?.title) || {
+      RESERVED: 'Reservation received',
+      CONFIRMED: 'Reservation confirmed',
+      SCHEDULED: 'Delivery scheduled',
+      PREPARING: 'Preparing your pack',
+      OUT_FOR_DELIVERY: 'Out for delivery',
+      DELIVERED: 'Delivered',
+      FAILED: 'Delivery attempt unsuccessful',
+      CANCELLED: 'Cancelled'
+    }[status] || (status ? status.replaceAll('_', ' ') : 'Update');
+  }
+
+  function renderLaunchTimeline(events) {
+    const list = create('ol', 'launch-tracking-timeline');
+    events.forEach((event) => {
+      const item = create('li', 'launch-tracking-event');
+      item.append(
+        create('strong', '', launchEventLabel(event)),
+        create('span', '', firstValue(event.occurred_at, event.created_at, event.timestamp) ? formatLaunchDate(firstValue(event.occurred_at, event.created_at, event.timestamp), true) : 'Time not supplied')
+      );
+      if (firstValue(event.description, event.message, event.reason)) item.append(create('p', '', firstValue(event.description, event.message, event.reason)));
+      list.append(item);
+    });
+    return list;
+  }
+
+  function makeLaunchReservationCard(row, { compact = false } = {}) {
+    const card = create('article', `launch-reservation-card${compact ? ' is-compact' : ''}`);
+    const address = launchAddress(row);
+    const reference = firstValue(row.reference, row.reservation_reference, row.id, 'Launch reservation');
+    const scheduled = firstValue(row.scheduled_delivery_date, row.delivery?.scheduled_delivery_date);
+    const head = create('div', 'launch-reservation-card-head');
+    head.append(
+      create('span', 'launch-reservation-kicker', 'COMPLIMENTARY LAUNCH PACK'),
+      create('strong', '', reference),
+      create('span', 'launch-reservation-state', launchReservationStatus(row))
+    );
+    const details = create('div', 'launch-reservation-card-details');
+    details.append(
+      create('div', '', `${firstValue(row.quantity_kg, row.quantity, '1')} kg pack · Amount payable ₹0`),
+      create('div', '', `${launchDeliveryStatus(row)} · ${scheduled ? formatLaunchDate(scheduled) : 'Delivery date will be confirmed'}`),
+      create('div', '', [address.area, address.pincode].filter(Boolean).join(' · ') || 'Delivery area will be confirmed')
+    );
+    if (!compact && address.full) details.append(create('p', 'launch-reservation-address', address.full));
+    const actions = create('div', 'launch-reservation-actions');
+    actions.append(
+      button('View tracking', 'card-action', () => openLaunchTracking(row)),
+      button('Refresh status', 'card-action is-light', () => loadLaunchReservations(true))
+    );
+    card.append(head, details, actions);
+    return card;
+  }
+
+  function renderLaunchReservations(rows = state.launchReservations) {
+    if (!elements.launchReservationsList) return;
+    if (!rows.length) {
+      renderEmpty(
+        elements.launchReservationsList,
+        'No Launch Experience reservation yet.',
+        'Reserve your complimentary 1 kg pack from the Launch Experience page. It will appear here after confirmation.',
+        Object.assign(create('a', 'secondary-button', 'Open Launch Experience →'), { href: 'launch.html' })
+      );
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    rows.forEach((row) => fragment.append(makeLaunchReservationCard(row)));
+    elements.launchReservationsList.replaceChildren(fragment);
+  }
+
+  async function loadLaunchReservations(force = false) {
+    if (!client()?.request) throw new Error('The Launch Experience service is unavailable right now.');
+    return coalesceLoad('launch-reservations', async () => {
+      if (!force && state.launchReservations.length) {
+        renderLaunchReservations();
+        return state.launchReservations;
+      }
+      try {
+        const payload = await client().request('/launch-experience/reservations/?page_size=100', { method: 'GET' });
+        state.launchReservations = launchReservationRows(payload);
+        renderLaunchReservations();
+        return state.launchReservations;
+      } catch (error) {
+        renderError(elements.launchReservationsList, error, () => loadLaunchReservations(true));
+        throw error;
+      }
+    });
+  }
+
+  async function openLaunchTracking(row) {
+    const body = create('div', 'launch-tracking-dialog-body');
+    body.append(create('p', 'dialog-loading-copy', 'Refreshing the latest Launch Experience status…'));
+    openDialog('Complimentary launch pack', 'Launch Experience tracking', body);
+    let detail = row;
+    const id = firstValue(row?.id, row?.reservation_id, row?.reference);
+    if (id && client()?.request) {
+      try {
+        const response = await client().request(`/launch-experience/reservations/${encodeURIComponent(id)}/`, { method: 'GET' });
+        const loaded = responseData(response);
+        if (loaded && typeof loaded === 'object') detail = Object.assign({}, row, loaded);
+      } catch (_error) {
+        // The current public API may expose only the collection route. The
+        // card data remains authoritative and is shown without fabricating events.
+      }
+    }
+    const address = launchAddress(detail);
+    const events = launchTrackingEvents(detail);
+    body.replaceChildren(
+      create('p', 'launch-tracking-reference', firstValue(detail.reference, detail.reservation_reference, detail.id, 'Reservation')),
+      create('div', 'launch-tracking-summary', `${launchReservationStatus(detail)} · ${launchDeliveryStatus(detail)}`),
+      create('p', '', `${firstValue(detail.quantity_kg, detail.quantity, '1')} kg complimentary pack · Amount payable ₹0`),
+      create('p', '', firstValue(detail.scheduled_delivery_date, detail.delivery?.scheduled_delivery_date) ? `Scheduled for ${formatLaunchDate(firstValue(detail.scheduled_delivery_date, detail.delivery?.scheduled_delivery_date))}` : 'Delivery date will be confirmed by Atulyash operations.'),
+      create('p', '', [address.area, address.pincode, address.full].filter(Boolean).join(' · ') || 'Delivery address is on file.'),
+      events.length ? renderLaunchTimeline(events) : create('p', 'launch-tracking-empty', 'Tracking updates will appear here as operations confirms each step.')
+    );
+  }
+
   async function renderOrders({ page = 1, force = false } = {}) {
-    if (page === 1) renderLoading(elements.ordersList, 'Finding your fresh-batch history…');
+    if (page === 1) {
+      renderLoading(elements.ordersList, 'Finding your fresh-batch history…');
+      renderLoading(elements.launchReservationsList, 'Checking your complimentary pack…');
+    }
     try {
-      const [ordersResult, subscriptionsResult] = await Promise.allSettled([
+      const [ordersResult, subscriptionsResult, launchResult] = await Promise.allSettled([
         getOrders({
           page,
           oneTime: elements.orderFilter.value,
           force
         }),
-        loadSubscriptions(page === 1 ? force : false)
+        loadSubscriptions(page === 1 ? force : false),
+        page === 1 ? loadLaunchReservations(force) : Promise.resolve(state.launchReservations)
       ]);
       if (ordersResult.status === 'rejected') throw ordersResult.reason;
       if (subscriptionsResult.status === 'rejected' && isUnauthorized(subscriptionsResult.reason)) {
         throw subscriptionsResult.reason;
       }
       const orders = ordersResult.value;
-      if (!orders.length) {
+      if (launchResult.status === 'rejected' && isUnauthorized(launchResult.reason)) throw launchResult.reason;
+      if (launchResult.status === 'fulfilled' && Array.isArray(launchResult.value)) state.launchReservations = launchResult.value;
+      if (!orders.length && !state.launchReservations.length) {
         renderEmpty(
           elements.ordersList,
           'Your first batch is waiting.',
@@ -2985,6 +3174,7 @@
         );
       } else {
         const fragment = document.createDocumentFragment();
+        if (page === 1) state.launchReservations.forEach((reservation) => fragment.append(makeLaunchReservationCard(reservation, { compact: true })));
         orders.forEach((order) => fragment.append(makeOrderCard(order)));
         elements.ordersList.replaceChildren(fragment);
       }
@@ -8481,6 +8671,13 @@
   });
   elements.logoutButton.addEventListener('click', logout);
   elements.ordersLoadMore.addEventListener('click', () => renderOrders({ page: state.orderPage + 1, force: true }));
+  elements.launchReservationsRefresh?.addEventListener('click', () => {
+    setButtonBusy(elements.launchReservationsRefresh, true, 'Refreshing…');
+    loadLaunchReservations(true).catch((error) => {
+      if (isUnauthorized(error)) enterAuth('Your session has ended. Please sign in again.');
+      else showToast(friendlyError(error, 'Launch Experience status could not be refreshed.'), 'error');
+    }).finally(() => setButtonBusy(elements.launchReservationsRefresh, false));
+  });
   elements.ordersStatementButton?.addEventListener('click', openCustomerStatement);
   elements.orderFilter.addEventListener('change', () => {
     state.orders = [];

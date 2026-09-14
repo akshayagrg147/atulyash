@@ -111,6 +111,7 @@
       '#mobileBuyBar',
       '#checkoutHandoff',
       '#storeServiceStatus',
+      '#catalogApiStatus',
       '#addToCartButton',
       '#buyNowButton',
       '#mobileAddButton',

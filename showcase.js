@@ -92,6 +92,12 @@
     element.replaceWith(makeExploreLink(label));
   }
 
+  function replaceAllWithExplore(selector, label) {
+    document.querySelectorAll(selector).forEach(function (element) {
+      element.replaceWith(makeExploreLink(label));
+    });
+  }
+
   function applyShowcaseMode() {
     document.body.classList.add('showcase-demo');
 
@@ -109,6 +115,8 @@
       '#buyNowButton',
       '#mobileAddButton',
       '#weeklyCalculatorApplyButton',
+      '#heroWeeklyButton',
+      '#startWeeklyButton',
     ].forEach(function (selector) {
       hide(document.querySelector(selector));
     });
@@ -121,9 +129,7 @@
       purchaseRow.appendChild(makeExploreLink('Explore our atta'));
     }
 
-    replaceWithExplore('a[href="#packSelector"]', 'Explore our atta');
-    replaceWithExplore('#startWeeklyButton', 'Explore our atta');
-    replaceWithExplore('#heroWeeklyButton', 'Explore our atta');
+    replaceAllWithExplore('a[href="#packSelector"]', 'Explore our atta');
     replaceWithExplore('#calculatorCta', 'Explore our atta');
 
     document.querySelectorAll('form').forEach(function (form) {

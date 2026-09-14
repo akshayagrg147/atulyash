@@ -18,6 +18,8 @@ html.showcase-demo #initiateRechargeButton,
 html.showcase-demo #accountBagCheckoutButton,
 html.showcase-demo #launchReservationForm,
 html.showcase-demo a[href*="launch.html"],
+html.showcase-demo #heroWeeklyButton,
+html.showcase-demo #startWeeklyButton,
 html.showcase-demo #weeklyCalculatorApplyButton {
   display: none !important;
 }
@@ -28,13 +30,27 @@ html.showcase-demo .product-purchase-row {
 }
 
 html.showcase-demo .showcase-explore-cta {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  min-height: 54px;
+  width: auto;
+  min-width: 250px;
+  min-height: 52px;
   text-decoration: none;
   text-align: center;
+}
+
+html.showcase-demo .hero-actions-client .showcase-explore-cta,
+html.showcase-demo .start-actions .showcase-explore-cta {
+  max-width: 320px;
+}
+
+html.showcase-demo .product-purchase-row .showcase-explore-cta {
+  width: 100%;
+}
+
+html.showcase-demo .calculator .showcase-explore-cta {
+  margin-top: 18px;
 }
 
 html.showcase-demo .showcase-weekly-plans {

@@ -27,6 +27,8 @@
   <link rel="stylesheet" href="ecommerce.css?v=20260902-14">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
   <link rel="stylesheet" href="client-design.css?v=20260911-1">
+  <link rel="stylesheet" href="showcase.css?v=20260914-1">
+  <script src="showcase.js?v=20260914-1"></script>
 </head>
 <body data-commerce-page="storefront">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -458,6 +460,29 @@
       </div>
     </section>
 
+    <section class="showcase-weekly-plans" id="showcaseWeeklyPlans" aria-labelledby="showcaseWeeklyPlansTitle">
+      <div class="showcase-weekly-plans-inner">
+        <div class="showcase-weekly-plans-heading">
+          <div>
+            <p class="eyebrow"><span></span>Fresh every week</p>
+            <h2 id="showcaseWeeklyPlansTitle">Choose the rhythm that fits your home.</h2>
+          </div>
+          <p>Every plan delivers the same slow-milled Atulyash atta weekly. Explore the quantities and per-delivery pricing below.</p>
+        </div>
+        <div class="showcase-weekly-plan-grid" aria-label="Weekly atta plans">
+          <article class="showcase-weekly-plan-card"><strong>2 kg every week</strong><span>₹240 per delivery</span><small>₹960 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>3 kg every week</strong><span>₹360 per delivery</span><small>₹1,440 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>4 kg every week</strong><span>₹480 per delivery</span><small>₹1,920 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>5 kg every week</strong><span>₹600 per delivery</span><small>₹2,400 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>6 kg every week</strong><span>₹720 per delivery</span><small>₹2,880 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>7 kg every week</strong><span>₹840 per delivery</span><small>₹3,360 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>8 kg every week</strong><span>₹960 per delivery</span><small>₹3,840 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>9 kg every week</strong><span>₹1,080 per delivery</span><small>₹4,320 wallet funding for 4 deliveries</small></article>
+          <article class="showcase-weekly-plan-card"><strong>10 kg every week</strong><span>₹1,200 per delivery</span><small>₹4,800 wallet funding for 4 deliveries</small></article>
+        </div>
+      </div>
+    </section>
+
     <section class="weekly-section section" id="weekly" aria-labelledby="weekly-title">
       <div class="container weekly-layout">
         <div class="weekly-copy reveal">
@@ -814,6 +839,7 @@
 
 
   <div class="commerce-toast" id="commerceToast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div class="showcase-notice" id="showcaseNotice" role="status" aria-live="polite"></div>
 
   <div class="mobile-buy-bar" id="mobileBuyBar" aria-hidden="true" inert>
     <div><small id="mobilePackLabel">2 kg pack</small><strong id="mobilePackPrice">₹180</strong></div>

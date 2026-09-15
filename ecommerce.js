@@ -4591,10 +4591,14 @@
   }
 
   function walletRechargeAmount() {
-    const minimumRecharge = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
-    if (Number.isFinite(minimumRecharge) && minimumRecharge > 0) return Math.ceil(minimumRecharge);
+    // The customer-facing recharge is the amount still needed to reach the
+    // required wallet cover, not the gross four-delivery requirement. Some
+    // older API responses populate minimum_recharge_amount with the gross
+    // requirement, so prefer the canonical shortfall whenever it is present.
     const shortfall = walletShortfall();
-    return Number.isFinite(shortfall) ? Math.max(0, Math.ceil(shortfall)) : 0;
+    if (Number.isFinite(shortfall)) return Math.max(0, Math.ceil(shortfall));
+    const minimumRecharge = numericValue(walletFundingPolicy?.minimumRechargeAmount, NaN);
+    return Number.isFinite(minimumRecharge) ? Math.max(0, Math.ceil(minimumRecharge)) : 0;
   }
 
   function walletRequiredBalance() {
@@ -5007,8 +5011,10 @@
           || 'Your live wallet balance must be available before money can be added.'
         );
       }
-      // The server's minimum_recharge_amount is authoritative. The local
-      // shortfall is only a fallback while the policy response is unavailable.
+      // The customer pays only the remaining shortfall. The gross wallet
+      // requirement is displayed separately and must never become the
+      // recharge amount just because an older response labels it as
+      // minimum_recharge_amount.
       const amount = walletRechargeAmount() || Math.max(0, Math.ceil(walletShortfall()));
       if (amount <= 0) {
         resetWalletRechargePreview();
@@ -5022,6 +5028,7 @@
       const payload = preview.payload;
       applyWalletFundingPolicy(payload);
       const serverRechargeAmount = numericValue(firstResponseValue(payload, [
+        'shortfall',
         'minimum_recharge_amount',
         'recharge_amount',
         'amount'
@@ -5037,12 +5044,22 @@
         'cashback'
       ]), 0);
       const tax = numericValue(firstResponseValue(payload, ['tax', 'tax_amount', 'gst']), 0);
-      const payable = numericValue(firstResponseValue(payload, [
-        'payable_amount', 'amount_to_pay', 'payment_amount', 'total'
-      ]), rechargeAmount);
-      const credited = numericValue(firstResponseValue(payload, [
-        'total_credit', 'credited_amount', 'credit_amount', 'wallet_credit'
-      ]), rechargeAmount + bonus);
+      const explicitPayable = numericValue(firstResponseValue(payload, [
+        'amount_payable', 'payable_amount', 'amount_to_pay', 'payment_amount'
+      ]), NaN);
+      const expectedPayable = rechargeAmount + Math.max(0, tax);
+      const payable = Number.isFinite(explicitPayable)
+        && explicitPayable <= expectedPayable + 0.01
+        ? explicitPayable
+        : expectedPayable;
+      const explicitCredit = numericValue(firstResponseValue(payload, [
+        'credited_amount', 'credit_amount', 'wallet_credit', 'wallet_receives'
+      ]), NaN);
+      const expectedCredit = rechargeAmount + bonus;
+      const credited = Number.isFinite(explicitCredit)
+        && Math.abs(explicitCredit - expectedCredit) < 0.01
+        ? explicitCredit
+        : expectedCredit;
       walletRechargePreview = { amount: rechargeAmount, bonus, tax, payable, credited };
       if (elements.checkoutWalletTopupTitle) {
         elements.checkoutWalletTopupTitle.textContent = `Add ${formatPrice(rechargeAmount)} to your wallet`;

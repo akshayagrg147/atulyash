@@ -326,6 +326,9 @@
           : withoutKeys(value, ['id', 'orderId', 'deliveryId'])];
       }
       if (/^reorder$/.test(methodName)) return [identifier];
+      if (/^changeAddress$|changeOrderAddress/.test(methodName)) {
+        return [identifier, { address_id: value.address_id || value.addressId }];
+      }
       if (/^modify$|modifyOrder|modifyPreview|previewModification/.test(methodName)) {
         return [identifier, withoutKeys(value, ['id', 'orderId'])];
       }
@@ -3941,6 +3944,12 @@
       const actions = create('div', 'dialog-actions');
       if (canModifyOneTimeOrder(detail)) actions.append(button('Modify delivery', 'secondary-button', () => openOneTimeOrderModification(detail)));
       actions.append(button('View receipt', 'secondary-button', () => openOrderReceipt(detail)));
+      const isSubscriptionOrder = orderSubscriptionPlanId(detail) != null
+        || detail?.is_subscription === true
+        || /subscription|weekly|freshness/i.test(String(firstValue(detail?.purchase_type, detail?.order_type, detail?.fulfilment_type, '')));
+      if (isSubscriptionOrder) {
+        actions.append(button('Change delivery home', 'secondary-button', () => openOrderAddressChange(detail)));
+      }
       const invoiceUrl = orderInvoiceUrl(detail);
       if (invoiceUrl) {
         const invoice = create('a', 'secondary-button', 'Download invoice');
@@ -4493,6 +4502,219 @@
       address?.is_primary,
       false
     ));
+  }
+
+  function subscriptionOrderReference(subscription) {
+    if (!subscription || typeof subscription !== 'object') return null;
+    const relation = firstValue(
+      subscription.order,
+      subscription.subscription_order,
+      subscription.active_order,
+      subscription.order_detail
+    );
+    const relationId = relation && typeof relation === 'object' ? orderId(relation) : relation;
+    return firstValue(
+      relationId,
+      subscription.order_id,
+      subscription.subscription_order_id,
+      subscription.active_order_id,
+      subscription.parent_order_id
+    );
+  }
+
+  function orderBelongsToSubscription(order, subscription) {
+    if (!order || !subscription) return false;
+    const planId = subscriptionId(subscription);
+    const orderPlanId = orderSubscriptionPlanId(order);
+    return planId != null && orderPlanId != null && String(planId) === String(orderPlanId);
+  }
+
+  async function findSubscriptionOrder(subscription) {
+    const directId = subscriptionOrderReference(subscription);
+    if (directId != null) {
+      const directObject = firstValue(
+        subscription?.order,
+        subscription?.subscription_order,
+        subscription?.active_order,
+        subscription?.order_detail
+      );
+      return directObject && typeof directObject === 'object'
+        ? directObject
+        : { id: directId };
+    }
+
+    let match = state.orders.find((order) => orderBelongsToSubscription(order, subscription));
+    if (match) return match;
+
+    // Subscription cards can be rendered before order history has loaded. A
+    // single server refresh gives the address-change action a real order ID;
+    // the backend remains responsible for deciding which deliveries are safe.
+    try {
+      await getOrders({ page: 1, force: true });
+    } catch (_error) {
+      return null;
+    }
+    match = state.orders.find((order) => orderBelongsToSubscription(order, subscription));
+    return match || null;
+  }
+
+  function addressChangeConflictMessage(lock) {
+    const delivery = lock?.deliveryDate ? formatDate(lock.deliveryDate) : '';
+    const next = lock?.nextEligibleDate ? formatDate(lock.nextEligibleDate) : '';
+    if (delivery && next) {
+      return `The ${delivery} delivery is already protected. This address will be available from ${next}.`;
+    }
+    if (delivery) {
+      return `The ${delivery} delivery is already protected and cannot be changed.`;
+    }
+    return 'This delivery is within its protected window, so its address cannot be changed.';
+  }
+
+  async function openOrderAddressChange(order, subscription = null) {
+    const body = create('div');
+    body.append(makeState('loading', 'Checking delivery homes.', 'Loading your saved addresses and the current order schedule…'));
+    openDialog('Delivery address', 'Change delivery home', body);
+
+    try {
+      const resolvedOrder = order || await findSubscriptionOrder(subscription);
+      const id = orderId(resolvedOrder);
+      if (id == null) throw new Error('The subscription order could not be identified. Please refresh and try again.');
+
+      const [detailResult, addressesResult] = await Promise.all([
+        apiCall('orders', ['detail', 'getOrderDetails'], { id, orderId: id }, {
+          path: `/orders/order/${id}/`,
+          method: 'GET'
+        }),
+        ensureAddresses()
+      ]);
+      const detailPayload = responseData(detailResult);
+      const detail = detailPayload && typeof detailPayload === 'object'
+        ? { ...resolvedOrder, ...detailPayload }
+        : resolvedOrder;
+      const addresses = responseList(addressesResult);
+      if (!addresses.length) {
+        body.replaceChildren(
+          makeState('empty', 'No saved delivery homes.', 'Add and save another address before changing this order.'),
+          (() => {
+            const actions = create('div', 'dialog-actions');
+            actions.append(button('Close', 'secondary-button', closeDialog), button('Add an address', 'primary-button', () => openAddressForm()));
+            return actions;
+          })()
+        );
+        return;
+      }
+
+      const form = create('form', 'dialog-form');
+      form.append(
+        create('p', 'dialog-copy', 'Choose a saved delivery home. The live service checks the configured cutoff for each upcoming delivery and changes only the deliveries that are still eligible.')
+      );
+      const label = create('label', '', 'Delivery home');
+      const select = create('select');
+      select.required = true;
+      const currentAddress = firstValue(
+        detail.delivery_address,
+        detail.customer_address,
+        detail.address,
+        detail.address_of_customer,
+        subscription?.customer_address,
+        subscription?.delivery_address
+      );
+      const currentAddressId = addressId(currentAddress);
+      addresses.forEach((address) => {
+        const idValue = addressId(address);
+        if (idValue == null) return;
+        const option = create('option', '', `${firstValue(address.address_type, 'Address')} — ${addressText(address)}`);
+        option.value = String(idValue);
+        option.selected = String(idValue) === String(currentAddressId);
+        select.append(option);
+      });
+      if (!select.options.length) throw new Error('The saved addresses did not include usable address IDs. Please refresh and try again.');
+      label.append(select);
+      form.append(label);
+
+      const note = create('div', 'confirmation-panel');
+      note.append(
+        create('strong', '', 'Before you save'),
+        create('p', '', 'A delivery inside its protected window stays at its original address. The selected home applies from the next eligible, uncharged delivery. The server decides using its configured timezone and cutoff.')
+      );
+      form.append(note);
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Cancel', 'secondary-button', closeDialog));
+      const submit = create('button', 'primary-button', 'Update delivery home →');
+      submit.type = 'submit';
+      actions.append(submit);
+      form.append(actions);
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const selectedAddressId = Number(select.value);
+        if (!Number.isInteger(selectedAddressId) || selectedAddressId <= 0) {
+          showToast('Choose a valid saved delivery home.', 'error');
+          return;
+        }
+        setButtonBusy(submit, true, 'Checking cutoff…');
+        try {
+          const result = await apiCall('orders', ['changeAddress', 'changeOrderAddress'], {
+            id,
+            orderId: id,
+            address_id: selectedAddressId,
+            addressId: selectedAddressId
+          }, {
+            path: `/orders/order/${id}/change-address/`,
+            method: 'POST',
+            body: { address_id: selectedAddressId }
+          });
+          const data = responseData(result);
+          if (data?.success === false || String(data?.success || '').toLowerCase() === 'false') {
+            throw new Error(firstValue(data.message, 'The delivery home was not changed.'));
+          }
+
+          closeDialog();
+          state.loaded.delete('subscriptions');
+          state.loaded.forEach((key) => {
+            if (String(key).startsWith('orders:')) state.loaded.delete(key);
+          });
+          // Refresh both views so the subscription card and order history use
+          // the same server-authoritative address snapshots.
+          await Promise.allSettled([
+            renderSubscriptions(true),
+            renderOrders({ page: 1, force: true })
+          ]);
+          const protectedCount = Array.isArray(data.protected_deliveries) ? data.protected_deliveries.length : 0;
+          const updatedCount = Array.isArray(data.updated_deliveries)
+            ? data.updated_deliveries.length
+            : Number(firstValue(data.deliveries_updated, 0));
+          showToast(protectedCount > 0
+            ? `Address updated for ${updatedCount || 'future'} eligible deliveries. The protected delivery remains unchanged.`
+            : 'Delivery home updated for your upcoming deliveries.');
+        } catch (error) {
+          const lock = planChangeLockDetails(error);
+          if (lock) {
+            const conflict = create('div');
+            conflict.append(
+              makeState('empty', 'This delivery is protected.', addressChangeConflictMessage(lock)),
+              create('small', '', lock.lockStartAt ? `Protected from ${formatDate(lock.lockStartAt, true)}. No delivery was changed.` : 'No delivery was changed.')
+            );
+            const conflictActions = create('div', 'dialog-actions');
+            conflictActions.append(button('Close', 'secondary-button', closeDialog));
+            if (lock.nextEligibleDate) conflictActions.append(create('p', 'dialog-note', `Next eligible delivery: ${formatDate(lock.nextEligibleDate)}`));
+            conflict.append(conflictActions);
+            body.replaceChildren(conflict);
+          } else {
+            showToast(friendlyError(error, 'The delivery home could not be changed. No delivery was modified.'), 'error');
+            setButtonBusy(submit, false);
+          }
+        }
+      });
+
+      body.replaceChildren(form);
+    } catch (error) {
+      body.replaceChildren(makeState('error', 'Delivery homes are unavailable.', friendlyError(error, 'The current order and saved addresses could not be loaded.'), () => openOrderAddressChange(order, subscription)));
+    }
+  }
+
+  async function openSubscriptionAddressChange(subscription) {
+    return openOrderAddressChange(null, subscription);
   }
 
   function updateDeliveryHomeCount(count = null) {
@@ -5095,6 +5317,7 @@
       actions.append(note);
     }
     actions.append(
+      button('Change address', 'card-action', () => openSubscriptionAddressChange(subscription)),
       button('Vacation', 'card-action', () => openVacationForm(subscription)),
       button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
     );

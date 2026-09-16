@@ -1124,6 +1124,16 @@
         options
       );
     },
+    changeAddress: function changeOrderAddress(orderId, payload, options) {
+      return request(
+        '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/change-address/',
+        mergeObjects({}, options, {
+          method: 'POST',
+          body: payload || {},
+          form: false
+        })
+      );
+    },
     modify: function modifyOrder(orderId, payload, options) {
       return request(
         '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/modify/',

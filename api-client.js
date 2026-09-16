@@ -1386,7 +1386,7 @@
       );
     },
     settings: function subscriptionSettings(options) {
-      return publicGet('/subscription/subscription_settings/1/', null, options);
+      return publicGet('/subscription/policy/', null, options);
     },
     listVacations: function listVacations(params, options) {
       params = params || {};

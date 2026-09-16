@@ -4979,12 +4979,12 @@
     const rows = [];
     if (walletFundingPolicy) {
       rows.push(
-        ['Wallet balance required', formatPrice(walletRequiredBalance())],
+        ['Target wallet cover', formatPrice(walletRequiredBalance())],
         ['Available balance', formatPrice(checkoutWalletBalanceAmount)]
       );
     }
     rows.push(
-      ['Add to wallet', formatPrice(preview.amount)],
+      ['Recharge now', formatPrice(preview.amount)],
       ['Extra wallet credit', preview.bonus > 0 ? `+${formatPrice(preview.bonus)}` : 'No extra credit'],
       ['Tax / charges', formatPrice(preview.tax)],
       ['Pay securely now', formatPrice(preview.payable)],

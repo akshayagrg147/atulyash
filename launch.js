@@ -27,7 +27,11 @@
   function setCounter(value) {
     var c = value && value.campaign;
     if (!c) { counter.textContent = 'Launch Experience availability is being prepared.'; return; }
-    counter.textContent = c.can_reserve ? (c.reserved_count.toLocaleString() + ' reserved · ' + c.remaining_count.toLocaleString() + ' remaining') : c.status_message;
+    var reserved = Number(c.reserved_count ?? c.reservation_count ?? 0);
+    var remaining = Number(c.remaining_count ?? c.remaining_reservations ?? 0);
+    counter.textContent = c.can_reserve !== false
+      ? (reserved.toLocaleString() + ' reserved · ' + remaining.toLocaleString() + ' remaining')
+      : (c.status_message || 'Launch Experience reservations are currently unavailable.');
   }
   function loadCampaign() {
     return api.request('/launch-experience/campaigns/current/', { method: 'GET', auth: false }).then(function (payload) {
@@ -64,8 +68,14 @@
     serviceability.textContent = '';
     if (value.length !== 6) { area.innerHTML = '<option value="">Enter a 6-digit PIN code</option>'; return; }
     api.request('/launch-experience/campaigns/serviceability/', { method: 'GET', auth: false, query: { pincode: value } }).then(function (payload) {
-      var areas = Array.isArray(payload && payload.available_areas) ? payload.available_areas : [];
-      area.innerHTML = '<option value="">Choose an area</option>' + areas.map(function (row) { return '<option value="' + String(row.id) + '">' + String(row.area).replace(/[&<>"']/g, '') + '</option>'; }).join('');
+      var areas = Array.isArray(payload && payload.available_area_objects)
+        ? payload.available_area_objects
+        : (Array.isArray(payload && payload.available_areas) ? payload.available_areas : []);
+      area.innerHTML = '<option value="">Choose an area</option>' + areas.map(function (row) {
+        var id = (row && typeof row === 'object') ? row.id : '';
+        var label = (row && typeof row === 'object') ? row.area : row;
+        return '<option value="' + String(id || '').replace(/[&<>"']/g, '') + '">' + String(label || '').replace(/[&<>"']/g, '') + '</option>';
+      }).join('');
       area.disabled = !areas.length;
       serviceability.textContent = areas.length ? 'This PIN is eligible for the Launch Experience.' : 'No eligible Launch Experience area was found for this PIN.';
     }).catch(function () { area.innerHTML = '<option value="">Unable to check this PIN</option>'; });

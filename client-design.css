@@ -903,6 +903,22 @@
   height: 100%;
 }
 
+.app-download-qr-disabled {
+  cursor: default;
+}
+
+.app-download-qr-frame-soon {
+  color: var(--forest-950);
+  background: var(--accent-lime);
+  border-color: rgba(174, 243, 46, 0.72);
+}
+
+.app-download-qr-frame-soon > span {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
 .app-download-qr > span:last-child {
   display: grid;
   gap: 3px;

@@ -154,6 +154,8 @@
     walletBalanceBreakdown: $('walletBalanceBreakdown'),
     walletOriginalBalance: $('walletOriginalBalance'),
     walletCashbackBalance: $('walletCashbackBalance'),
+    walletReservedBalance: $('walletReservedBalance'),
+    walletAvailableBalance: $('walletAvailableBalance'),
     rechargeForm: $('rechargeForm'),
     rechargeAmount: $('rechargeAmount'),
     rechargeOptions: $('rechargeOptions'),
@@ -559,6 +561,32 @@
       return `Plan changes are locked from ${starts} until the rider confirms the upcoming delivery.`;
     }
     return 'Plan changes are temporarily locked until the upcoming delivery is confirmed.';
+  }
+
+  // The backend returns this policy on subscription, schedule, skip and
+  // vacation responses. Keep it as data so customer messaging reflects the
+  // configured cutoff/timezone instead of a hardcoded client-side rule.
+  function subscriptionModificationPolicy(subscription) {
+    const value = firstValue(
+      subscription?.modification_policy,
+      subscription?.delivery_modification_policy,
+      subscription?.plan_change_policy,
+      subscription?.policy
+    );
+    return value && typeof value === 'object' ? value : null;
+  }
+
+  function modificationPolicyCopy(policy) {
+    if (!policy) return 'The live service will validate the cutoff for each upcoming delivery.';
+    const cutoff = firstValue(policy.cutoff_time, policy.cutoffTime);
+    const gap = firstValue(policy.minimum_days_gap, policy.minimumDaysGap);
+    const buffer = Number(firstValue(policy.booking_buffer_minutes, policy.bookingBufferMinutes, 0)) || 0;
+    const timezone = firstValue(policy.timezone, policy.business_timezone, 'the delivery timezone');
+    const timing = cutoff
+      ? `the ${cutoff}${buffer ? ` plus ${buffer} minute${buffer === 1 ? '' : 's'}` : ''} cutoff`
+      : 'the configured cutoff';
+    const lead = gap != null ? `${gap} calendar-day lead time` : 'the configured lead time';
+    return `The live service uses a ${lead} and ${timing} in ${timezone}. Protected deliveries remain unchanged; changes apply from the next eligible uncharged delivery.`;
   }
 
   function responseList(response) {
@@ -3574,6 +3602,27 @@
   }
 
   async function loadOrderTracking(orderIdValue, detail) {
+    // Prefer the canonical order-level timeline.  The backend filters this
+    // to events that actually exist and marks the latest one as current; the
+    // per-delivery history endpoints remain a compatibility fallback for
+    // older deployments.
+    let canonicalTracking = null;
+    try {
+      const trackingResult = await apiCall('orders', ['tracking', 'orderTracking', 'getOrderTracking'], {
+        id: orderIdValue,
+        orderId: orderIdValue
+      }, {
+        path: `/orders/order/${orderIdValue}/tracking/`,
+        method: 'GET'
+      });
+      const trackingPayload = responseData(trackingResult);
+      if (trackingPayload && typeof trackingPayload === 'object') canonicalTracking = trackingPayload;
+    } catch (error) {
+      if (isUnauthorized(error)) throw error;
+      // Older backend versions do not expose the order-level endpoint; keep
+      // loading the delivery details below so existing clients still work.
+    }
+
     // The order-detail response already contains the delivery schedule for
     // current orders. Use it directly instead of requesting the same rows
     // from /deliveries/ and then fetching detail + history for every row.
@@ -3615,7 +3664,13 @@
       }
     }
 
-    if (!sourceDeliveries.length) return { ...detail, subscription_orders: subscriptionOrders };
+    if (!sourceDeliveries.length) {
+      return {
+        ...detail,
+        ...(canonicalTracking || {}),
+        subscription_orders: subscriptionOrders
+      };
+    }
 
     // Keep any history that the order endpoint supplied. Per-delivery detail
     // and history are deliberately loaded only from the delivery detail view.
@@ -3629,7 +3684,7 @@
       };
     });
 
-    const directEvents = [
+    const directEvents = canonicalTracking?.tracking_events || [
       detail?.tracking_events,
       detail?.status_history,
       detail?.tracking_history,
@@ -3638,6 +3693,7 @@
     const historyEvents = enrichedResults.flatMap((delivery) => deliveryHistoryFor(delivery));
     return {
       ...detail,
+      ...(canonicalTracking || {}),
       deliveries: enrichedResults,
       subscription_orders: subscriptionOrders,
       tracking_events: [...directEvents, ...historyEvents]
@@ -6189,17 +6245,24 @@
     const date = create('input');
     date.type = 'date';
     date.required = true;
+    // Prefer the server-provided next eligible date. The fallback only keeps
+    // the native date input usable when an older API response has no policy.
+    const serverPolicy = subscriptionModificationPolicy(subscription);
+    const serverEarliest = firstValue(
+      serverPolicy?.next_eligible_delivery_date,
+      subscription?.next_eligible_delivery_date
+    );
     const earliest = new Date();
     earliest.setDate(earliest.getDate() + 1);
     const localEarliest = new Date(earliest.getTime() - (earliest.getTimezoneOffset() * 60000));
-    date.min = localEarliest.toISOString().slice(0, 10);
+    date.min = serverEarliest ? String(serverEarliest).slice(0, 10) : localEarliest.toISOString().slice(0, 10);
     date.value = date.min;
     dateLabel.append(date);
     fields.append(weekdayLabel, dateLabel);
     const policy = create('div', 'confirmation-panel');
     policy.append(
       create('strong', '', 'Before you confirm'),
-      create('p', '', 'Sunday and Monday are reserved for plant deep cleaning and plant care, hence no deliveries on Monday and Tuesday. A minimum one-day lead time and the 6:20 PM IST cutoff apply. Your delivery route must also be active.')
+      create('p', '', `${modificationPolicyCopy(subscriptionModificationPolicy(subscription))} Sunday and Monday are reserved for plant deep cleaning and plant care, hence no deliveries on Monday and Tuesday. Your delivery route must also be active.`)
     );
     const actions = create('div', 'dialog-actions');
     actions.append(button('Back', 'secondary-button', () => openManageDeliveries(subscription)));
@@ -6236,7 +6299,10 @@
           : String(firstValue(data.message, 'Your weekly delivery schedule has been updated.'))
         );
       } catch (error) {
-        showToast(friendlyError(error, 'The schedule could not be updated. No delivery was changed.'), 'error');
+        const lock = planChangeLockDetails(error);
+        showToast(lock
+          ? planChangeLockMessage(lock)
+          : friendlyError(error, 'The schedule could not be updated. No delivery was changed.'), 'error');
         setButtonBusy(submit, false);
       }
     });
@@ -6282,7 +6348,8 @@
           ? `${currentlySkipped ? 'The delivery is back on your schedule' : 'That delivery has been skipped'}. Next delivery: ${formatDate(nextDeliveryDate)}.`
           : (currentlySkipped ? 'The delivery is back on your schedule.' : 'That delivery has been skipped.'));
       } catch (error) {
-        showToast(friendlyError(error), 'error');
+        const lock = planChangeLockDetails(error);
+        showToast(lock ? planChangeLockMessage(lock) : friendlyError(error), 'error');
         setButtonBusy(control, false);
       }
     }));
@@ -6462,7 +6529,8 @@
           ? `${vacation ? 'Vacation dates updated' : 'Vacation mode scheduled'}. Next delivery: ${formatDate(nextDeliveryDate)}.`
           : (vacation ? 'Your vacation dates have been updated.' : 'Vacation mode has been scheduled.'));
       } catch (error) {
-        showToast(friendlyError(error), 'error');
+        const lock = planChangeLockDetails(error);
+        showToast(lock ? planChangeLockMessage(lock) : friendlyError(error), 'error');
         setButtonBusy(submit, false);
       }
     });
@@ -6493,7 +6561,8 @@
         showToast('Vacation mode has ended.');
         renderSubscriptions(true);
       } catch (error) {
-        showToast(friendlyError(error), 'error');
+        const lock = planChangeLockDetails(error);
+        showToast(lock ? planChangeLockMessage(lock) : friendlyError(error), 'error');
         setButtonBusy(control, false);
       }
     }));
@@ -7381,6 +7450,12 @@
       }
       if (elements.walletCashbackBalance) {
         elements.walletCashbackBalance.textContent = hasBreakdown ? `+${formatMoney(walletSnapshot.cashback)}` : '+₹—';
+      }
+      if (elements.walletReservedBalance) {
+        elements.walletReservedBalance.textContent = walletSnapshot.reserved !== null ? formatMoney(walletSnapshot.reserved) : '₹—';
+      }
+      if (elements.walletAvailableBalance) {
+        elements.walletAvailableBalance.textContent = walletSnapshot.available !== null ? formatMoney(walletSnapshot.available) : '₹—';
       }
       renderWalletTransactions();
       const options = state.rechargeOptionsData || [];

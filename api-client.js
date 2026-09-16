@@ -895,6 +895,26 @@
     addAddon: function addAddon(payload, options) {
       return cart.addItem(withDefaults({ cart_item_type: 'Add On' }, payload), options);
     },
+    listSubscriptionAddOns: function listSubscriptionAddOns(params, options) {
+      return getRequest('/subscription/subscription_add_ons/', params, options);
+    },
+    createSubscriptionAddOn: function createSubscriptionAddOn(payload, options) {
+      return formRequest('POST', '/subscription/subscription_add_ons/', payload, options);
+    },
+    updateSubscriptionAddOn: function updateSubscriptionAddOn(addOnId, payload, options) {
+      return formRequest(
+        'PATCH',
+        '/subscription/subscription_add_ons/' + idPathSegment(addOnId, '', 'Add-on ID') + '/',
+        payload,
+        options
+      );
+    },
+    removeSubscriptionAddOn: function removeSubscriptionAddOn(addOnId, options) {
+      return request(
+        '/subscription/subscription_add_ons/' + idPathSegment(addOnId, '', 'Add-on ID') + '/remove/',
+        mergeObjects({}, options, { method: 'POST', form: false })
+      );
+    },
     addSubscription: function addSubscription(payload, options) {
       return cart.addItem(withDefaults({ cart_item_type: 'Subscription' }, payload), options);
     },
@@ -1303,6 +1323,16 @@
     },
     updatePack: function updateSubscriptionPack(planId, payload, options) {
       return cart.updateSubscription(planId, payload, options);
+    },
+    confirmPackChange: function confirmSubscriptionPackChange(planId, payload, options) {
+      return formRequest(
+        'POST',
+        '/subscription/subscription_plan/' +
+          idPathSegment(planId, '', 'Subscription plan ID') +
+          '/confirm-pack-change/',
+        payload,
+        options
+      );
     },
     updateSchedule: function updateSubscriptionSchedule(planId, payload, options) {
       return request(

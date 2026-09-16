@@ -2845,7 +2845,7 @@
       create('div', 'order-plan-change-summary-copy', 'Plan change'),
       create('span', 'order-plan-change-summary-status', change.appliedImmediately ? 'Applied' : 'Confirmed')
     );
-    section.append(header, create('p', 'order-plan-change-summary-intro', 'This order records the plan update separately from your original purchase. Your earlier deliveries and charges remain part of the order history.'));
+    section.append(header, create('p', 'order-plan-change-summary-intro', 'This updates your active subscription in place. No separate one-time order is created, and earlier deliveries and charges remain unchanged.'));
     const rows = [
       ['Previous plan', planSnapshotText(change.previous)],
       ['Updated plan', planSnapshotText(change.updated)]
@@ -5691,6 +5691,15 @@
       };
 
       const showPackChangeConfirmation = (updateData) => {
+        const numericPaymentSignals = [
+          updateData?.amount_to_debit,
+          updateData?.wallet_debit,
+          updateData?.payment_amount
+        ].filter((value) => value !== null && typeof value !== 'undefined');
+        const walletNeutral = updateData?.wallet_neutral === true
+          || updateData?.walletNeutral === true
+          || (numericPaymentSignals.length > 0
+            && numericPaymentSignals.every((value) => Math.abs(Number(value) || 0) <= 0.005));
         const paymentAmount = finiteMoney(
           updateData?.payment_amount,
           updateData?.amount_to_debit,
@@ -5734,11 +5743,15 @@
 
         const panel = create('div', 'confirmation-panel');
         panel.append(
-          create('strong', '', 'Confirm payment to apply this plan'),
-          create('p', '', paymentAmount !== null && paymentAmount > 0.005
+          create('strong', '', walletNeutral ? 'Confirm plan change' : 'Confirm payment to apply this plan'),
+          create('p', '', walletNeutral
+            ? 'Your wallet is already covered. No payment or wallet debit is taken during this confirmation.'
+            : paymentAmount !== null && paymentAmount > 0.005
             ? `A ${formatMoney(paymentAmount)} payment is required before your weekly plan can change.`
             : 'Payment confirmation is required before your weekly plan can change.'),
-          create('small', '', 'Your current plan remains active until the payment is confirmed.')
+          create('small', '', walletNeutral
+            ? 'Your current plan remains active until you confirm this change.'
+            : 'Your current plan remains active until the payment is confirmed.')
         );
         const actions = create('div', 'dialog-actions');
         if (hasConfirmationPayload) {
@@ -5751,7 +5764,7 @@
               if (confirmationBusy) return;
               const control = event.currentTarget;
               confirmationBusy = true;
-              setButtonBusy(control, true, 'Confirming payment…');
+              setButtonBusy(control, true, walletNeutral ? 'Confirming plan…' : 'Confirming payment…');
               try {
                 const api = client();
                 if (!api || typeof api.request !== 'function') {
@@ -5904,29 +5917,35 @@
             updatePackChangeSubmitState();
             return;
           }
-          setButtonBusy(submit, true, 'Updating…');
-          const updateResult = await apiCall('subscriptions', ['updatePack'], { id, subscriptionId: id, subPlanId: id, new_pack_id }, {
-            path: `/subscription/subscription_plan/${id}/update-pack/`,
-            method: 'POST',
-            form: { new_pack_id }
+          /*
+           * Preview creates a version-bound PlanChangeAttempt and returns the
+           * dedicated confirmation endpoint. Confirm it directly; the normal
+           * order/cart endpoint is reserved for new purchases and must never
+           * create a customer-facing zero-value plan-change order.
+           */
+          const previewConfirmation = latestPreview.confirmation || {};
+          const confirmationEndpoint = firstValue(
+            latestPreview.confirmation_endpoint,
+            previewConfirmation.confirmation_endpoint
+          );
+          const previewPayload = latestPreview.confirmation_payload
+            || previewConfirmation.confirmation_payload;
+          if (!confirmationEndpoint || !previewPayload?.confirmation_id) {
+            throw new Error('The secure plan-change confirmation was not returned. Please refresh and try again.');
+          }
+          showPackChangeConfirmation({
+            ...latestPreview,
+            confirmation_endpoint: confirmationEndpoint,
+            confirmation_payload: previewPayload,
+            /* Plan confirmation is wallet-neutral; recharge, if needed, is a
+             * separate wallet operation completed before this step. */
+            payment_amount: '0.00',
+            amount_to_debit: '0.00',
+            wallet_debit: '0.00'
           });
-          const updateData = responseData(updateResult);
-          const requiresConfirmation = updateData?.requires_confirmation === true
-            || String(updateData?.requires_confirmation || '').toLowerCase() === 'true';
-          const appliedImmediately = updateData?.applied_immediately === true
-            || String(updateData?.applied_immediately || '').toLowerCase() === 'true';
-          if (requiresConfirmation && !appliedImmediately) {
-            showPackChangeConfirmation(updateData);
-            return;
-          }
-          if (updateData?.success === false) {
-            throw new Error(firstValue(updateData.message, 'The plan change was not applied.'));
-          }
-          closeDialog();
-          state.loaded.delete('subscriptions');
-          invalidateWalletCache();
-          showToast('Your weekly plan has been updated.');
-          await renderSubscriptions(true);
+          submitBusy = false;
+          setButtonBusy(submit, false);
+          updatePackChangeSubmitState();
         } catch (error) {
           const lock = planChangeLockDetails(error);
           if (lock) {

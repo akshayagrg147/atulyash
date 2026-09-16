@@ -5947,7 +5947,15 @@
     const weekdayLabel = create('label', '', 'Preferred weekday');
     const weekday = create('select');
     const currentWeekday = String(firstValue(subscription.delivery_day, subscription.preferred_delivery_day, '')).toLowerCase();
-    ['Sunday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].forEach((day) => {
+    const allowedWeekdays = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    if (currentWeekday && !allowedWeekdays.some((day) => day.toLowerCase() === currentWeekday)) {
+      const legacyOption = create('option', '', `${currentWeekday} (existing schedule)`);
+      legacyOption.value = currentWeekday;
+      legacyOption.selected = true;
+      legacyOption.disabled = true;
+      weekday.append(legacyOption);
+    }
+    allowedWeekdays.forEach((day) => {
       const option = create('option', '', day);
       option.value = day;
       option.selected = day.toLowerCase() === currentWeekday;
@@ -5968,7 +5976,7 @@
     const policy = create('div', 'confirmation-panel');
     policy.append(
       create('strong', '', 'Before you confirm'),
-      create('p', '', 'Monday is unavailable. A minimum one-day lead time and the 6:20 PM IST cutoff apply. Your delivery route must also be active.')
+      create('p', '', 'Sunday and Monday are reserved for plant deep cleaning and plant care, hence no deliveries on Monday and Tuesday. A minimum one-day lead time and the 6:20 PM IST cutoff apply. Your delivery route must also be active.')
     );
     const actions = create('div', 'dialog-actions');
     actions.append(button('Back', 'secondary-button', () => openManageDeliveries(subscription)));

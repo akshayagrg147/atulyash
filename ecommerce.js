@@ -15,7 +15,7 @@
 
   let WEEKLY_PLANS = [];
   let WEEKLY_PLAN_BY_ID = new Map(WEEKLY_PLANS.map((plan) => [plan.id, plan]));
-  const DELIVERY_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const DELIVERY_DAYS = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const ROTI_ATTA_GRAMS = 30;
   const MIN_DAILY_ROTIS = 1;
   const CART_STORAGE_KEY = 'atulyash-cart-v1';
@@ -4144,8 +4144,9 @@
       .filter((dateValue, index, values) => dateValue && values.indexOf(dateValue) === index);
     return normalizedDates.filter((dateValue) => {
       const weekday = deliveryDateWeekday(dateValue);
-      // Monday is not an eligible delivery day in the live schedule.
-      if (!weekday || weekday === 'Monday') return false;
+      // Monday and Tuesday are reserved for plant deep cleaning and plant
+      // care, so neither day is available for delivery.
+      if (!weekday || weekday === 'Monday' || weekday === 'Tuesday') return false;
       return !hasWeekly || !selectedDay || weekday === selectedDay;
     });
   }

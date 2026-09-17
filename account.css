@@ -8986,6 +8986,22 @@ body.account-bag-open {
   display: block;
 }
 
+.order-delivery-card-head .delivery-lock-badge,
+.delivery-detail-hero .delivery-lock-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: .65rem;
+  padding: .28rem .55rem;
+  border: 1px solid rgba(174, 112, 34, .35);
+  border-radius: 999px;
+  background: #fff6df;
+  color: #8a551e;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
 .order-delivery-card-head strong {
   color: var(--forest-900);
   font-size: .72rem;

@@ -2933,6 +2933,43 @@
     return pill;
   }
 
+  // The API is authoritative for cutoff state.  Keep the UI label concise,
+  // while retaining the real delivery status in its own pill.
+  function deliveryLockInfo(delivery, parent = {}) {
+    if (!delivery || typeof delivery !== 'object') return null;
+    const explicit = firstValue(delivery.is_locked, delivery.locked);
+    const explicitLocked = explicit === true || String(explicit).toLowerCase() === 'true';
+    const policy = firstValue(
+      delivery.modification_policy,
+      parent?.modification_policy,
+      parent?.delivery_modification_policy
+    );
+    const rows = Array.isArray(policy?.protected_deliveries)
+      ? policy.protected_deliveries
+      : Array.isArray(policy?.protectedDeliveries) ? policy.protectedDeliveries : [];
+    const id = deliveryId(delivery);
+    const date = calendarDate(deliveryDate(delivery));
+    const match = rows.find((row) => (
+      (id != null && String(firstValue(row?.id, row?.delivery_id)) === String(id))
+      || (date && calendarDate(firstValue(row?.date, row?.delivery_date)) === date)
+    ));
+    const policyLocked = Boolean(match)
+      || (policy?.locked_delivery_id != null && id != null
+        && String(policy.locked_delivery_id) === String(id))
+      || (policy?.locked_delivery_date && date
+        && calendarDate(policy.locked_delivery_date) === date);
+    if (!explicitLocked && !policyLocked) return null;
+    return {
+      reason: firstValue(delivery.lock_reason, match?.reason, 'protected_window'),
+      lockStartAt: firstValue(delivery.lock_start_at, match?.lock_start_at, policy?.lock_start_at)
+    };
+  }
+
+  function lockedDeliveryBadge(delivery, parent) {
+    if (!deliveryLockInfo(delivery, parent)) return null;
+    return create('span', 'delivery-lock-badge', 'Locked · changes unavailable');
+  }
+
   function makeOrderCard(order, { compact = false } = {}) {
     const card = create('article', 'order-card');
     const planChange = planChangeRecord(order);
@@ -3715,6 +3752,8 @@
         create('span', '', deliveryDate(delivery) ? formatDate(deliveryDate(delivery)) : `Delivery ${index + 1}`)
       );
       heading.append(title, statusPill(deliveryStatus(delivery)));
+      const lockBadge = lockedDeliveryBadge(delivery, order);
+      if (lockBadge) heading.append(lockBadge);
       card.append(heading);
       const quantityText = deliveryQuantityText(delivery, order, index);
       if (quantityText) card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${quantityText}`));
@@ -3748,6 +3787,8 @@
           : 'Date to be confirmed')
       );
       heading.append(title, statusPill(firstValue(subscriptionOrder.order_status, subscriptionOrder.status, 'Pending')));
+      const lockBadge = lockedDeliveryBadge(subscriptionOrder, order);
+      if (lockBadge) heading.append(lockBadge);
       card.append(heading);
       const quantityText = deliveryQuantityText(subscriptionOrder, order, index);
       if (quantityText) card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${quantityText}`));
@@ -3804,6 +3845,8 @@
         create('div', 'delivery-detail-hero-copy', `${deliveryNumber(detail)} · ${deliveryStatus(detail)}`),
         statusPill(deliveryStatus(detail))
       );
+      const lockBadge = lockedDeliveryBadge(detail, order);
+      if (lockBadge) hero.append(lockBadge);
       body.append(hero);
 
       const summary = create('div', 'dialog-summary');

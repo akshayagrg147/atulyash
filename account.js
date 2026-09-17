@@ -4939,6 +4939,10 @@
       subscription.updated_pack,
       subscription.new_subscription_pack,
       subscription.new_pack,
+      // SubscriptionPlansSerializer exposes the canonical pack object as
+      // `sub_pack`. Keep the ID fields for identity, but use this object for
+      // weekly price and four-delivery funding values.
+      subscription.sub_pack,
       subscription.subscription_pack,
       subscription.pack,
       subscription.package

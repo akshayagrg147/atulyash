@@ -5449,9 +5449,59 @@
       let currentPlanChangeLock = null;
 
       const walletCoverage = (canStartValue, shortfall) => {
+        // A positive server-calculated shortfall is authoritative even when
+        // an older response incorrectly says can_start_subscription=true.
+        if (shortfall !== null && shortfall > 0.005) return false;
+        if (shortfall !== null) return true;
         const hasServerDecision = canStartValue !== undefined && canStartValue !== null && canStartValue !== '';
-        if (hasServerDecision) return canStartValue === true || String(canStartValue).toLowerCase() === 'true';
-        return shortfall !== null && shortfall <= 0.005;
+        return hasServerDecision
+          ? canStartValue === true || String(canStartValue).toLowerCase() === 'true'
+          : false;
+      };
+
+      const planChangeShortfall = (data, funding) => {
+        const source = data && typeof data === 'object' ? data : {};
+        const wallet = funding && typeof funding === 'object' ? funding : {};
+        const reported = finiteMoney(
+          wallet.shortfall,
+          source.shortfall,
+          wallet.incremental_amount_due,
+          source.incremental_amount_due
+        );
+        const minimumRecharge = finiteMoney(
+          wallet.minimum_recharge_amount,
+          source.minimum_recharge_amount,
+          wallet.wallet_recharge_amount,
+          source.wallet_recharge_amount
+        );
+        const positiveReported = [reported, minimumRecharge]
+          .filter((value) => value !== null && value > 0.005);
+        if (positiveReported.length) return Math.max(...positiveReported);
+
+        // If an older deployment returned shortfall=0 while still returning
+        // the new requirement and wallet balance, repair the display from
+        // those authoritative values. This never changes the server state;
+        // it only prevents a false "wallet covers this plan" message.
+        const required = finiteMoney(
+          wallet.new_wallet_required,
+          wallet.minimum_wallet_required,
+          source.new_wallet_required,
+          source.minimum_wallet_required
+        );
+        const effectiveAvailable = finiteMoney(
+          wallet.effective_available_balance,
+          source.effective_available_balance,
+          wallet.eligible_current_cover,
+          source.eligible_current_cover,
+          wallet.total_wallet_balance,
+          wallet.wallet_balance,
+          source.total_wallet_balance,
+          source.wallet_balance
+        );
+        if (required !== null && effectiveAvailable !== null) {
+          return Math.max(0, required - effectiveAvailable);
+        }
+        return reported ?? minimumRecharge;
       };
 
       const planChangeErrorMessage = (error, fallback = 'The live plan preview could not be loaded.') => {
@@ -5463,7 +5513,7 @@
         return friendlyError(error, fallback);
       };
 
-      const previewPlan = (plan) => {
+      const previewPlan = (plan, fallback = {}) => {
         const source = plan && typeof plan === 'object' ? plan : {};
         const quantity = firstValue(
           source.quantity_per_week,
@@ -5476,17 +5526,27 @@
         const quantityText = quantityNumber !== null
           ? `${bagWeightLabel(quantityNumber)} kg every week`
           : quantity ? String(quantity) : 'Quantity not supplied';
+        const monthlyPrice = finiteMoney(source.price_per_month, source.monthly_price);
         const price = finiteMoney(
           source.price_per_delivery,
+          source.average_price_per_delivery,
           source.weekly_price,
           source.delivery_price,
-          source.price
+          source.price,
+          fallback.price_per_delivery,
+          fallback.average_price_per_delivery,
+          fallback.weekly_price,
+          monthlyPrice !== null ? monthlyPrice / 4 : null
         );
         const walletFunding = finiteMoney(
           source.four_delivery_wallet_funding,
           source.minimum_wallet_required,
           source.wallet_required,
-          source.price
+          source.price,
+          fallback.four_delivery_wallet_funding,
+          fallback.minimum_wallet_required,
+          fallback.price_per_month,
+          monthlyPrice
         );
         return {
           quantityText,
@@ -5554,10 +5614,21 @@
         }
 
         const data = preview && typeof preview === 'object' ? preview : {};
-        const existing = previewPlan(data.existing_plan || data.current_plan || data.previous_plan);
-        const revised = previewPlan(data.new_plan || data.revised_plan || data.next_plan);
+        const existing = previewPlan(
+          data.existing_plan || data.current_plan || data.previous_plan,
+          data.old_pack || data.current_pack || {}
+        );
+        const revised = previewPlan(
+          data.new_plan || data.revised_plan || data.next_plan,
+          {
+            ...(data.new_pack || data.next_pack || {}),
+            price_per_delivery: data.new_plan_average_price_per_delivery,
+            average_price_per_delivery: data.new_plan_average_price_per_delivery,
+            four_delivery_wallet_funding: data.new_wallet_required
+          }
+        );
         const funding = data.wallet_funding || data.wallet_impact || data.wallet || {};
-        const shortfall = finiteMoney(funding.shortfall, data.shortfall);
+        const shortfall = planChangeShortfall(data, funding);
         const amountToDebit = finiteMoney(
           funding.pack_change_amount_due,
           data.amount_to_debit,
@@ -5631,7 +5702,7 @@
         const funding = previewMatchesSelection
           ? (latestPreview.wallet_funding || latestPreview.wallet_impact || latestPreview.wallet || {})
           : {};
-        const shortfall = previewMatchesSelection ? finiteMoney(funding.shortfall, latestPreview.shortfall) : null;
+        const shortfall = previewMatchesSelection ? planChangeShortfall(latestPreview, funding) : null;
         const canStartValue = previewMatchesSelection
           ? firstValue(funding.can_start_subscription, latestPreview.can_start_subscription)
           : null;
@@ -5904,7 +5975,7 @@
             }
           }
           const funding = latestPreview.wallet_funding || latestPreview.wallet_impact || latestPreview.wallet || {};
-          const shortfall = finiteMoney(funding.shortfall, latestPreview.shortfall);
+          const shortfall = planChangeShortfall(latestPreview, funding);
           const canStartValue = firstValue(funding.can_start_subscription, latestPreview.can_start_subscription);
           const walletCovered = walletCoverage(canStartValue, shortfall);
           if (!walletCovered || (shortfall !== null && shortfall > 0.005)) {

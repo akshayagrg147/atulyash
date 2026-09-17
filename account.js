@@ -3751,9 +3751,11 @@
         create('strong', '', deliveryNumber(delivery)),
         create('span', '', deliveryDate(delivery) ? formatDate(deliveryDate(delivery)) : `Delivery ${index + 1}`)
       );
-      heading.append(title, statusPill(deliveryStatus(delivery)));
+      const statusGroup = create('div', 'delivery-status-group');
+      statusGroup.append(statusPill(deliveryStatus(delivery)));
       const lockBadge = lockedDeliveryBadge(delivery, order);
-      if (lockBadge) heading.append(lockBadge);
+      if (lockBadge) statusGroup.append(lockBadge);
+      heading.append(title, statusGroup);
       card.append(heading);
       const quantityText = deliveryQuantityText(delivery, order, index);
       if (quantityText) card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${quantityText}`));
@@ -3786,9 +3788,11 @@
           ? formatDate(firstValue(subscriptionOrder.order_delivery_date, subscriptionOrder.next_delivery_date))
           : 'Date to be confirmed')
       );
-      heading.append(title, statusPill(firstValue(subscriptionOrder.order_status, subscriptionOrder.status, 'Pending')));
+      const statusGroup = create('div', 'delivery-status-group');
+      statusGroup.append(statusPill(firstValue(subscriptionOrder.order_status, subscriptionOrder.status, 'Pending')));
       const lockBadge = lockedDeliveryBadge(subscriptionOrder, order);
-      if (lockBadge) heading.append(lockBadge);
+      if (lockBadge) statusGroup.append(lockBadge);
+      heading.append(title, statusGroup);
       card.append(heading);
       const quantityText = deliveryQuantityText(subscriptionOrder, order, index);
       if (quantityText) card.append(create('p', 'order-delivery-card-quantity', `Quantity to deliver · ${quantityText}`));
@@ -3841,12 +3845,14 @@
       }
       const body = create('div', 'delivery-detail');
       const hero = create('div', 'delivery-detail-hero');
+      const heroStatus = create('div', 'delivery-status-group');
+      heroStatus.append(statusPill(deliveryStatus(detail)));
+      const lockBadge = lockedDeliveryBadge(detail, order);
+      if (lockBadge) heroStatus.append(lockBadge);
       hero.append(
         create('div', 'delivery-detail-hero-copy', `${deliveryNumber(detail)} · ${deliveryStatus(detail)}`),
-        statusPill(deliveryStatus(detail))
+        heroStatus
       );
-      const lockBadge = lockedDeliveryBadge(detail, order);
-      if (lockBadge) hero.append(lockBadge);
       body.append(hero);
 
       const summary = create('div', 'dialog-summary');

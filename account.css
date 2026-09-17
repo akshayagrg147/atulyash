@@ -8979,6 +8979,17 @@ body.account-bag-open {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.delivery-status-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
 }
 
 .order-delivery-card-head strong,
@@ -8990,7 +9001,6 @@ body.account-bag-open {
 .delivery-detail-hero .delivery-lock-badge {
   display: inline-flex;
   align-items: center;
-  margin-left: .65rem;
   padding: .28rem .55rem;
   border: 1px solid rgba(174, 112, 34, .35);
   border-radius: 999px;
@@ -9000,6 +9010,11 @@ body.account-bag-open {
   font-weight: 700;
   letter-spacing: .02em;
   white-space: nowrap;
+}
+
+.order-delivery-card-head .status-pill,
+.delivery-detail-hero .status-pill {
+  flex: 0 0 auto;
 }
 
 .order-delivery-card-head strong {
@@ -9132,6 +9147,12 @@ body.account-bag-open {
   .order-delivery-card .status-pill,
   .delivery-detail-hero .status-pill {
     align-self: flex-start;
+  }
+
+  .delivery-status-group {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
   }
 }
 

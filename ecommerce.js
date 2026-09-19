@@ -24,6 +24,8 @@
   const STOREFRONT_INTENT_KEY = 'atulyash-storefront-intent-v1';
   const CHECKOUT_CONTEXT_KEY = 'atulyash-checkout-context-v1';
   const COUPON_CONTEXT_KEY = 'atulyash-coupon-context-v1';
+  const SERVICEABILITY_STORAGE_KEY = 'atulyash-home-serviceability-v1';
+  const SERVICEABILITY_MAX_AGE = 6 * 60 * 60 * 1000;
   const CHECKOUT_CONTEXT_TTL = 2 * 60 * 60 * 1000;
   const API = window.AtulyashAPI || null;
   const currency = new Intl.NumberFormat('en-IN', {
@@ -47,6 +49,21 @@
     heroVisualUnitPrice: document.getElementById('heroVisualUnitPrice'),
     heroWeeklyButton: document.getElementById('heroWeeklyButton'),
     startWeeklyButton: document.getElementById('startWeeklyButton'),
+    headerLocationButton: document.getElementById('headerLocationButton'),
+    headerLocationLabel: document.getElementById('headerLocationLabel'),
+    serviceabilityDialog: document.getElementById('serviceabilityDialog'),
+    serviceabilityCloseButton: document.getElementById('serviceabilityCloseButton'),
+    serviceabilityLocationButton: document.getElementById('serviceabilityLocationButton'),
+    serviceabilityLocationLabel: document.getElementById('serviceabilityLocationLabel'),
+    serviceabilityForm: document.getElementById('serviceabilityForm'),
+    serviceabilityPincode: document.getElementById('serviceabilityPincode'),
+    serviceabilityCheckButton: document.getElementById('serviceabilityCheckButton'),
+    serviceabilityStatus: document.getElementById('serviceabilityStatus'),
+    serviceabilityStatusMark: document.getElementById('serviceabilityStatusMark'),
+    serviceabilityStatusTitle: document.getElementById('serviceabilityStatusTitle'),
+    serviceabilityStatusCopy: document.getElementById('serviceabilityStatusCopy'),
+    serviceabilityContinueButton: document.getElementById('serviceabilityContinueButton'),
+    serviceabilityBrowseButton: document.getElementById('serviceabilityBrowseButton'),
     productShowcase: document.getElementById('productShowcase'),
     storeServiceStatus: document.getElementById('storeServiceStatus'),
     storeServiceStatusLabel: document.getElementById('storeServiceStatusLabel'),
@@ -318,6 +335,11 @@
   let checkoutReturnUrl = '';
   let cartReturnUrl = '';
   let lastCartFailureMessage = '';
+  let storefrontServiceability = null;
+  let serviceabilityCheckInFlight = false;
+  let serviceabilityLocationInFlight = false;
+  let pendingServiceabilityAction = null;
+  let pendingServiceabilityLabel = 'Continue to Atulyash';
   const cartItemUpdateLocks = new Set();
   let otpResendAvailableAt = 0;
   let otpResendTimer;
@@ -501,6 +523,283 @@
       return API.request(fallback.path, fallback.options || {});
     }
     throw new Error('The Atulyash service is not available in this build.');
+  }
+
+  function loadStorefrontServiceability() {
+    const record = loadSessionRecord(SERVICEABILITY_STORAGE_KEY, null);
+    const pincode = String(record?.pincode || '').replace(/\D/g, '').slice(0, 6);
+    const checkedAt = Number(record?.checkedAt);
+    if (
+      !record
+      || !/^\d{6}$/.test(pincode)
+      || !Number.isFinite(checkedAt)
+      || Date.now() - checkedAt > SERVICEABILITY_MAX_AGE
+    ) {
+      saveSessionRecord(SERVICEABILITY_STORAGE_KEY, null);
+      return null;
+    }
+    return { ...record, pincode, serviceable: record.serviceable === true };
+  }
+
+  function saveStorefrontServiceability(record) {
+    storefrontServiceability = record;
+    saveSessionRecord(SERVICEABILITY_STORAGE_KEY, record);
+    updateHeaderServiceability(record);
+  }
+
+  function updateHeaderServiceability(record = storefrontServiceability) {
+    if (!elements.headerLocationButton || !elements.headerLocationLabel) return;
+    if (record?.serviceable === true && record?.pincode) {
+      elements.headerLocationLabel.textContent = `Deliver to ${record.pincode}`;
+      elements.headerLocationButton.setAttribute('aria-label', `Delivery is available at PIN ${record.pincode}. Change delivery PIN code.`);
+      return;
+    }
+    elements.headerLocationLabel.textContent = record?.pincode ? 'Change delivery PIN' : 'Check delivery';
+    elements.headerLocationButton.setAttribute('aria-label', record?.pincode
+      ? `PIN ${record.pincode} is not serviceable. Check another delivery PIN code.`
+      : 'Check delivery availability for your PIN code');
+  }
+
+  function verifiedStorefrontServiceability() {
+    if (!storefrontServiceability) storefrontServiceability = loadStorefrontServiceability();
+    return storefrontServiceability?.serviceable === true
+      ? storefrontServiceability
+      : null;
+  }
+
+  function renderStorefrontServiceability(state = 'idle', {
+    title = 'Live delivery check',
+    message = 'Enter a six-digit PIN code or use your current location.'
+  } = {}) {
+    if (!elements.serviceabilityStatus) return;
+    elements.serviceabilityStatus.dataset.state = state;
+    if (elements.serviceabilityStatusTitle) elements.serviceabilityStatusTitle.textContent = title;
+    if (elements.serviceabilityStatusCopy) elements.serviceabilityStatusCopy.textContent = message;
+    if (elements.serviceabilityStatusMark) {
+      elements.serviceabilityStatusMark.textContent = state === 'success' ? '✓' : state === 'error' ? '!' : 'i';
+    }
+    if (elements.serviceabilityContinueButton) {
+      elements.serviceabilityContinueButton.hidden = state !== 'success';
+      elements.serviceabilityContinueButton.firstChild.textContent = `${pendingServiceabilityLabel} `;
+    }
+  }
+
+  function setStorefrontServiceabilityBusy() {
+    const busy = serviceabilityCheckInFlight || serviceabilityLocationInFlight;
+    if (elements.serviceabilityCheckButton) {
+      elements.serviceabilityCheckButton.disabled = busy;
+      elements.serviceabilityCheckButton.textContent = serviceabilityCheckInFlight ? 'Checking…' : 'Check availability';
+      elements.serviceabilityCheckButton.setAttribute('aria-busy', String(serviceabilityCheckInFlight));
+    }
+    if (elements.serviceabilityLocationButton) {
+      elements.serviceabilityLocationButton.disabled = busy;
+      elements.serviceabilityLocationButton.setAttribute('aria-busy', String(serviceabilityLocationInFlight));
+    }
+    if (elements.serviceabilityLocationLabel) {
+      elements.serviceabilityLocationLabel.textContent = serviceabilityLocationInFlight
+        ? 'Finding your PIN code…'
+        : 'Use my current location';
+    }
+  }
+
+  function serviceableLocationCopy(record) {
+    const location = [record?.city, record?.state]
+      .map((value) => String(value || '').trim())
+      .filter((value, index, values) => value && values.indexOf(value) === index)
+      .join(', ');
+    return `${location || 'Your area'} is serviceable for fresh Atulyash delivery at PIN ${record.pincode}.`;
+  }
+
+  function openStorefrontServiceability({ action = null, label = 'Continue to Atulyash', force = false } = {}) {
+    if (!elements.serviceabilityDialog) {
+      if (typeof action === 'function') action();
+      return false;
+    }
+    const verified = verifiedStorefrontServiceability();
+    if (verified && typeof action === 'function' && !force) {
+      action();
+      return true;
+    }
+
+    pendingServiceabilityAction = typeof action === 'function' ? action : null;
+    pendingServiceabilityLabel = label;
+    const record = storefrontServiceability || loadStorefrontServiceability();
+    if (record?.pincode && elements.serviceabilityPincode) {
+      elements.serviceabilityPincode.value = record.pincode;
+    }
+    if (record?.serviceable === true) {
+      renderStorefrontServiceability('success', {
+        title: 'Fresh delivery is available',
+        message: serviceableLocationCopy(record)
+      });
+    } else if (record?.pincode) {
+      renderStorefrontServiceability('error', {
+        title: 'We do not deliver here yet',
+        message: `PIN ${record.pincode} is outside the current Atulyash delivery area. Try another PIN or browse the website for now.`
+      });
+    } else {
+      renderStorefrontServiceability();
+    }
+
+    if (!elements.serviceabilityDialog.open) {
+      document.body.classList.add('serviceability-open');
+      elements.serviceabilityDialog.showModal();
+    }
+    window.setTimeout(() => {
+      const focusTarget = record?.serviceable
+        ? elements.serviceabilityContinueButton
+        : elements.serviceabilityLocationButton;
+      focusTarget?.focus({ preventScroll: true });
+    }, 40);
+    return false;
+  }
+
+  function closeStorefrontServiceability({ continueAction = false } = {}) {
+    const action = continueAction && verifiedStorefrontServiceability()
+      ? pendingServiceabilityAction
+      : null;
+    pendingServiceabilityAction = null;
+    pendingServiceabilityLabel = 'Continue to Atulyash';
+    if (elements.serviceabilityDialog?.open) elements.serviceabilityDialog.close();
+    document.body.classList.remove('serviceability-open');
+    if (typeof action === 'function') window.setTimeout(action, 0);
+  }
+
+  function requireStorefrontServiceability(action, label) {
+    if (!IS_STOREFRONT_PAGE) {
+      if (typeof action === 'function') action();
+      return true;
+    }
+    return openStorefrontServiceability({ action, label });
+  }
+
+  async function checkStorefrontServiceability(pincodeValue) {
+    const pincode = String(pincodeValue || '').replace(/\D/g, '').slice(0, 6);
+    if (elements.serviceabilityPincode) elements.serviceabilityPincode.value = pincode;
+    if (!/^\d{6}$/.test(pincode)) {
+      elements.serviceabilityPincode?.setAttribute('aria-invalid', 'true');
+      renderStorefrontServiceability('error', {
+        title: 'Enter all six digits',
+        message: 'A valid Indian delivery PIN code contains six numbers.'
+      });
+      elements.serviceabilityPincode?.focus({ preventScroll: true });
+      return false;
+    }
+
+    elements.serviceabilityPincode?.removeAttribute('aria-invalid');
+    serviceabilityCheckInFlight = true;
+    setStorefrontServiceabilityBusy();
+    renderStorefrontServiceability('checking', {
+      title: 'Checking delivery coverage',
+      message: `Confirming live Atulyash service for PIN ${pincode}…`
+    });
+
+    try {
+      const payload = await invokeApi('pincodes', 'serviceability', [pincode], {
+        path: '/pincodes/pincode/serviceability/',
+        options: { method: 'GET', auth: false, cache: 'no-store', query: { pincode } }
+      });
+      const result = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+      const responsePincode = String(result?.pincode || pincode).replace(/\D/g, '').slice(0, 6);
+      if (responsePincode !== pincode) {
+        throw new Error('The delivery service returned a different PIN code. Please try again.');
+      }
+      const record = {
+        pincode,
+        serviceable: result?.serviceable === true,
+        city: String(result?.city || '').trim(),
+        state: String(result?.state || '').trim(),
+        availableAreas: Array.isArray(result?.available_areas) ? result.available_areas : [],
+        checkedAt: Date.now()
+      };
+      saveStorefrontServiceability(record);
+      if (record.serviceable) {
+        renderStorefrontServiceability('success', {
+          title: 'Fresh delivery is available',
+          message: serviceableLocationCopy(record)
+        });
+        elements.serviceabilityContinueButton?.focus({ preventScroll: true });
+        return true;
+      }
+      elements.serviceabilityPincode?.setAttribute('aria-invalid', 'true');
+      renderStorefrontServiceability('error', {
+        title: 'We do not deliver here yet',
+        message: `PIN ${pincode} is outside the current Atulyash delivery area. Ordering is unavailable, but you can try another PIN.`
+      });
+      return false;
+    } catch (error) {
+      renderStorefrontServiceability('error', {
+        title: 'Coverage could not be checked',
+        message: error?.message || 'The live delivery service is unavailable. Please try again.'
+      });
+      return null;
+    } finally {
+      serviceabilityCheckInFlight = false;
+      setStorefrontServiceabilityBusy();
+    }
+  }
+
+  async function useCurrentLocationForServiceability() {
+    if (!navigator.geolocation) {
+      renderStorefrontServiceability('error', {
+        title: 'Location is unavailable',
+        message: 'This browser cannot share its location. Enter your six-digit PIN code instead.'
+      });
+      elements.serviceabilityPincode?.focus({ preventScroll: true });
+      return;
+    }
+
+    serviceabilityLocationInFlight = true;
+    setStorefrontServiceabilityBusy();
+    renderStorefrontServiceability('checking', {
+      title: 'Finding your location',
+      message: 'Allow location access when your browser asks. We will use it only to find your PIN code.'
+    });
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 300000
+        });
+      });
+      const lookup = window.AtulyashGoogleAreaLookup;
+      if (!lookup?.reverseGeocodeCoordinates) {
+        throw new Error('Location lookup is not configured. Enter your PIN code instead.');
+      }
+      const result = await lookup.reverseGeocodeCoordinates(
+        position.coords.latitude,
+        position.coords.longitude
+      );
+      const pincode = String(result?.pincode || '').replace(/\D/g, '').slice(0, 6);
+      if (!/^\d{6}$/.test(pincode)) {
+        throw new Error('We found your location but could not identify its PIN code. Enter it manually below.');
+      }
+      if (elements.serviceabilityPincode) elements.serviceabilityPincode.value = pincode;
+      await checkStorefrontServiceability(pincode);
+    } catch (error) {
+      const permissionDenied = Number(error?.code) === 1;
+      renderStorefrontServiceability('error', {
+        title: permissionDenied ? 'Location permission was not granted' : 'Location could not be identified',
+        message: permissionDenied
+          ? 'Allow location access in your browser, or enter your six-digit PIN code below.'
+          : (error?.message || 'Enter your six-digit PIN code to check delivery availability.')
+      });
+      elements.serviceabilityPincode?.focus({ preventScroll: true });
+    } finally {
+      serviceabilityLocationInFlight = false;
+      setStorefrontServiceabilityBusy();
+    }
+  }
+
+  function initializeStorefrontServiceability() {
+    if (!IS_STOREFRONT_PAGE || !elements.serviceabilityDialog) return;
+    storefrontServiceability = loadStorefrontServiceability();
+    updateHeaderServiceability(storefrontServiceability);
+    const hasAccountHandoff = new URLSearchParams(window.location.search).get('checkout') === 'account'
+      || loadSessionRecord(STOREFRONT_INTENT_KEY, null)?.origin === 'account';
+    if (hasAccountHandoff) return;
+    window.setTimeout(() => openStorefrontServiceability({ force: true }), 260);
   }
 
   function updateAccountHeader() {
@@ -5862,6 +6161,59 @@
     elements.mobileBuyBar.inert = !visible;
   }
 
+  elements.serviceabilityForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (serviceabilityCheckInFlight || serviceabilityLocationInFlight) return;
+    void checkStorefrontServiceability(elements.serviceabilityPincode?.value);
+  });
+  elements.serviceabilityPincode?.addEventListener('input', (event) => {
+    const pincode = String(event.target.value || '').replace(/\D/g, '').slice(0, 6);
+    event.target.value = pincode;
+    event.target.removeAttribute('aria-invalid');
+    if (storefrontServiceability?.pincode && storefrontServiceability.pincode !== pincode) {
+      saveStorefrontServiceability(null);
+    }
+    renderStorefrontServiceability();
+  });
+  elements.serviceabilityLocationButton?.addEventListener('click', () => {
+    if (serviceabilityCheckInFlight || serviceabilityLocationInFlight) return;
+    void useCurrentLocationForServiceability();
+  });
+  elements.headerLocationButton?.addEventListener('click', () => {
+    closePrimaryNavigation();
+    openStorefrontServiceability({ force: true });
+  });
+  elements.serviceabilityContinueButton?.addEventListener('click', () => {
+    closeStorefrontServiceability({ continueAction: true });
+  });
+  elements.serviceabilityCloseButton?.addEventListener('click', () => closeStorefrontServiceability());
+  elements.serviceabilityBrowseButton?.addEventListener('click', () => closeStorefrontServiceability());
+  elements.serviceabilityDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeStorefrontServiceability();
+  });
+  elements.serviceabilityDialog?.addEventListener('close', () => {
+    document.body.classList.remove('serviceability-open');
+  });
+
+  document.querySelectorAll('[data-serviceability-intent="first-experience"]').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      requireStorefrontServiceability(() => {
+        selectedPurchaseType = 'once';
+        updateProductUI();
+        elements.packSelector?.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'center'
+        });
+        const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520;
+        window.setTimeout(() => {
+          elements.packSelector?.querySelector('input[name="packSize"]:checked')?.focus({ preventScroll: true });
+        }, delay);
+      }, 'Continue to choose a fresh batch');
+    });
+  });
+
   elements.packSelector?.addEventListener('change', (event) => {
     if (event.target.matches('input[name="packSize"]')) selectWeight(event.target.value);
   });
@@ -5875,8 +6227,18 @@
       updateProductUI();
       return;
     }
-    selectedPurchaseType = event.target.value === 'weekly' ? 'weekly' : 'once';
-    updateProductUI();
+    const nextPurchaseType = event.target.value === 'weekly' ? 'weekly' : 'once';
+    if (!verifiedStorefrontServiceability()) {
+      event.target.checked = false;
+      const currentInput = elements.purchaseSelector.querySelector(`input[name="purchaseType"][value="${selectedPurchaseType}"]`);
+      if (currentInput) currentInput.checked = true;
+    }
+    requireStorefrontServiceability(() => {
+      selectedPurchaseType = nextPurchaseType;
+      const nextInput = elements.purchaseSelector?.querySelector(`input[name="purchaseType"][value="${nextPurchaseType}"]`);
+      if (nextInput) nextInput.checked = true;
+      updateProductUI();
+    }, nextPurchaseType === 'weekly' ? 'Continue to weekly plans' : 'Continue with a one-time order');
   });
 
   elements.weeklyPlanSelect?.addEventListener('change', (event) => {
@@ -5920,9 +6282,24 @@
     updateProductUI();
   });
 
-  elements.addToCartButton?.addEventListener('click', () => addSelectionToCart());
-  elements.mobileAddButton?.addEventListener('click', () => addSelectionToCart());
-  elements.buyNowButton?.addEventListener('click', () => addSelectionToCart({ openAfter: true }));
+  elements.addToCartButton?.addEventListener('click', () => {
+    requireStorefrontServiceability(
+      () => addSelectionToCart(),
+      selectedPurchaseType === 'weekly' ? 'Continue with this weekly plan' : 'Continue with this one-time order'
+    );
+  });
+  elements.mobileAddButton?.addEventListener('click', () => {
+    requireStorefrontServiceability(
+      () => addSelectionToCart(),
+      selectedPurchaseType === 'weekly' ? 'Continue with this weekly plan' : 'Continue with this one-time order'
+    );
+  });
+  elements.buyNowButton?.addEventListener('click', () => {
+    requireStorefrontServiceability(
+      () => addSelectionToCart({ openAfter: true }),
+      selectedPurchaseType === 'weekly' ? 'Continue with this weekly plan' : 'Continue with this one-time order'
+    );
+  });
   elements.headerCartButton?.addEventListener('click', openCart);
   elements.checkoutHandoffReview?.addEventListener('click', () => {
     if (IS_CHECKOUT_PAGE) {
@@ -5941,13 +6318,18 @@
         announce('Weekly plans are not available right now.');
         return;
       }
-      selectWeeklyPlan(selectedWeeklyPlanId, { scroll: true, notify: true });
+      requireStorefrontServiceability(
+        () => selectWeeklyPlan(selectedWeeklyPlanId, { scroll: true, notify: true }),
+        'Continue to weekly plans'
+      );
     });
   });
   elements.cartCloseButton?.addEventListener('click', () => closeCart());
   elements.continueShoppingButton?.addEventListener('click', () => closeCart());
   elements.checkoutCloseButton?.addEventListener('click', closeCheckout);
-  elements.checkoutButton?.addEventListener('click', openCheckout);
+  elements.checkoutButton?.addEventListener('click', () => {
+    requireStorefrontServiceability(openCheckout, 'Continue to delivery details');
+  });
   [elements.storeServiceRetryButton, elements.catalogRetryButton].forEach((button) => {
     button?.addEventListener('click', hydratePublicCommerce);
   });
@@ -6535,6 +6917,7 @@
     updateRotiCalculator();
     renderCart();
     updateMobileBuyBar();
+    initializeStorefrontServiceability();
     await hydratePublicCommerce();
     if (await resumeStorefrontIntent()) return;
     closeCheckoutHandoff();

@@ -328,6 +328,7 @@
           : withoutKeys(value, ['id', 'orderId', 'deliveryId'])];
       }
       if (/^reorder$/.test(methodName)) return [identifier];
+      if (/^cancel$|cancelOrder/.test(methodName)) return [identifier];
       if (/^changeAddress$|changeOrderAddress/.test(methodName)) {
         return [identifier, { address_id: value.address_id || value.addressId }];
       }
@@ -2920,8 +2921,110 @@
       order.is_subscription === true ? 'subscription' : ''
     );
     return !subscription
+      && !oneTimeOrderLockInfo(order)
       && !orderHasSuccessfulPayment(order)
       && !/deliver|complete|fulfilled|cancel|fail|refund|paid|payment|received|success|captur/.test(status);
+  }
+
+  function canChangeOneTimeOrderAddress(order) {
+    const status = orderStatus(order).toLowerCase();
+    const subscription = firstValue(
+      order?.subscription,
+      order?.subscription_plan,
+      order?.subscription_id,
+      order?.is_subscription === true ? 'subscription' : ''
+    );
+    return !subscription
+      && !oneTimeOrderLockInfo(order)
+      && !/deliver|complete|fulfilled|cancel|fail|refund/.test(status);
+  }
+
+  function isSubscriptionOrder(order) {
+    return orderSubscriptionPlanId(order) != null
+      || order?.is_subscription === true
+      || /subscription|weekly|freshness/i.test(String(firstValue(
+        order?.purchase_type,
+        order?.order_type,
+        order?.fulfilment_type,
+        ''
+      )));
+  }
+
+  function oneTimeOrderCancellationLockInfo(order) {
+    const existingLock = oneTimeOrderLockInfo(order);
+    if (existingLock) return existingLock;
+    if (!order || typeof order !== 'object') return null;
+
+    const policy = firstValue(order.cancellation_policy, order.order_cancellation_policy);
+    const explicitlyLocked = firstValue(order.cancellation_locked, policy?.is_locked, policy?.locked);
+    const cancellationAllowed = firstValue(
+      order.cancellation_allowed,
+      order.can_cancel,
+      policy?.cancellation_allowed,
+      policy?.allowed
+    );
+    if (explicitlyLocked === true
+      || String(explicitlyLocked).toLowerCase() === 'true'
+      || String(cancellationAllowed).toLowerCase() === 'false') {
+      return {
+        reason: firstValue(order.cancellation_lock_reason, order.lock_reason, policy?.reason, 'protected_window'),
+        lockStartAt: firstValue(
+          order.cancellation_lock_start_at,
+          order.lock_start_at,
+          policy?.lock_start_at
+        )
+      };
+    }
+    return null;
+  }
+
+  function oneTimeOrderCancellationState(order) {
+    const status = orderStatus(order).toLowerCase();
+    if (!order || isSubscriptionOrder(order)) return { isOneTime: false, allowed: false };
+    if (/deliver|complete|fulfilled|cancel|fail|refund/.test(status)) {
+      return { isOneTime: true, allowed: false, closed: true };
+    }
+    const lock = oneTimeOrderCancellationLockInfo(order);
+    return lock
+      ? { isOneTime: true, allowed: false, locked: true, lock }
+      : { isOneTime: true, allowed: true };
+  }
+
+  function oneTimeOrderCancellationLockMessage(order, lock = {}) {
+    const deliveryDate = firstValue(
+      order?.locked_delivery_date,
+      order?.order_delivery_date,
+      order?.delivery_date,
+      order?.requested_delivery_date,
+      order?.deliveries?.find((delivery) => deliveryLockInfo(delivery, order))?.delivery_date
+    );
+    const dateText = deliveryDate ? `The ${formatDate(deliveryDate)} delivery` : 'This delivery';
+    const startText = lock?.lockStartAt ? ` The protected window began ${formatDate(lock.lockStartAt, true)}.` : '';
+    return `${dateText} is now locked and can no longer be cancelled online.${startText}`;
+  }
+
+  function cancellationLockFromError(error) {
+    if (!error) return null;
+    const payload = responseData(firstValue(
+      error?.details,
+      error?.data,
+      error?.response?.data,
+      error?.body,
+      {}
+    ));
+    const lock = oneTimeOrderCancellationLockInfo(payload);
+    if (lock) return lock;
+    const code = String(firstValue(error?.code, payload?.code, payload?.error_code, '')).toUpperCase();
+    const message = friendlyError(error, '');
+    const status = Number(firstValue(error?.status, error?.statusCode, error?.response?.status));
+    if ((status === 409 || /LOCK|CUTOFF|PROTECTED/.test(code))
+      && /lock|cutoff|protected|too late/i.test(`${code} ${message}`)) {
+      return {
+        reason: firstValue(payload?.reason, payload?.lock_reason, code, 'protected_window'),
+        lockStartAt: firstValue(payload?.lock_start_at, payload?.cancellation_lock_start_at)
+      };
+    }
+    return null;
   }
 
   function statusPill(status) {
@@ -2963,6 +3066,33 @@
       reason: firstValue(delivery.lock_reason, match?.reason, 'protected_window'),
       lockStartAt: firstValue(delivery.lock_start_at, match?.lock_start_at, policy?.lock_start_at)
     };
+  }
+
+  function oneTimeOrderLockInfo(order) {
+    if (!order || typeof order !== 'object') return null;
+    const explicit = firstValue(order.is_locked, order.locked);
+    if (explicit === true || String(explicit).toLowerCase() === 'true') {
+      return {
+        reason: firstValue(order.lock_reason, 'protected_window'),
+        lockStartAt: firstValue(order.lock_start_at, order.lock_starts_at)
+      };
+    }
+
+    const policy = firstValue(order.modification_policy, order.delivery_modification_policy);
+    const allowed = firstValue(order.modification_allowed, policy?.modification_allowed, policy?.allowed);
+    if (allowed !== undefined && String(allowed).toLowerCase() === 'false') {
+      return {
+        reason: firstValue(order.lock_reason, policy?.reason, 'protected_window'),
+        lockStartAt: firstValue(order.lock_start_at, policy?.lock_start_at)
+      };
+    }
+
+    const deliveries = Array.isArray(order.deliveries) ? order.deliveries : [];
+    for (const delivery of deliveries) {
+      const lock = deliveryLockInfo(delivery, order);
+      if (lock) return lock;
+    }
+    return null;
   }
 
   function lockedDeliveryBadge(delivery, parent) {
@@ -3024,6 +3154,15 @@
     actions.append(button('Track order', 'card-action', () => openOrderDetail(order)));
     if (!compact) {
       if (canModifyOneTimeOrder(order)) actions.append(button('Modify delivery', 'card-action', () => openOneTimeOrderModification(order)));
+      const cancellation = oneTimeOrderCancellationState(order);
+      if (cancellation.allowed) {
+        actions.append(button('Cancel order', 'card-action is-rust', () => openCancelOneTimeOrder(order)));
+      } else if (cancellation.locked) {
+        const lockedCancel = button('Cancellation locked', 'card-action is-rust is-order-locked-button');
+        lockedCancel.disabled = true;
+        lockedCancel.title = oneTimeOrderCancellationLockMessage(order, cancellation.lock);
+        actions.append(lockedCancel);
+      }
       actions.append(button('Order again', 'card-action', () => confirmReorder(order)));
       if (isCompleted(order)) actions.append(button('Review', 'card-action is-rust', () => openReview(order)));
     }
@@ -4049,11 +4188,20 @@
       const actions = create('div', 'dialog-actions');
       if (canModifyOneTimeOrder(detail)) actions.append(button('Modify delivery', 'secondary-button', () => openOneTimeOrderModification(detail)));
       actions.append(button('View receipt', 'secondary-button', () => openOrderReceipt(detail)));
-      const isSubscriptionOrder = orderSubscriptionPlanId(detail) != null
-        || detail?.is_subscription === true
-        || /subscription|weekly|freshness/i.test(String(firstValue(detail?.purchase_type, detail?.order_type, detail?.fulfilment_type, '')));
-      if (isSubscriptionOrder) {
+      const subscriptionOrder = isSubscriptionOrder(detail);
+      if (subscriptionOrder) {
         actions.append(button('Change delivery home', 'secondary-button', () => openOrderAddressChange(detail)));
+      } else if (canChangeOneTimeOrderAddress(detail)) {
+        actions.append(button('Change delivery home', 'secondary-button', () => openOrderAddressChange(detail, null, { oneTimeOrder: true })));
+      }
+      const cancellation = oneTimeOrderCancellationState(detail);
+      if (cancellation.allowed) {
+        actions.append(button('Cancel order', 'danger-button', () => openCancelOneTimeOrder(detail)));
+      } else if (cancellation.locked) {
+        const lockedCancel = button('Cancellation locked', 'danger-button is-order-locked-button');
+        lockedCancel.disabled = true;
+        lockedCancel.title = oneTimeOrderCancellationLockMessage(detail, cancellation.lock);
+        actions.append(lockedCancel);
       }
       const invoiceUrl = orderInvoiceUrl(detail);
       if (invoiceUrl) {
@@ -4085,6 +4233,29 @@
         method: 'GET'
       });
       const detail = responseData(detailResult);
+      const lock = oneTimeOrderLockInfo(detail);
+      if (lock) {
+        const deliveryDate = firstValue(
+          detail?.locked_delivery_date,
+          detail?.delivery_date,
+          detail?.order_delivery_date,
+          detail?.deliveries?.find((delivery) => deliveryLockInfo(delivery, detail))?.delivery_date
+        );
+        const dateText = deliveryDate
+          ? `The ${formatDate(deliveryDate)} delivery is locked.`
+          : 'This delivery is locked.';
+        const statePanel = makeState(
+          'empty',
+          'Delivery locked',
+          `${dateText} Address, date, pack and quantity changes are unavailable after the cutoff.`
+        );
+        const actions = create('div', 'dialog-actions');
+        const care = create('a', 'primary-button', 'Contact customer care →');
+        care.href = 'mailto:info@atulyash.com';
+        actions.append(button('Close', 'secondary-button', closeDialog), care);
+        body.replaceChildren(statePanel, actions);
+        return;
+      }
       if (!canModifyOneTimeOrder(detail)) {
         const statePanel = makeState(
           'empty',
@@ -4416,6 +4587,134 @@
     }
   }
 
+  async function openCancelOneTimeOrder(order) {
+    const body = create('div');
+    body.append(makeState(
+      'loading',
+      'Checking cancellation availability.',
+      'Confirming the latest delivery cutoff before any action is shown…'
+    ));
+    openDialog('One-time order', 'Cancel delivery', body);
+
+    const renderLockedState = (detail, lock) => {
+      const panel = makeState(
+        'empty',
+        'Cancellation is locked',
+        oneTimeOrderCancellationLockMessage(detail, lock)
+      );
+      const actions = create('div', 'dialog-actions');
+      const care = create('a', 'primary-button', 'Contact customer care →');
+      care.href = 'mailto:info@atulyash.com';
+      actions.append(button('Close', 'secondary-button', closeDialog), care);
+      body.replaceChildren(panel, actions);
+    };
+
+    try {
+      const id = orderId(order);
+      if (id == null) throw new Error('This order could not be identified. Please refresh and try again.');
+      const detailResult = await apiCall('orders', ['detail', 'getOrderDetails'], { id, orderId: id }, {
+        path: `/orders/order/${id}/`,
+        method: 'GET'
+      });
+      const detailPayload = responseData(detailResult);
+      const detail = detailPayload && typeof detailPayload === 'object'
+        ? { ...order, ...detailPayload }
+        : order;
+      const cancellation = oneTimeOrderCancellationState(detail);
+      if (cancellation.locked) {
+        renderLockedState(detail, cancellation.lock);
+        return;
+      }
+      if (!cancellation.isOneTime || cancellation.closed || !cancellation.allowed) {
+        const panel = makeState(
+          'empty',
+          'Cancellation is unavailable',
+          cancellation.isOneTime
+            ? 'Delivered, cancelled and closed orders cannot be cancelled again.'
+            : 'Weekly plans must be managed from the subscription controls.'
+        );
+        const actions = create('div', 'dialog-actions');
+        actions.append(button('Close', 'secondary-button', closeDialog));
+        body.replaceChildren(panel, actions);
+        return;
+      }
+
+      const form = create('form', 'dialog-form');
+      const panel = create('div', 'confirmation-panel');
+      const paid = orderHasSuccessfulPayment(detail);
+      panel.append(
+        create('strong', '', `Cancel ${orderNumber(detail)}?`),
+        create('p', '', paid
+          ? 'This permanently cancels the one-time delivery. Any refund requirement will be recorded by Atulyash for processing.'
+          : 'This permanently cancels the one-time delivery. Any active wallet hold will be released by the order service.')
+      );
+      const deliveryDate = orderDeliveryDate(detail);
+      if (deliveryDate) {
+        const delivery = create('div', 'dialog-summary');
+        const row = create('div', 'dialog-summary-row');
+        row.append(create('span', '', 'Delivery being cancelled'), create('strong', '', formatDate(deliveryDate)));
+        delivery.append(row);
+        form.append(panel, delivery);
+      } else {
+        form.append(panel);
+      }
+
+      const confirmLabel = create('label', 'check-control');
+      const confirm = create('input');
+      confirm.type = 'checkbox';
+      confirm.required = true;
+      confirmLabel.append(confirm, document.createTextNode(' I understand this one-time delivery will be cancelled.'));
+      const actions = create('div', 'dialog-actions');
+      actions.append(button('Keep my delivery', 'secondary-button', closeDialog));
+      const submit = create('button', 'danger-button', 'Cancel one-time order');
+      submit.type = 'submit';
+      actions.append(submit);
+      form.append(confirmLabel, actions);
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setButtonBusy(submit, true, 'Checking cutoff…');
+        try {
+          const result = await apiCall('orders', ['cancel', 'cancelOrder'], { id, orderId: id }, {
+            path: `/orders/order/${id}/cancel/`,
+            method: 'POST',
+            body: {}
+          });
+          const data = responseData(result);
+          closeDialog();
+          state.loaded.forEach((key) => {
+            if (String(key).startsWith('orders:')) state.loaded.delete(key);
+          });
+          await Promise.allSettled([
+            renderOrders({ page: 1, force: true }),
+            renderOverview(true)
+          ]);
+          const refundRequired = String(firstValue(data?.refund_required, data?.refund?.required, false)).toLowerCase() === 'true';
+          showToast(refundRequired
+            ? 'Order cancelled. The refund requirement has been recorded for processing.'
+            : String(firstValue(data?.message, 'Your one-time order has been cancelled.'))
+          );
+        } catch (error) {
+          const lock = cancellationLockFromError(error);
+          if (lock) {
+            renderLockedState(detail, lock);
+          } else {
+            showToast(friendlyError(error, 'The order could not be cancelled. No changes were made.'), 'error');
+            setButtonBusy(submit, false);
+          }
+        }
+      });
+      body.replaceChildren(form);
+    } catch (error) {
+      body.replaceChildren(makeState(
+        'error',
+        'Cancellation is unavailable.',
+        friendlyError(error, 'The latest order details could not be checked. No changes were made.'),
+        () => openCancelOneTimeOrder(order)
+      ));
+    }
+  }
+
   function openOrderReceipt(order) {
     const body = create('div');
     body.append(create('p', 'dialog-copy', 'This customer receipt brings your order, delivery and payment details together in one place. You can print it for your records.'));
@@ -4675,9 +4974,16 @@
     return 'This delivery is within its protected window, so its address cannot be changed.';
   }
 
-  async function openOrderAddressChange(order, subscription = null) {
+  async function openOrderAddressChange(order, subscription = null, options = {}) {
+    const oneTimeOrder = options.oneTimeOrder === true;
     const body = create('div');
-    body.append(makeState('loading', 'Checking delivery homes.', 'Loading your saved addresses and the current order schedule…'));
+    body.append(makeState(
+      'loading',
+      'Checking delivery homes.',
+      oneTimeOrder
+        ? 'Loading your saved addresses and checking the one-time delivery cutoff…'
+        : 'Loading your saved addresses and the current order schedule…'
+    ));
     openDialog('Delivery address', 'Change delivery home', body);
 
     try {
@@ -4696,6 +5002,21 @@
       const detail = detailPayload && typeof detailPayload === 'object'
         ? { ...resolvedOrder, ...detailPayload }
         : resolvedOrder;
+      if (oneTimeOrder && oneTimeOrderLockInfo(detail)) {
+        const lockedDate = firstValue(
+          detail?.locked_delivery_date,
+          detail?.order_delivery_date,
+          detail?.delivery_date,
+          detail?.deliveries?.find((delivery) => deliveryLockInfo(delivery, detail))?.delivery_date
+        );
+        body.replaceChildren(makeState(
+          'empty',
+          'Delivery locked',
+          `${lockedDate ? `The ${formatDate(lockedDate)} delivery is locked. ` : 'This delivery is locked. '}`
+            + 'Its address can no longer be changed after the cutoff.'
+        ));
+        return;
+      }
       const addresses = responseList(addressesResult);
       if (!addresses.length) {
         body.replaceChildren(
@@ -4711,7 +5032,9 @@
 
       const form = create('form', 'dialog-form');
       form.append(
-        create('p', 'dialog-copy', 'Choose a saved delivery home. The live service checks the configured cutoff for each upcoming delivery and changes only the deliveries that are still eligible.')
+        create('p', 'dialog-copy', oneTimeOrder
+          ? 'Choose a saved delivery home. It can be changed for this one-time delivery before its cutoff; after that, the delivery is locked.'
+          : 'Choose a saved delivery home. The live service checks the configured cutoff for each upcoming delivery and changes only the deliveries that are still eligible.')
       );
       const label = create('label', '', 'Delivery home');
       const select = create('select');
@@ -4740,7 +5063,9 @@
       const note = create('div', 'confirmation-panel');
       note.append(
         create('strong', '', 'Before you save'),
-        create('p', '', 'A delivery inside its protected window stays at its original address. The selected home applies from the next eligible, uncharged delivery. The server decides using its configured timezone and cutoff.')
+        create('p', '', oneTimeOrder
+          ? 'The server checks the configured timezone and cutoff again when you save. If the cutoff has passed, this one-time delivery stays unchanged.'
+          : 'A delivery inside its protected window stays at its original address. The selected home applies from the next eligible, uncharged delivery. The server decides using its configured timezone and cutoff.')
       );
       form.append(note);
       const actions = create('div', 'dialog-actions');
@@ -4789,7 +5114,9 @@
           const updatedCount = Array.isArray(data.updated_deliveries)
             ? data.updated_deliveries.length
             : Number(firstValue(data.deliveries_updated, 0));
-          showToast(protectedCount > 0
+          showToast(oneTimeOrder
+            ? 'Delivery home updated for this one-time order.'
+            : protectedCount > 0
             ? `Address updated for ${updatedCount || 'future'} eligible deliveries. The protected delivery remains unchanged.`
             : 'Delivery home updated for your upcoming deliveries.');
         } catch (error) {

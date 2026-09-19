@@ -1174,6 +1174,16 @@
         })
       );
     },
+    cancel: function cancelOneTimeOrder(orderId, options) {
+      return request(
+        '/orders/order/' + idPathSegment(orderId, '', 'Order ID') + '/cancel/',
+        mergeObjects({}, options, {
+          method: 'POST',
+          body: {},
+          form: false
+        })
+      );
+    },
     reorder: function reorderOrder(orderId, options) {
       return cart.reorder(orderId, options);
     }
@@ -1185,6 +1195,7 @@
   orders.getDeliveryDetails = orders.deliveryDetail;
   orders.getDeliveryHistory = orders.deliveryHistory;
   orders.previewModification = orders.modifyPreview;
+  orders.cancelOrder = orders.cancel;
 
   var products = {
     list: function listProducts(params, options) {

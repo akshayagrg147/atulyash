@@ -1525,6 +1525,41 @@ select {
   font-size: .62rem;
 }
 
+.subscription-next.is-cancelled {
+  min-height: 86px;
+  color: var(--forest-900);
+  background: rgba(184, 79, 49, .08);
+}
+
+.subscription-next.is-cancelled p {
+  max-width: 620px;
+  color: var(--forest-900);
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.restart-funding-due {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: var(--cream-50);
+}
+
+.restart-funding-due span {
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.restart-funding-due strong {
+  color: var(--forest-900);
+  font-family: var(--serif);
+  font-size: 1.4rem;
+}
+
 .subscription-actions {
   display: flex;
   flex-wrap: wrap;

@@ -203,9 +203,11 @@
     launchReservations: [],
     addresses: [],
     subscriptions: [],
+    pendingSubscriptionRestartId: sessionStorage.getItem('atulyash.pendingSubscriptionRestartId') || null,
     vacations: [],
     wallet: null,
     walletPreview: null,
+    walletVerificationInProgress: false,
     notifications: [],
     unreadCount: 0,
     // Delivery details are loaded on demand from the order journey. Keep the
@@ -5272,16 +5274,15 @@
     if (!force && state.loaded.has('subscriptions')) return state.subscriptions;
     if (!force) return coalesceLoad('subscriptions', () => loadSubscriptions(true));
     const query = {
-      is_active: true,
       page_size: 100,
       customerId: state.customerId
     };
     const [subscriptionsResult, vacationsResult] = await Promise.allSettled([
-      apiCall('subscriptions', ['listActive', 'getCustomerActiveSubscriptions'], query, {
+      apiCall('subscriptions', [], query, {
         path: '/subscription/subscription_plan/',
         method: 'GET',
         query: {
-          is_active: true,
+          include_cancelled: true,
           page_size: 100,
           customer_address__customer__id: state.customerId
         }
@@ -5304,6 +5305,17 @@
 
   function subscriptionId(subscription) {
     return firstValue(subscription?.id, subscription?.subscription_plan_id, subscription?.plan_id, subscription?.pk);
+  }
+
+  function subscriptionIsCancelled(subscription) {
+    const status = String(firstValue(subscription?.plan_status, subscription?.status, '')).toLowerCase();
+    return status === 'cancelled' || (!status && subscription?.is_active === false);
+  }
+
+  function subscriptionIsActive(subscription) {
+    const status = String(firstValue(subscription?.plan_status, subscription?.status, '')).toLowerCase();
+    return !subscriptionIsCancelled(subscription)
+      && (subscription?.is_active !== false || status === 'paused' || status === 'active');
   }
 
   function subscriptionCurrentPackObject(subscription) {
@@ -5709,7 +5721,16 @@
       body.append(stat);
     });
 
-    const next = create('div', 'subscription-next');
+    const next = create('div', `subscription-next${subscriptionIsCancelled(subscription) ? ' is-cancelled' : ''}`);
+    if (subscriptionIsCancelled(subscription)) {
+      next.append(create('p', '', 'This plan is cancelled. Restart to continue with the same weekly quantity, delivery day and address.'));
+      const actions = create('div', 'subscription-actions');
+      const restartButton = button('Restart subscription', 'card-action is-restart', () => restartSubscription(subscription));
+      restartButton.dataset.restartId = String(subscriptionId(subscription));
+      actions.append(restartButton);
+      card.append(head, body, next, actions);
+      return card;
+    }
     const scheduledNextDate = subscriptionNextDate(subscription);
     const displayedNextDate = subscriptionNextDateWithVacation(subscription);
     const nextDate = dateValue(displayedNextDate);
@@ -5769,6 +5790,80 @@
     }
     card.append(head, body, next, actions);
     return card;
+  }
+
+  function restartFundingPayload(value) {
+    const data = responseData(value);
+    const wallet = numberFrom(firstValue(data.available_balance, data.wallet_balance, 0));
+    const required = numberFrom(firstValue(data.minimum_wallet_required, data.gross_wallet_required, 0));
+    const shortfall = Math.max(0, numberFrom(firstValue(data.minimum_recharge_amount, data.shortfall, required - wallet)));
+    const canStart = data.can_start_subscription === true || String(data.can_start_subscription).toLowerCase() === 'true';
+    return { data, wallet, required, shortfall, canStart };
+  }
+
+  function openRestartFunding(subscription, funding) {
+    const body = create('div');
+    body.append(create(
+      'p',
+      'modification-preview-message',
+      `Your available wallet balance is ${formatMoney(funding.wallet)}. ${formatMoney(funding.required)} is needed to cover the first ${firstValue(funding.data.minimum_deliveries_required, 4)} deliveries.`
+    ));
+    const due = create('div', 'restart-funding-due');
+    due.append(create('span', '', 'Add to wallet'), create('strong', '', formatMoney(funding.shortfall)));
+    body.append(due);
+    const actions = create('div', 'dialog-actions');
+    actions.append(button(`Add funds · ${formatMoney(funding.shortfall)}`, 'primary-button', () => {
+      const id = subscriptionId(subscription);
+      if (id != null) {
+        state.pendingSubscriptionRestartId = String(id);
+        sessionStorage.setItem('atulyash.pendingSubscriptionRestartId', String(id));
+      }
+      openWalletRecharge(funding.shortfall, { subscriptionId: id });
+    }));
+    body.append(actions);
+    openDialog('Weekly plan', 'Add funds to restart', body);
+  }
+
+  async function restartSubscription(subscription) {
+    const id = subscriptionId(subscription);
+    if (id == null || !subscriptionIsCancelled(subscription)) return;
+    const control = elements.subscriptionsList.querySelector(`[data-restart-id="${CSS.escape(String(id))}"]`);
+    if (control) setButtonBusy(control, true, 'Checking wallet…');
+    try {
+      const previewResponse = await apiCall('subscriptions', ['reactivationPreview', 'previewReactivation'], { id }, {
+        path: `/subscription/subscription_plan/${id}/reactivation-preview/`,
+        method: 'POST',
+        body: {}
+      });
+      const funding = restartFundingPayload(previewResponse);
+      if (!funding.canStart) {
+        if (funding.shortfall > 0) openRestartFunding(subscription, funding);
+        else throw new Error('Your wallet could not be verified. Please try again.');
+        return;
+      }
+
+      const result = responseData(await apiCall('subscriptions', ['reactivate'], { id }, {
+        path: `/subscription/subscription_plan/${id}/reactivate/`,
+        method: 'POST',
+        body: {}
+      }));
+      if (result.success === false) throw new Error(firstValue(result.message, 'The plan could not be restarted.'));
+      state.pendingSubscriptionRestartId = null;
+      sessionStorage.removeItem('atulyash.pendingSubscriptionRestartId');
+      state.loaded.delete('subscriptions');
+      await renderSubscriptions(true);
+      showToast('Your weekly subscription has restarted. Wallet charges continue with each delivery as usual.');
+    } catch (error) {
+      const payload = responseData(firstValue(error?.response?.data, error?.data, error?.body, {}));
+      const funding = restartFundingPayload(payload);
+      if (String(payload.code || '').toUpperCase() === 'INSUFFICIENT_WALLET_BALANCE' && funding.shortfall > 0) {
+        openRestartFunding(subscription, funding);
+      } else {
+        showToast(friendlyError(error), 'error');
+      }
+    } finally {
+      if (control) setButtonBusy(control, false);
+    }
   }
 
   async function openChangeSubscriptionPlan(subscription) {
@@ -6471,11 +6566,11 @@
     renderLoading(elements.subscriptionsList, 'Checking your weekly freshness plans…');
     try {
       const subscriptions = await loadSubscriptions(force);
-      const planCount = subscriptions.length;
-      if (elements.weeklyPlanCount) elements.weeklyPlanCount.textContent = String(planCount);
-      if (elements.weeklyPlanCountLabel) elements.weeklyPlanCountLabel.textContent = planCount === 1 ? 'Active weekly plan' : planCount ? 'Active weekly plans' : 'No active plan';
-      if (elements.chooseWeeklyPlanButton) elements.chooseWeeklyPlanButton.hidden = planCount > 0;
-      if (elements.vacationBanner) elements.vacationBanner.hidden = planCount === 0;
+      const activePlanCount = subscriptions.filter(subscriptionIsActive).length;
+      if (elements.weeklyPlanCount) elements.weeklyPlanCount.textContent = String(activePlanCount);
+      if (elements.weeklyPlanCountLabel) elements.weeklyPlanCountLabel.textContent = activePlanCount === 1 ? 'Active weekly plan' : activePlanCount ? 'Active weekly plans' : 'No active plan';
+      if (elements.chooseWeeklyPlanButton) elements.chooseWeeklyPlanButton.hidden = activePlanCount > 0;
+      if (elements.vacationBanner) elements.vacationBanner.hidden = activePlanCount === 0;
       renderVacationBanner();
       if (!subscriptions.length) {
         renderEmpty(
@@ -8017,9 +8112,13 @@
     elements.previewRechargeButton.hidden = false;
   }
 
-  function openWalletRecharge(amount) {
+  function openWalletRecharge(amount, { subscriptionId: restartId = null } = {}) {
     const rechargeAmount = Math.ceil(numberFrom(amount));
     if (!Number.isFinite(rechargeAmount) || rechargeAmount <= 0) return;
+    if (restartId != null && restartId !== '') {
+      state.pendingSubscriptionRestartId = String(restartId);
+      sessionStorage.setItem('atulyash.pendingSubscriptionRestartId', String(restartId));
+    }
     closeDialog();
     showView('wallet');
     resetRechargePreview();
@@ -8036,16 +8135,56 @@
   function walletRechargeRequestPayload(amount, cartIdOverride = null) {
     const payload = { amount: Math.max(1, Math.ceil(numberFrom(amount))) };
     const activeSession = client()?.getSession?.() || {};
-    const cartId = firstValue(cartIdOverride, activeSession.cartId, activeSession.cart_id);
+    const restartId = state.pendingSubscriptionRestartId;
+    const cartId = restartId
+      ? null
+      : firstValue(cartIdOverride, activeSession.cartId, activeSession.cart_id);
     if (cartId != null && cartId !== '') payload.cart_id = cartId;
-    const activeSubscription = state.subscriptions.find((subscription) => (
-      subscription && subscription.is_active !== false
-    ));
-    const subscriptionPlanId = activeSubscription ? subscriptionId(activeSubscription) : null;
+    const activeSubscription = restartId
+      ? null
+      : state.subscriptions.find((subscription) => subscription && subscriptionIsActive(subscription));
+    const subscriptionPlanId = restartId || (activeSubscription ? subscriptionId(activeSubscription) : null);
     if (subscriptionPlanId != null && subscriptionPlanId !== '') {
       payload.subscription_plan_id = subscriptionPlanId;
     }
     return payload;
+  }
+
+  function clearPendingSubscriptionRestart() {
+    state.pendingSubscriptionRestartId = null;
+    sessionStorage.removeItem('atulyash.pendingSubscriptionRestartId');
+  }
+
+  async function resumeSubscriptionAfterRecharge() {
+    const id = state.pendingSubscriptionRestartId;
+    if (!id) return false;
+    try {
+      const preview = responseData(await apiCall('subscriptions', ['reactivationPreview', 'previewReactivation'], { id }, {
+        path: `/subscription/subscription_plan/${id}/reactivation-preview/`,
+        method: 'POST',
+        body: {}
+      }));
+      const funding = restartFundingPayload(preview);
+      if (!funding.canStart) {
+        showToast(`Recharge verified. Add ${formatMoney(funding.shortfall)} more, then tap Restart subscription.`);
+        return false;
+      }
+      const result = responseData(await apiCall('subscriptions', ['reactivate'], { id }, {
+        path: `/subscription/subscription_plan/${id}/reactivate/`,
+        method: 'POST',
+        body: {}
+      }));
+      if (result.success === false) throw new Error(firstValue(result.message, 'The plan could not be restarted.'));
+      state.loaded.delete('subscriptions');
+      await renderSubscriptions(true);
+      showToast('Recharge verified and your weekly subscription has restarted. Wallet charges continue with each delivery as usual.');
+      return true;
+    } catch (error) {
+      showToast(`Recharge was verified, but the plan was not restarted: ${friendlyError(error)}. You can tap Restart subscription to try again.`, 'error');
+      return false;
+    } finally {
+      clearPendingSubscriptionRestart();
+    }
   }
 
   async function ensureWalletCartId() {
@@ -8144,7 +8283,7 @@
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.previewRechargeButton, true, 'Preparing preview…');
     try {
-      const cartId = await ensureWalletCartId();
+      const cartId = state.pendingSubscriptionRestartId ? null : await ensureWalletCartId();
       const request = walletRechargeRequestPayload(amount, cartId);
       const result = await apiCall('misc', ['rechargePreview', 'previewRecharge'], request, {
         path: '/customers/customer-wallet/recharge/preview/',
@@ -8241,7 +8380,7 @@
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.initiateRechargeButton, true, 'Starting payment…');
     try {
-      const cartId = await ensureWalletCartId();
+      const cartId = state.pendingSubscriptionRestartId ? null : await ensureWalletCartId();
       const request = walletRechargeRequestPayload(amount, cartId);
       const result = await apiCall('misc', ['rechargeInitiate', 'initiateRecharge'], request, {
         path: '/customers/customer-wallet/recharge/initiate/',
@@ -8286,7 +8425,15 @@
           contact: state.mobile
         },
         theme: { color: '#0d342a' },
+        modal: {
+          ondismiss: () => {
+            if (state.pendingSubscriptionRestartId && !state.walletVerificationInProgress) {
+              clearPendingSubscriptionRestart();
+            }
+          }
+        },
         handler: async (payment) => {
+          state.walletVerificationInProgress = true;
           try {
             await apiCall('misc', ['rechargeVerify', 'verifyRecharge'], payment, {
               path: '/customers/customer-wallet/recharge/verify/',
@@ -8295,10 +8442,18 @@
             });
             state.loaded.delete('wallet');
             resetRechargePreview();
-            showToast('Recharge successful. Your wallet is being refreshed.');
+            const wasRestartFlow = Boolean(state.pendingSubscriptionRestartId);
+            if (wasRestartFlow) {
+              await resumeSubscriptionAfterRecharge();
+            } else {
+              showToast('Recharge successful. Your wallet is being refreshed.');
+            }
             renderWallet(true);
           } catch (error) {
+            clearPendingSubscriptionRestart();
             showToast(friendlyError(error, 'Payment completed, but verification is still pending. Please contact support.'), 'error');
+          } finally {
+            state.walletVerificationInProgress = false;
           }
         }
       });

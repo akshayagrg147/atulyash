@@ -5774,6 +5774,7 @@
       actions.append(note);
     }
     actions.append(
+      button('Add atta to a delivery', 'card-action is-quantity-addon', () => openDeliveryQuantityAddOn(subscription)),
       button('Change address', 'card-action', () => openSubscriptionAddressChange(subscription)),
       button('Vacation', 'card-action', () => openVacationForm(subscription)),
       button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
@@ -6587,6 +6588,183 @@
     } catch (error) {
       if (isUnauthorized(error)) return enterAuth('Your session has ended. Please sign in again.');
       renderError(elements.subscriptionsList, error, () => renderSubscriptions(true));
+    }
+  }
+
+  async function openDeliveryQuantityAddOn(subscription) {
+    const id = subscriptionId(subscription);
+    openDialog(
+      'Weekly plan',
+      'Add atta to a delivery',
+      makeState('loading', 'Checking upcoming deliveries.', 'Finding dates that are still before their cutoff…')
+    );
+    try {
+      const result = await apiCall('subscriptions', ['deliveryQuantityOptions', 'getDeliveryQuantityOptions'], {
+        id, subscriptionId: id, subPlanId: id
+      }, {
+        path: `/subscription/subscription_plan/${id}/delivery-quantity-options/`,
+        method: 'GET'
+      });
+      const payload = responseData(result);
+      const deliveries = responseList(payload.deliveries || payload.results || result);
+      const canChange = (delivery) => delivery.can_modify === true
+        || String(delivery.can_modify).toLowerCase() === 'true';
+      const eligible = deliveries.filter(canChange);
+      const body = create('div', 'delivery-quantity-addon');
+      body.append(create(
+        'p',
+        'dialog-copy',
+        'Add 1, 2, or 3 kg of atta to one upcoming delivery. Your weekly plan stays the same. The updated amount is charged from your wallet when the rider confirms delivery; nothing is debited now.'
+      ));
+      if (!eligible.length) {
+        body.append(makeState(
+          'empty',
+          deliveries.length ? 'No delivery can be changed right now.' : 'No upcoming deliveries are scheduled.',
+          'Choose a delivery before its modification cutoff. Once a delivery is locked or fulfilment has started, its quantity cannot be changed.'
+        ));
+        openDialog('Weekly plan', 'Add atta to a delivery', body);
+        return;
+      }
+
+      const controls = create('div', 'delivery-quantity-addon-controls');
+      const dateLabel = create('label', '', 'Choose a delivery');
+      const dateSelect = create('select', 'delivery-quantity-addon-select');
+      deliveries.forEach((delivery) => {
+        const date = firstValue(delivery.delivery_date, delivery.date, '');
+        const quantity = firstValue(delivery.current_total_quantity, delivery.total_quantity, '—');
+        const option = create('option', '', `${formatDate(date)} · ${bagWeightLabel(quantity)} kg${canChange(delivery) ? '' : ' · Locked'}`);
+        option.value = String(firstValue(delivery.delivery_id, delivery.id, ''));
+        option.disabled = !canChange(delivery);
+        option.selected = option.value === String(firstValue(eligible[0].delivery_id, eligible[0].id));
+        dateSelect.append(option);
+      });
+      dateLabel.append(dateSelect);
+
+      const quantityLabel = create('label', '', 'Extra atta for this delivery');
+      const quantitySelect = create('select', 'delivery-quantity-addon-select');
+      const selectedDelivery = () => deliveries.find((delivery) => (
+        String(firstValue(delivery.delivery_id, delivery.id)) === dateSelect.value
+      ));
+      const populateQuantities = () => {
+        const currentExtra = Number(firstValue(selectedDelivery()?.current_extra_quantity, 0));
+        quantitySelect.replaceChildren();
+        if (currentExtra > 0) {
+          const remove = create('option', '', 'Remove the current extra');
+          remove.value = '0';
+          quantitySelect.append(remove);
+        }
+        [1, 2, 3].forEach((kg) => {
+          const option = create('option', '', `Add ${kg} kg`);
+          option.value = String(kg);
+          option.selected = currentExtra === kg;
+          quantitySelect.append(option);
+        });
+        if (currentExtra === 0) quantitySelect.value = '1';
+      };
+      populateQuantities();
+      quantityLabel.append(quantitySelect);
+      controls.append(dateLabel, quantityLabel);
+      body.append(controls);
+
+      const previewPanel = create('section', 'delivery-quantity-addon-preview');
+      previewPanel.setAttribute('aria-live', 'polite');
+      const previewButton = button('Review delivery amount', 'primary-button', null);
+      const confirmButton = button('Confirm for this delivery', 'card-action is-quantity-addon-confirm', null);
+      confirmButton.disabled = true;
+      confirmButton.setAttribute('aria-disabled', 'true');
+      let latestPreview = null;
+      let requestRevision = 0;
+      const clearPreview = () => {
+        latestPreview = null;
+        previewPanel.replaceChildren(create('p', 'dialog-copy', 'Review the revised quantity and atta charge before confirming.'));
+        confirmButton.disabled = true;
+        confirmButton.setAttribute('aria-disabled', 'true');
+      };
+      const showPreview = (preview) => {
+        previewPanel.replaceChildren(
+          create('p', 'delivery-quantity-addon-date', `${formatDate(preview.delivery_date)} · ${bagWeightLabel(preview.current_total_quantity)} kg → ${bagWeightLabel(preview.new_total_quantity)} kg`),
+          create('p', 'delivery-quantity-addon-price', `Atta charge · ${formatMoney(preview.current_delivery_charge)} → ${formatMoney(preview.new_delivery_charge)}`),
+          create('p', 'dialog-copy', Number(preview.additional_charge) > 0
+            ? `${formatMoney(preview.additional_charge)} more will be charged from your wallet when the rider confirms this delivery.`
+            : Number(preview.additional_charge) < 0
+              ? `The atta charge will reduce by ${formatMoney(Math.abs(Number(preview.additional_charge)))}.`
+              : 'There is no change to the delivery charge.'),
+          create('small', '', 'This applies to this delivery only. Your weekly plan and later delivery quantities remain unchanged.')
+        );
+        confirmButton.disabled = false;
+        confirmButton.setAttribute('aria-disabled', 'false');
+      };
+
+      previewButton.addEventListener('click', async () => {
+        const delivery = selectedDelivery();
+        if (!delivery || !canChange(delivery)) return;
+        const revision = ++requestRevision;
+        latestPreview = null;
+        confirmButton.disabled = true;
+        confirmButton.setAttribute('aria-disabled', 'true');
+        previewPanel.replaceChildren(makeState('loading', 'Calculating the delivery amount.', 'Checking current pricing and cutoff…'));
+        try {
+          const response = await apiCall('subscriptions', ['previewDeliveryQuantity', 'previewDeliveryQuantityAddOn'], {
+            id,
+            delivery_id: Number(dateSelect.value),
+            extra_quantity: quantitySelect.value
+          }, {
+            path: `/subscription/subscription_plan/${id}/preview-delivery-quantity/`,
+            method: 'POST',
+            body: { delivery_id: Number(dateSelect.value), extra_quantity: quantitySelect.value }
+          });
+          if (revision !== requestRevision) return;
+          latestPreview = responseData(response);
+          showPreview(latestPreview);
+        } catch (error) {
+          if (revision !== requestRevision) return;
+          previewPanel.replaceChildren(makeState('error', 'Could not prepare the preview.', friendlyError(error, 'Refresh your schedule and try again.')));
+        }
+      });
+      const invalidate = () => { requestRevision += 1; clearPreview(); };
+      dateSelect.addEventListener('change', () => { populateQuantities(); invalidate(); });
+      quantitySelect.addEventListener('change', invalidate);
+      confirmButton.addEventListener('click', async () => {
+        if (!latestPreview || confirmButton.disabled) return;
+        confirmButton.disabled = true;
+        confirmButton.setAttribute('aria-disabled', 'true');
+        try {
+          const request = {
+            delivery_id: latestPreview.delivery_id,
+            extra_quantity: latestPreview.extra_quantity,
+            expected_quantity: latestPreview.current_quantity,
+            expected_extra_quantity: latestPreview.current_extra_quantity,
+            expected_delivery_charge: latestPreview.current_delivery_charge
+          };
+          const response = await apiCall('subscriptions', ['confirmDeliveryQuantity', 'confirmDeliveryQuantityAddOn'], {
+            id, ...request
+          }, {
+            path: `/subscription/subscription_plan/${id}/confirm-delivery-quantity/`,
+            method: 'POST',
+            body: request
+          });
+          const saved = responseData(response);
+          if (saved.success !== true) throw new Error(saved.message || 'The delivery quantity was not updated.');
+          body.replaceChildren(makeState(
+            'success',
+            'Delivery updated.',
+            `${bagWeightLabel(saved.new_total_quantity)} kg is scheduled for ${formatDate(saved.delivery_date)}. Your weekly plan has not changed.`
+          ));
+          body.append(button('Done', 'primary-button', closeDialog));
+          latestPreview = null;
+          renderSubscriptions(true);
+        } catch (error) {
+          latestPreview = null;
+          confirmButton.disabled = true;
+          confirmButton.setAttribute('aria-disabled', 'true');
+          previewPanel.replaceChildren(makeState('error', 'The delivery was not updated.', friendlyError(error, 'The cutoff or price may have changed. Review the latest schedule and try again.')));
+        }
+      });
+      clearPreview();
+      body.append(previewPanel, previewButton, confirmButton);
+      openDialog('Weekly plan', 'Add atta to a delivery', body);
+    } catch (error) {
+      openDialog('Weekly plan', 'Add atta to a delivery', makeState('error', 'Schedule unavailable.', friendlyError(error, 'Please try again.')));
     }
   }
 

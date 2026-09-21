@@ -9866,3 +9866,90 @@ body.account-bag-open {
     font-size: 1.15rem;
   }
 }
+
+.delivery-quantity-addon {
+  display: grid;
+  gap: 16px;
+}
+
+.subscription-actions .is-quantity-addon {
+  border-color: rgba(34, 106, 65, .28);
+  color: var(--forest-900);
+  background: rgba(239, 247, 235, .78);
+}
+
+.delivery-quantity-addon-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.delivery-quantity-addon-controls label {
+  display: grid;
+  gap: 7px;
+  color: var(--forest-900);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.delivery-quantity-addon-select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--forest-900);
+  background: var(--cream-50);
+  font: inherit;
+}
+
+.delivery-quantity-addon-preview {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brand-green);
+  background: var(--cream-50);
+}
+
+.delivery-quantity-addon-preview p,
+.delivery-quantity-addon-preview small {
+  margin: 0;
+}
+
+.delivery-quantity-addon-date {
+  color: var(--forest-900);
+  font-family: var(--serif);
+  font-size: 1.15rem;
+}
+
+.delivery-quantity-addon-price {
+  color: var(--forest-900);
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.delivery-quantity-addon-preview small {
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.5;
+}
+
+.is-quantity-addon-confirm {
+  justify-self: start;
+}
+
+.is-quantity-addon-confirm:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+}
+
+@media (max-width: 560px) {
+  .delivery-quantity-addon-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .is-quantity-addon-confirm {
+    width: 100%;
+  }
+}

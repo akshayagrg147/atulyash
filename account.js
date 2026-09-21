@@ -6592,6 +6592,7 @@
     }
   }
 
+  // TEMP: remove after Netlify confirms the latest production deploy.
   async function openDeliveryQuantityAddOn(
     subscription,
     { deliveryId: resumeDeliveryId = null, extraQuantity: resumeExtraQuantity = null, autoReview = false } = {}

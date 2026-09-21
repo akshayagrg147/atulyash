@@ -204,6 +204,7 @@
     addresses: [],
     subscriptions: [],
     pendingSubscriptionRestartId: sessionStorage.getItem('atulyash.pendingSubscriptionRestartId') || null,
+    pendingDeliveryAddOn: null,
     vacations: [],
     wallet: null,
     walletPreview: null,
@@ -6591,7 +6592,10 @@
     }
   }
 
-  async function openDeliveryQuantityAddOn(subscription) {
+  async function openDeliveryQuantityAddOn(
+    subscription,
+    { deliveryId: resumeDeliveryId = null, extraQuantity: resumeExtraQuantity = null, autoReview = false } = {}
+  ) {
     const id = subscriptionId(subscription);
     openDialog(
       'Weekly plan',
@@ -6610,11 +6614,15 @@
       const canChange = (delivery) => delivery.can_modify === true
         || String(delivery.can_modify).toLowerCase() === 'true';
       const eligible = deliveries.filter(canChange);
+      const resumedDelivery = eligible.find((delivery) => (
+        String(firstValue(delivery.delivery_id, delivery.id, '')) === String(resumeDeliveryId)
+      ));
+      const initialDelivery = resumedDelivery || eligible[0];
       const body = create('div', 'delivery-quantity-addon');
       body.append(create(
         'p',
         'dialog-copy',
-        'Add 1, 2, or 3 kg of atta to one upcoming delivery. Your weekly plan stays the same. The updated amount is charged from your wallet when the rider confirms delivery; nothing is debited now.'
+        'Add 1, 2, or 3 kg on top of the selected delivery quantity. Your weekly plan stays the same; any extra charge is applied after delivery confirmation.'
       ));
       if (!eligible.length) {
         body.append(makeState(
@@ -6635,7 +6643,7 @@
         const option = create('option', '', `${formatDate(date)} · ${bagWeightLabel(quantity)} kg${canChange(delivery) ? '' : ' · Locked'}`);
         option.value = String(firstValue(delivery.delivery_id, delivery.id, ''));
         option.disabled = !canChange(delivery);
-        option.selected = option.value === String(firstValue(eligible[0].delivery_id, eligible[0].id));
+        option.selected = option.value === String(firstValue(initialDelivery.delivery_id, initialDelivery.id));
         dateSelect.append(option);
       });
       dateLabel.append(dateSelect);
@@ -6656,62 +6664,143 @@
         [1, 2, 3].forEach((kg) => {
           const option = create('option', '', `Add ${kg} kg`);
           option.value = String(kg);
-          option.selected = currentExtra === kg;
           quantitySelect.append(option);
         });
-        if (currentExtra === 0) quantitySelect.value = '1';
+        quantitySelect.value = '1';
       };
       populateQuantities();
+      if (
+        resumedDelivery
+        && [0, 1, 2, 3].includes(Number(resumeExtraQuantity))
+        && (Number(resumeExtraQuantity) !== 0 || Number(resumedDelivery.current_extra_quantity) > 0)
+      ) {
+        quantitySelect.value = String(Number(resumeExtraQuantity));
+      }
       quantityLabel.append(quantitySelect);
       controls.append(dateLabel, quantityLabel);
       body.append(controls);
 
       const previewPanel = create('section', 'delivery-quantity-addon-preview');
       previewPanel.setAttribute('aria-live', 'polite');
-      const previewButton = button('Review delivery amount', 'primary-button', null);
-      const confirmButton = button('Confirm for this delivery', 'card-action is-quantity-addon-confirm', null);
+      const previewButton = button('Review delivery amount', 'primary-button delivery-quantity-addon-action', null);
+      const rechargeButton = button('Recharge wallet', 'primary-button delivery-quantity-addon-action', null);
+      const confirmButton = button('Confirm delivery change', 'primary-button delivery-quantity-addon-action', null);
+      let rechargeAmountForPreview = null;
+      rechargeButton.hidden = true;
       confirmButton.disabled = true;
       confirmButton.setAttribute('aria-disabled', 'true');
+      confirmButton.hidden = true;
       let latestPreview = null;
       let requestRevision = 0;
       const clearPreview = () => {
         latestPreview = null;
         previewPanel.replaceChildren(create('p', 'dialog-copy', 'Review the revised quantity and atta charge before confirming.'));
+        previewButton.hidden = false;
+        previewButton.disabled = false;
+        previewButton.textContent = 'Review delivery amount';
+        rechargeButton.hidden = true;
+        confirmButton.hidden = true;
         confirmButton.disabled = true;
         confirmButton.setAttribute('aria-disabled', 'true');
+        confirmButton.textContent = 'Confirm delivery change';
       };
       const showPreview = (preview) => {
-        previewPanel.replaceChildren(
-          create('p', 'delivery-quantity-addon-date', `${formatDate(preview.delivery_date)} · ${bagWeightLabel(preview.current_total_quantity)} kg → ${bagWeightLabel(preview.new_total_quantity)} kg`),
-          create('p', 'delivery-quantity-addon-price', `Atta charge · ${formatMoney(preview.current_delivery_charge)} → ${formatMoney(preview.new_delivery_charge)}`),
-          create('p', 'dialog-copy', Number(preview.additional_charge) > 0
-            ? `${formatMoney(preview.additional_charge)} more will be charged from your wallet when the rider confirms this delivery.`
-            : Number(preview.additional_charge) < 0
-              ? `The atta charge will reduce by ${formatMoney(Math.abs(Number(preview.additional_charge)))}.`
-              : 'There is no change to the delivery charge.'),
-          create('small', '', 'This applies to this delivery only. Your weekly plan and later delivery quantities remain unchanged.')
+        const shortfallValue = Number(firstValue(
+          preview.minimum_recharge_amount,
+          preview.shortfall,
+          NaN
+        ));
+        const walletShortfall = Number.isFinite(shortfallValue)
+          ? Math.max(0, shortfallValue)
+          : null;
+        const walletSufficient = preview.wallet_sufficient === true
+          || String(preview.wallet_sufficient).toLowerCase() === 'true';
+        const walletCheckAvailable = walletShortfall !== null
+          && (preview.wallet_sufficient === true || preview.wallet_sufficient === false
+            || ['true', 'false'].includes(String(preview.wallet_sufficient).toLowerCase()));
+        const additionalCharge = Number(preview.additional_charge) || 0;
+        const walletStatus = walletCheckAvailable
+          ? walletShortfall > 0
+            ? `${formatMoney(preview.available_balance)} available · ${formatMoney(walletShortfall)} more needed.`
+            : `${formatMoney(preview.available_balance)} available · enough for this change.`
+          : 'We couldn’t verify your available balance. Recharge or check again before confirming.';
+        const walletSummary = create(
+          'div',
+          `delivery-quantity-addon-wallet${!walletCheckAvailable ? ' is-unavailable' : walletShortfall > 0 ? ' is-insufficient' : ' is-ready'}`
         );
-        confirmButton.disabled = false;
-        confirmButton.setAttribute('aria-disabled', 'false');
+        walletSummary.append(
+          create('strong', '', walletCheckAvailable ? 'Available in wallet' : 'Wallet balance unavailable'),
+          create('span', '', walletStatus)
+        );
+        const previewChildren = [
+          create('p', 'delivery-quantity-addon-date', `${formatDate(preview.delivery_date)} · ${bagWeightLabel(preview.current_total_quantity)} kg → ${bagWeightLabel(preview.new_total_quantity)} kg`),
+          create('p', 'delivery-quantity-addon-price', `Delivery total · ${formatMoney(preview.current_delivery_charge)} → ${formatMoney(preview.new_delivery_charge)}`),
+          create('p', 'delivery-quantity-addon-funding', additionalCharge > 0
+            ? `${formatMoney(additionalCharge)} extra · charged after delivery confirmation.`
+            : additionalCharge < 0
+              ? `The delivery total decreases by ${formatMoney(Math.abs(additionalCharge))}.`
+              : 'No additional charge for this change.'),
+          walletSummary,
+        ];
+        const needsRecharge = walletCheckAvailable
+          ? walletShortfall > 0
+          : additionalCharge > 0;
+        rechargeAmountForPreview = walletCheckAvailable
+          ? walletShortfall
+          : additionalCharge > 0
+            ? Math.ceil(additionalCharge)
+            : null;
+        rechargeButton.textContent = walletCheckAvailable
+          ? `Recharge ${formatMoney(walletShortfall)}`
+          : 'Recharge wallet';
+        previewPanel.replaceChildren(...previewChildren);
+        const canConfirm = walletCheckAvailable && walletSufficient && walletShortfall === 0;
+        previewButton.hidden = canConfirm || needsRecharge;
+        previewButton.disabled = false;
+        previewButton.textContent = 'Check wallet again';
+        rechargeButton.hidden = !needsRecharge;
+        confirmButton.hidden = !canConfirm;
+        confirmButton.disabled = !canConfirm;
+        confirmButton.setAttribute('aria-disabled', canConfirm ? 'false' : 'true');
       };
 
-      previewButton.addEventListener('click', async () => {
+      rechargeButton.addEventListener('click', () => {
+        const pending = {
+          subscriptionId: String(id),
+          deliveryId: Number(dateSelect.value),
+          extraQuantity: Number(quantitySelect.value)
+        };
+        state.pendingDeliveryAddOn = pending;
+        openWalletRecharge(rechargeAmountForPreview, { deliveryAddOn: pending });
+      });
+
+      const requestDeliveryQuantityPreview = async () => {
         const delivery = selectedDelivery();
         if (!delivery || !canChange(delivery)) return;
         const revision = ++requestRevision;
         latestPreview = null;
+        previewButton.hidden = true;
+        rechargeButton.hidden = true;
+        confirmButton.hidden = true;
         confirmButton.disabled = true;
         confirmButton.setAttribute('aria-disabled', 'true');
         previewPanel.replaceChildren(makeState('loading', 'Calculating the delivery amount.', 'Checking current pricing and cutoff…'));
         try {
+          const selectedAddition = Number(quantitySelect.value);
+          const selection = selectedAddition === 0
+            ? { remove_current_extra: true }
+            : { add_quantity: selectedAddition };
+          const previewRequest = {
+            delivery_id: Number(dateSelect.value),
+            ...selection
+          };
           const response = await apiCall('subscriptions', ['previewDeliveryQuantity', 'previewDeliveryQuantityAddOn'], {
             id,
-            delivery_id: Number(dateSelect.value),
-            extra_quantity: quantitySelect.value
+            ...previewRequest
           }, {
             path: `/subscription/subscription_plan/${id}/preview-delivery-quantity/`,
             method: 'POST',
-            body: { delivery_id: Number(dateSelect.value), extra_quantity: quantitySelect.value }
+            body: previewRequest
           });
           if (revision !== requestRevision) return;
           latestPreview = responseData(response);
@@ -6719,22 +6808,34 @@
         } catch (error) {
           if (revision !== requestRevision) return;
           previewPanel.replaceChildren(makeState('error', 'Could not prepare the preview.', friendlyError(error, 'Refresh your schedule and try again.')));
+          previewButton.hidden = false;
+          previewButton.disabled = false;
+          previewButton.textContent = 'Try again';
         }
-      });
+      };
+      previewButton.addEventListener('click', requestDeliveryQuantityPreview);
       const invalidate = () => { requestRevision += 1; clearPreview(); };
       dateSelect.addEventListener('change', () => { populateQuantities(); invalidate(); });
       quantitySelect.addEventListener('change', invalidate);
       confirmButton.addEventListener('click', async () => {
-        if (!latestPreview || confirmButton.disabled) return;
+        if (
+          !latestPreview
+          || confirmButton.disabled
+          || latestPreview.wallet_sufficient !== true
+        ) return;
         confirmButton.disabled = true;
         confirmButton.setAttribute('aria-disabled', 'true');
+        confirmButton.textContent = 'Saving…';
         try {
           const request = {
             delivery_id: latestPreview.delivery_id,
             extra_quantity: latestPreview.extra_quantity,
             expected_quantity: latestPreview.current_quantity,
             expected_extra_quantity: latestPreview.current_extra_quantity,
-            expected_delivery_charge: latestPreview.current_delivery_charge
+            expected_delivery_charge: latestPreview.current_delivery_charge,
+            ...(Number(quantitySelect.value) === 0
+              ? { remove_current_extra: true }
+              : { add_quantity: Number(quantitySelect.value) })
           };
           const response = await apiCall('subscriptions', ['confirmDeliveryQuantity', 'confirmDeliveryQuantityAddOn'], {
             id, ...request
@@ -6755,14 +6856,20 @@
           renderSubscriptions(true);
         } catch (error) {
           latestPreview = null;
+          confirmButton.hidden = true;
           confirmButton.disabled = true;
           confirmButton.setAttribute('aria-disabled', 'true');
+          previewButton.hidden = false;
+          previewButton.disabled = false;
+          previewButton.textContent = 'Review amount again';
+          rechargeButton.hidden = true;
           previewPanel.replaceChildren(makeState('error', 'The delivery was not updated.', friendlyError(error, 'The cutoff or price may have changed. Review the latest schedule and try again.')));
         }
       });
       clearPreview();
-      body.append(previewPanel, previewButton, confirmButton);
+      body.append(previewPanel, previewButton, rechargeButton, confirmButton);
       openDialog('Weekly plan', 'Add atta to a delivery', body);
+      if (autoReview && resumedDelivery) requestDeliveryQuantityPreview();
     } catch (error) {
       openDialog('Weekly plan', 'Add atta to a delivery', makeState('error', 'Schedule unavailable.', friendlyError(error, 'Please try again.')));
     }
@@ -8290,9 +8397,15 @@
     elements.previewRechargeButton.hidden = false;
   }
 
-  function openWalletRecharge(amount, { subscriptionId: restartId = null } = {}) {
-    const rechargeAmount = Math.ceil(numberFrom(amount));
-    if (!Number.isFinite(rechargeAmount) || rechargeAmount <= 0) return;
+  function openWalletRecharge(
+    amount,
+    { subscriptionId: restartId = null, deliveryAddOn = null } = {}
+  ) {
+    const requestedAmount = amount == null || amount === '' ? null : numberFrom(amount);
+    if (requestedAmount !== null && (!Number.isFinite(requestedAmount) || requestedAmount <= 0)) return;
+    const rechargeAmount = requestedAmount === null ? null : Math.ceil(requestedAmount);
+    state.pendingDeliveryAddOn = deliveryAddOn;
+    if (deliveryAddOn && state.pendingSubscriptionRestartId) clearPendingSubscriptionRestart();
     if (restartId != null && restartId !== '') {
       state.pendingSubscriptionRestartId = String(restartId);
       sessionStorage.setItem('atulyash.pendingSubscriptionRestartId', String(restartId));
@@ -8300,7 +8413,7 @@
     closeDialog();
     showView('wallet');
     resetRechargePreview();
-    elements.rechargeAmount.value = String(rechargeAmount);
+    elements.rechargeAmount.value = rechargeAmount === null ? '' : String(rechargeAmount);
     window.setTimeout(() => {
       elements.rechargeAmount.focus({ preventScroll: true });
       elements.rechargeAmount.scrollIntoView({
@@ -8608,6 +8721,7 @@
             if (state.pendingSubscriptionRestartId && !state.walletVerificationInProgress) {
               clearPendingSubscriptionRestart();
             }
+            if (!state.walletVerificationInProgress) state.pendingDeliveryAddOn = null;
           }
         },
         handler: async (payment) => {
@@ -8621,14 +8735,32 @@
             state.loaded.delete('wallet');
             resetRechargePreview();
             const wasRestartFlow = Boolean(state.pendingSubscriptionRestartId);
+            const pendingAddOn = state.pendingDeliveryAddOn;
+            state.pendingDeliveryAddOn = null;
             if (wasRestartFlow) {
               await resumeSubscriptionAfterRecharge();
+            } else if (pendingAddOn) {
+              const subscription = state.subscriptions.find((row) => (
+                String(subscriptionId(row)) === pendingAddOn.subscriptionId
+              ));
+              await renderWallet(true);
+              if (subscription) {
+                showView('subscriptions', { focus: false });
+                await openDeliveryQuantityAddOn(subscription, {
+                  deliveryId: pendingAddOn.deliveryId,
+                  extraQuantity: pendingAddOn.extraQuantity,
+                  autoReview: true
+                });
+              } else {
+                showToast('Recharge successful. Return to your weekly plan to review the delivery amount.');
+              }
             } else {
               showToast('Recharge successful. Your wallet is being refreshed.');
             }
-            renderWallet(true);
+            if (!pendingAddOn || wasRestartFlow) renderWallet(true);
           } catch (error) {
             clearPendingSubscriptionRestart();
+            state.pendingDeliveryAddOn = null;
             showToast(friendlyError(error, 'Payment completed, but verification is still pending. Please contact support.'), 'error');
           } finally {
             state.walletVerificationInProgress = false;
@@ -9603,6 +9735,7 @@
   function showView(viewName, { focus = true, updateHash = true } = {}) {
     const panel = document.querySelector(`[data-view-panel="${viewName}"]`);
     if (!panel) return;
+    if (viewName !== 'wallet') state.pendingDeliveryAddOn = null;
     state.activeView = viewName;
     document.querySelectorAll('[data-view-panel]').forEach((view) => {
       const active = view === panel;

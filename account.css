@@ -9905,8 +9905,8 @@ body.account-bag-open {
 
 .delivery-quantity-addon-preview {
   display: grid;
-  gap: 7px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-left: 3px solid var(--brand-green);
   background: var(--cream-50);
@@ -9920,7 +9920,7 @@ body.account-bag-open {
 .delivery-quantity-addon-date {
   color: var(--forest-900);
   font-family: var(--serif);
-  font-size: 1.15rem;
+  font-size: 1.05rem;
 }
 
 .delivery-quantity-addon-price {
@@ -9929,19 +9929,43 @@ body.account-bag-open {
   font-weight: 700;
 }
 
-.delivery-quantity-addon-preview small {
+.delivery-quantity-addon-funding {
   color: var(--muted);
-  font-size: .72rem;
-  line-height: 1.5;
+  font-size: .8rem;
+  line-height: 1.45;
 }
 
-.is-quantity-addon-confirm {
-  justify-self: start;
+.delivery-quantity-addon-wallet {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  color: var(--forest-900);
+  font-size: .78rem;
+  line-height: 1.55;
 }
 
-.is-quantity-addon-confirm:disabled {
-  cursor: not-allowed;
-  opacity: .52;
+.delivery-quantity-addon-wallet.is-insufficient,
+.delivery-quantity-addon-wallet.is-unavailable {
+  border-color: #e7c4a9;
+  background: #fff8f2;
+  color: #843d27;
+}
+
+.delivery-quantity-addon-wallet.is-ready {
+  border-color: #cbd9c7;
+  background: #f7fbf5;
+}
+
+.delivery-quantity-addon-action {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 2px;
+}
+
+.delivery-quantity-addon-action[hidden] {
+  display: none;
 }
 
 @media (max-width: 560px) {
@@ -9949,7 +9973,7 @@ body.account-bag-open {
     grid-template-columns: 1fr;
   }
 
-  .is-quantity-addon-confirm {
-    width: 100%;
+  .delivery-quantity-addon-preview {
+    padding: 12px;
   }
 }

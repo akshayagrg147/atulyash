@@ -7261,14 +7261,27 @@
     const stateInput = fields.querySelector('input[name="state"]');
     const areaLabel = create('label', '', 'Area');
     const areaSelect = create('select');
+    const otherAreaValue = '__atulyash_other_area__';
     areaSelect.name = 'area';
     areaSelect.required = true;
     areaSelect.disabled = true;
     areaLabel.hidden = true;
     areaLabel.inert = true;
     areaLabel.append(areaSelect);
-    fields.append(areaLabel);
+    const customAreaLabel = create('label', '', 'Enter your area');
+    const customAreaInput = create('input');
+    customAreaInput.name = 'custom_area';
+    customAreaInput.type = 'text';
+    customAreaInput.maxLength = 160;
+    customAreaInput.autocomplete = 'address-level3';
+    customAreaInput.placeholder = 'Enter your locality or sector';
+    customAreaInput.required = false;
+    customAreaLabel.hidden = true;
+    customAreaLabel.inert = true;
+    customAreaLabel.append(customAreaInput);
+    fields.append(areaLabel, customAreaLabel);
     const initialArea = String(firstValue(address?.area, address?.locality, ''));
+    const initialAreaIsCustom = address?.area_is_custom === true;
     const serviceabilityNotice = create('div', 'address-serviceability-notice');
     serviceabilityNotice.hidden = true;
     serviceabilityNotice.setAttribute('role', 'alert');
@@ -7348,18 +7361,25 @@
 
       pincodeInput.value = pincode;
       clearServiceabilityError();
-      let area = renderGoogleAreas(result);
-      if (!area) {
-        await lookupAreaFromPincode();
-        area = areaSelect.value;
-      }
-      if (!area) {
-        setMapStatus('Location found. Choose the delivery area below.', 'warning');
-        return;
-      }
-
       try {
-        const serviceability = await checkLiveServiceability(pincode, area);
+        renderGoogleAreas(result);
+        const detectedArea = String(firstValue(
+          result.area,
+          result.locality,
+          result.sublocality,
+          result.neighborhood,
+          result.neighbourhood,
+          ''
+        )).trim();
+        await lookupAreaFromPincode();
+        const listedAreas = [...areaSelect.options].map((option) => option.value)
+          .filter((value) => value && value !== otherAreaValue);
+        if (detectedArea && !listedAreas.some((area) => area.toLowerCase() === detectedArea.toLowerCase())) {
+          areaSelect.value = otherAreaValue;
+          customAreaInput.value = detectedArea;
+          syncCustomAreaField();
+        }
+        const serviceability = await checkLiveServiceability(pincode, areaSelect.value);
         if (serviceability) setMapStatus('Location selected. Review the address fields below.', 'success');
       } catch (_error) {
         setMapStatus('Location found. Confirm the address fields below.', 'warning');
@@ -7464,8 +7484,17 @@
       areaSelect.replaceChildren(placeholder);
       areaSelect.disabled = true;
       areaSelect.value = '';
+      customAreaInput.required = false;
+      customAreaLabel.hidden = true;
+      customAreaLabel.inert = true;
       areaLabel.hidden = true;
       areaLabel.inert = true;
+    };
+    const syncCustomAreaField = () => {
+      const isCustom = areaSelect.value === otherAreaValue;
+      customAreaInput.required = isCustom;
+      customAreaLabel.hidden = !isCustom;
+      customAreaLabel.inert = !isCustom;
     };
     const renderGoogleAreas = (result) => {
       const rawAreas = result?.areas || result?.available_areas || result?.serviceable_areas || result?.area_options || [];
@@ -7473,25 +7502,35 @@
         if (area && typeof area === 'object') return firstValue(area.name, area.area, area.label, area.locality, '');
         return String(area || '').trim();
       }).map((area) => String(area || '').trim()).filter(Boolean))];
-      if (!areas.length) {
-        resetAreaOptions('No delivery areas returned for this PIN');
-        return '';
-      }
       const current = areaSelect.value;
-      const selected = areas.includes(current)
-        ? current
-        : (areas.includes(initialArea) ? initialArea : (areas.includes(result?.selectedArea) ? result.selectedArea : areas[0]));
       const options = areas.map((area) => create('option', '', area));
       options.forEach((option) => { option.value = option.textContent; });
+      const otherOption = create('option', '', 'Others');
+      otherOption.value = otherAreaValue;
+      options.push(otherOption);
+      const selected = current === otherAreaValue
+        ? otherAreaValue
+        : (initialAreaIsCustom && initialArea
+          ? otherAreaValue
+          : (areas.includes(current)
+            ? current
+            : (areas.includes(initialArea)
+              ? initialArea
+              : (initialArea ? otherAreaValue : (areas.includes(result?.selectedArea) ? result.selectedArea : (areas[0] || otherAreaValue))))));
       areaSelect.replaceChildren(...options);
       areaSelect.disabled = false;
       areaSelect.value = selected;
       areaLabel.hidden = false;
       areaLabel.inert = false;
+      if (selected === otherAreaValue && !customAreaInput.value.trim() && initialArea) {
+        customAreaInput.value = initialArea;
+      }
+      syncCustomAreaField();
       if (result?.city && cityInput) cityInput.value = result.city;
       if (result?.state && stateInput) stateInput.value = result.state;
       return selected;
     };
+    areaSelect.addEventListener('change', syncCustomAreaField);
     const clearServiceabilityError = () => {
       if (!pincodeInput) return;
       verifiedPincode = '';
@@ -7500,9 +7539,10 @@
       serviceabilityNotice.hidden = true;
     };
     const checkLiveServiceability = async (pincode, area = '') => {
-      showAreaLookupNotice('Checking delivery coverage', `Confirming live Atulyash service for PIN ${pincode}${area ? ` and ${area}` : ''}…`, 'checking');
-      const query = { pincode, ...(area ? { area } : {}) };
-      const result = await apiCall('pincodes', ['serviceability'], { pincode, area }, {
+      const serviceabilityArea = area === otherAreaValue ? '' : area;
+      showAreaLookupNotice('Checking delivery coverage', `Confirming live Atulyash service for PIN ${pincode}${serviceabilityArea ? ` and ${serviceabilityArea}` : ''}…`, 'checking');
+      const query = { pincode, ...(serviceabilityArea ? { area: serviceabilityArea } : {}) };
+      const result = await apiCall('pincodes', ['serviceability'], { pincode, area: serviceabilityArea }, {
         path: '/pincodes/pincode/serviceability/',
         method: 'GET',
         query,
@@ -7519,7 +7559,7 @@
         pincodeInput?.setAttribute('aria-invalid', 'true');
         return null;
       }
-      verifiedPincode = `${pincode}|${area}`;
+      verifiedPincode = `${pincode}|${serviceabilityArea}`;
       if (data.city && cityInput) cityInput.value = data.city;
       if (data.state && stateInput) stateInput.value = data.state;
       showAreaLookupNotice(
@@ -7570,12 +7610,13 @@
         }
         if (request !== areaLookupRequest || pincode !== String(pincodeInput?.value || '')) return;
         const area = renderGoogleAreas(result);
-        if (!area) throw new Error('The service did not return any areas for this PIN code.');
-        showAreaLookupNotice(
-          'Fresh-batch delivery is available',
-          `${area}, ${pincode} is inside the current Atulyash delivery area.`,
-          'success'
-        );
+      showAreaLookupNotice(
+        'Fresh-batch delivery is available',
+        area === otherAreaValue
+          ? `PIN ${pincode} is covered. Choose Others and enter your delivery locality.`
+          : `${area}, ${pincode} is inside the current Atulyash delivery area.`,
+        'success'
+      );
       } catch (error) {
         if (request !== areaLookupRequest) return;
         verifiedPincode = '';
@@ -7584,7 +7625,7 @@
       }
     };
     if (/^\d{6}$/.test(String(pincodeInput?.value || ''))) {
-      if (initialArea) {
+      if (initialArea && !initialAreaIsCustom) {
         renderGoogleAreas({ areas: [initialArea], selectedArea: initialArea });
       }
       void lookupAreaFromPincode();
@@ -7597,6 +7638,7 @@
       if (cityInput) cityInput.value = '';
       if (stateInput) stateInput.value = '';
       // Clear areas returned for the previous PIN before starting a new lookup.
+      customAreaInput.value = '';
       resetAreaOptions();
       void lookupAreaFromPincode();
     });
@@ -7629,9 +7671,12 @@
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
         const normalizedPincode = String(payload.pincode || '').replace(/\D/g, '').slice(0, 6);
-        const selectedArea = String(payload.area || '').trim();
-        if (verifiedPincode !== `${normalizedPincode}|${selectedArea}`) {
-          const serviceability = await checkLiveServiceability(normalizedPincode, selectedArea);
+        const areaChoice = String(payload.area || '').trim();
+        const areaIsCustom = areaChoice === otherAreaValue;
+        const selectedArea = areaIsCustom ? customAreaInput.value.trim() : areaChoice;
+        const serviceabilityArea = areaIsCustom ? '' : selectedArea;
+        if (verifiedPincode !== `${normalizedPincode}|${serviceabilityArea}`) {
+          const serviceability = await checkLiveServiceability(normalizedPincode, areaIsCustom ? otherAreaValue : selectedArea);
           if (!serviceability) {
             pincodeInput?.focus({ preventScroll: true });
             setButtonBusy(submit, false);
@@ -7639,11 +7684,15 @@
           }
         }
         if (!selectedArea) {
-          showAreaLookupNotice('Area needed', 'Wait for Atulyash to return the available areas for this PIN code, then try again.');
-          areaSelect.focus({ preventScroll: true });
+          showAreaLookupNotice('Area needed', 'Choose an area from the list, or select Others and enter your locality.');
+          if (areaIsCustom) customAreaInput.focus({ preventScroll: true });
+          else areaSelect.focus({ preventScroll: true });
           setButtonBusy(submit, false);
           return;
         }
+        payload.area = selectedArea;
+        payload.area_is_custom = areaIsCustom;
+        delete payload.custom_area;
         const activeSession = methodFrom('auth', ['getSession'])?.() || methodFrom(null, ['getSession'])?.() || {};
         payload.customer = firstValue(state.customerId, activeSession.customerId, activeSession.customer_id);
         if (!payload.customer) {

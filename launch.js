@@ -11,6 +11,9 @@
   var counter = document.getElementById('launchCounter');
   var pincode = document.getElementById('launchPincode');
   var area = document.getElementById('launchArea');
+  var otherAreaField = document.getElementById('launchOtherAreaField');
+  var otherArea = document.getElementById('launchOtherArea');
+  var otherAreaValue = '__atulyash_other_area__';
   var serviceability = document.getElementById('launchServiceability');
   var submit = document.getElementById('launchSubmit');
   var campaignDate = document.getElementById('launchCampaignDate');
@@ -65,6 +68,9 @@
     pincode.value = value;
     area.innerHTML = '<option value="">Checking areas…</option>';
     area.disabled = true;
+    otherArea.value = '';
+    otherArea.required = false;
+    otherAreaField.hidden = true;
     serviceability.textContent = '';
     if (value.length !== 6) { area.innerHTML = '<option value="">Enter a 6-digit PIN code</option>'; return; }
     api.request('/launch-experience/campaigns/serviceability/', { method: 'GET', auth: false, query: { pincode: value } }).then(function (payload) {
@@ -76,19 +82,39 @@
         var label = (row && typeof row === 'object') ? row.area : row;
         return '<option value="' + String(id || '').replace(/[&<>"']/g, '') + '">' + String(label || '').replace(/[&<>"']/g, '') + '</option>';
       }).join('');
-      area.disabled = !areas.length;
-      serviceability.textContent = areas.length ? 'This PIN is eligible for the Launch Experience.' : 'No eligible Launch Experience area was found for this PIN.';
+      if (payload && payload.allow_custom_area) area.insertAdjacentHTML('beforeend', '<option value="' + otherAreaValue + '">Others</option>');
+      area.disabled = !(payload && payload.serviceable);
+      serviceability.textContent = payload && payload.serviceable
+        ? (areas.length ? 'This PIN is eligible for the Launch Experience.' : 'This PIN is covered. Enter your delivery locality to continue.')
+        : 'No eligible Launch Experience area was found for this PIN.';
+      if (!areas.length && payload && payload.allow_custom_area) {
+        area.value = otherAreaValue;
+        otherAreaField.hidden = false;
+        otherArea.required = true;
+      }
     }).catch(function () { area.innerHTML = '<option value="">Unable to check this PIN</option>'; });
   }
+  area.addEventListener('change', function () {
+    var isCustom = area.value === otherAreaValue;
+    otherAreaField.hidden = !isCustom;
+    otherArea.required = isCustom;
+  });
   pincode.addEventListener('input', loadAreas);
   form.addEventListener('submit', function (event) {
     event.preventDefault();
     setNotice('');
     var data = new FormData(form);
     var addressLine = data.get('address_line');
+    var customArea = data.get('area_id') === otherAreaValue;
+    var areaName = String(otherArea.value || '').trim();
+    if (customArea && !areaName) {
+      otherArea.focus();
+      setNotice('Enter your area or locality to continue.');
+      return;
+    }
     var key = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('launch-' + Date.now() + '-' + Math.random().toString(16).slice(2));
     submit.disabled = true; submit.textContent = 'Reserving…';
-    api.request('/launch-experience/reservations/', { method: 'POST', body: { campaign_id: campaign.id, full_name: data.get('full_name'), monthly_consumption_band: data.get('monthly_consumption_band'), household_confirmed: data.get('household_confirmed') === 'on', delivery_address: { pincode: data.get('pincode'), area_id: Number(data.get('area_id')), address_line: addressLine, full_address: addressLine } }, headers: { 'Idempotency-Key': key } }).then(function (payload) {
+    api.request('/launch-experience/reservations/', { method: 'POST', body: { campaign_id: campaign.id, full_name: data.get('full_name'), monthly_consumption_band: data.get('monthly_consumption_band'), household_confirmed: data.get('household_confirmed') === 'on', delivery_address: { pincode: data.get('pincode'), area_id: customArea ? null : Number(data.get('area_id')), area: customArea ? areaName : undefined, area_is_custom: customArea, address_line: addressLine, full_address: addressLine } }, headers: { 'Idempotency-Key': key } }).then(function (payload) {
       form.hidden = true; success.hidden = false; document.getElementById('launchReference').textContent = payload.reference || payload.reservation_reference || 'confirmed';
     }).catch(function (error) { setNotice(error && error.message ? error.message : 'We could not reserve this Launch Experience. Please try again.'); submit.disabled = false; submit.textContent = 'Reserve my launch experience →'; });
   });

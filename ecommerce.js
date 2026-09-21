@@ -180,6 +180,8 @@
     checkoutPincode: document.getElementById('checkoutPincode'),
     checkoutAreaField: document.getElementById('checkoutAreaField'),
     checkoutArea: document.getElementById('checkoutArea'),
+    checkoutOtherAreaField: document.getElementById('checkoutOtherAreaField'),
+    checkoutOtherArea: document.getElementById('checkoutOtherArea'),
     checkoutPincodeServiceability: document.getElementById('checkoutPincodeServiceability'),
     checkoutPincodeTitle: document.getElementById('checkoutPincodeTitle'),
     checkoutPincodeStatus: document.getElementById('checkoutPincodeStatus'),
@@ -331,6 +333,7 @@
   let checkedServiceabilityPincode = '';
   let checkedServiceabilityResult = null;
   let checkoutAreaLookupRequest = 0;
+  const CHECKOUT_OTHER_AREA_VALUE = '__atulyash_other_area__';
   let accountHandoffActive = false;
   let checkoutReturnUrl = '';
   let cartReturnUrl = '';
@@ -3944,6 +3947,7 @@
       building: document.getElementById('checkoutBuilding'),
       pincode: document.getElementById('checkoutPincode'),
       area: document.getElementById('checkoutArea'),
+      otherArea: document.getElementById('checkoutOtherArea'),
       city: document.getElementById('checkoutCity'),
       state: document.getElementById('checkoutState'),
       deliveryDay: document.getElementById('checkoutDeliveryDay'),
@@ -3955,7 +3959,15 @@
       if (!fields.address.value.trim()) errors.push([fields.address, 'Please enter your house or flat number.']);
       if (!fields.building.value.trim()) errors.push([fields.building, 'Please enter the building or street.']);
       if (!/^\d{6}$/.test(fields.pincode.value.trim())) errors.push([fields.pincode, 'Enter a valid 6-digit PIN code.']);
-      if (!fields.area?.value.trim()) errors.push([fields.area, 'We could not identify your area. Check the PIN code again.']);
+      const areaChoice = String(fields.area?.value || '');
+      const isCustomArea = areaChoice === CHECKOUT_OTHER_AREA_VALUE;
+      const areaName = isCustomArea ? String(fields.otherArea?.value || '').trim() : areaChoice.trim();
+      if (!areaName) {
+        errors.push([
+          isCustomArea ? fields.otherArea : fields.area,
+          isCustomArea ? 'Enter your area or locality.' : 'Choose an area or select Others.'
+        ]);
+      }
       if (!fields.city.value.trim()) errors.push([fields.city, 'Please enter your city.']);
       if (!fields.state.value) errors.push([fields.state, 'Please select your state.']);
     }
@@ -3994,6 +4006,25 @@
     return savedAddresses.find((address) => String(address.id) === String(selectedAddressId)) || null;
   }
 
+  function checkoutAreaIsCustom() {
+    return String(elements.checkoutArea?.value || '') === CHECKOUT_OTHER_AREA_VALUE;
+  }
+
+  function selectedCheckoutArea() {
+    return checkoutAreaIsCustom()
+      ? String(elements.checkoutOtherArea?.value || '').trim()
+      : String(elements.checkoutArea?.value || '').trim();
+  }
+
+  function syncCheckoutCustomAreaField() {
+    const isCustom = checkoutAreaIsCustom();
+    if (elements.checkoutOtherAreaField) {
+      elements.checkoutOtherAreaField.hidden = !isCustom;
+      elements.checkoutOtherAreaField.inert = !isCustom;
+    }
+    if (elements.checkoutOtherArea) elements.checkoutOtherArea.required = isCustom;
+  }
+
   function resetCheckoutAreaOptions(message = 'Enter a six-digit PIN code first') {
     const field = elements.checkoutAreaField;
     const select = elements.checkoutArea;
@@ -4008,6 +4039,15 @@
     select.value = '';
     field.hidden = true;
     field.inert = true;
+    if (elements.checkoutOtherArea) {
+      elements.checkoutOtherArea.value = '';
+      elements.checkoutOtherArea.required = false;
+      elements.checkoutOtherArea.removeAttribute('aria-invalid');
+    }
+    if (elements.checkoutOtherAreaField) {
+      elements.checkoutOtherAreaField.hidden = true;
+      elements.checkoutOtherAreaField.inert = true;
+    }
   }
 
   function renderCheckoutGoogleAreas(result) {
@@ -4019,23 +4059,28 @@
       if (area && typeof area === 'object') return String(area.name || area.area || area.label || area.locality || '').trim();
       return String(area || '').trim();
     }).filter(Boolean))];
-    if (!areas.length) {
-      resetCheckoutAreaOptions('No delivery areas returned for this PIN');
-      return '';
-    }
     const current = select.value;
-    const selected = areas.includes(current) ? current : (areas.includes(result?.selectedArea) ? result.selectedArea : areas[0]);
     const options = areas.map((area) => {
       const option = document.createElement('option');
       option.value = area;
       option.textContent = area;
       return option;
     });
+    const otherOption = document.createElement('option');
+    otherOption.value = CHECKOUT_OTHER_AREA_VALUE;
+    otherOption.textContent = 'Others';
+    options.push(otherOption);
+    const selected = current === CHECKOUT_OTHER_AREA_VALUE
+      ? CHECKOUT_OTHER_AREA_VALUE
+      : (areas.includes(current)
+        ? current
+        : (areas.includes(result?.selectedArea) ? result.selectedArea : (areas[0] || CHECKOUT_OTHER_AREA_VALUE)));
     select.replaceChildren(...options);
     select.disabled = false;
     select.value = selected;
     field.hidden = false;
     field.inert = false;
+    syncCheckoutCustomAreaField();
     return selected;
   }
 
@@ -4115,7 +4160,7 @@
       }
       if (request !== checkoutAreaLookupRequest || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return null;
       const area = renderCheckoutGoogleAreas(result);
-      if (!area) throw new Error('The service did not return any areas for this PIN code.');
+      if (!area) throw new Error('Choose an area, or select Others to enter your locality.');
       setGoogleAddressContext(result);
       await checkPincodeServiceability({ force: true });
       return result;
@@ -4169,8 +4214,8 @@
       });
       return false;
     }
-    const area = String(elements.checkoutArea?.value || '').trim();
-    if (!area) {
+    const areaChoice = String(elements.checkoutArea?.value || '').trim();
+    if (!areaChoice) {
       setFieldError(elements.checkoutArea, 'We could not identify your area. Check the PIN code again.');
       renderPincodeServiceability('error', {
         title: 'Area needed',
@@ -4178,6 +4223,7 @@
       });
       return false;
     }
+    const area = areaChoice === CHECKOUT_OTHER_AREA_VALUE ? '' : areaChoice;
     if (!force && checkedServiceabilityPincode === pincode && checkedServiceabilityResult !== null) {
       return checkedServiceabilityResult;
     }
@@ -4189,7 +4235,7 @@
       message: `Confirming live Atulyash delivery coverage for ${pincode}…`
     });
     try {
-      const query = { pincode, area };
+      const query = { pincode, ...(area ? { area } : {}) };
       const payload = await invokeApi('pincodes', 'serviceability', [pincode], {
         path: '/pincodes/pincode/serviceability/',
         options: { method: 'GET', auth: false, cache: 'no-store', query }
@@ -4201,7 +4247,9 @@
         setGoogleAddressContext(result);
         renderPincodeServiceability('success', {
           title: 'Fresh-batch delivery is available',
-          message: `${area}, ${pincode} is inside the current Atulyash delivery area.`
+          message: area
+            ? `${area}, ${pincode} is inside the current Atulyash delivery area.`
+            : `PIN ${pincode} is covered. Your entered locality will be saved with this delivery address.`
         });
         return true;
       }
@@ -4352,7 +4400,8 @@
     const house = fieldValue('checkoutAddress');
     const building = fieldValue('checkoutBuilding');
     const landmark = fieldValue('checkoutLandmark');
-    const area = fieldValue('checkoutArea');
+    const area = selectedCheckoutArea();
+    const areaIsCustom = checkoutAreaIsCustom();
     const city = fieldValue('checkoutCity');
     const state = fieldValue('checkoutState');
     const pincode = fieldValue('checkoutPincode');
@@ -4364,6 +4413,7 @@
       tower_wing: building,
       landmark,
       area,
+      area_is_custom: areaIsCustom,
       city,
       state,
       country: 'IN',
@@ -4457,7 +4507,7 @@
       fieldValue('checkoutAddress')
       && fieldValue('checkoutBuilding')
       && /^\d{6}$/.test(pincode)
-      && fieldValue('checkoutArea')
+      && selectedCheckoutArea()
       && fieldValue('checkoutCity')
       && fieldValue('checkoutState')
       && checkedServiceabilityPincode === pincode
@@ -6384,11 +6434,19 @@
     updateCheckoutAvailabilityAction();
   });
   elements.checkoutArea?.addEventListener('change', (event) => {
+    syncCheckoutCustomAreaField();
     event.target.removeAttribute('aria-invalid');
     const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
     if (error) error.textContent = '';
     resetPincodeServiceability();
     void checkPincodeServiceability({ force: true });
+    updateCheckoutAvailabilityAction();
+  });
+  elements.checkoutOtherArea?.addEventListener('input', (event) => {
+    event.target.removeAttribute('aria-invalid');
+    event.target.closest('.checkout-field')?.classList.remove('has-error');
+    const error = event.target.closest('.checkout-field')?.querySelector('.field-error');
+    if (error) error.textContent = '';
     updateCheckoutAvailabilityAction();
   });
   ['checkoutAddress', 'checkoutBuilding', 'checkoutLandmark', 'checkoutCity', 'checkoutState', 'checkoutAddressType']

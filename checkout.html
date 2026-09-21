@@ -212,9 +212,14 @@
                     </label>
                     <label class="checkout-field" id="checkoutAreaField" hidden>
                       <span>Area</span>
-                      <select id="checkoutArea" name="area" required disabled>
+                      <select id="checkoutArea" name="area_choice" required disabled>
                         <option value="">Finding your area…</option>
                       </select>
+                      <small class="field-error"></small>
+                    </label>
+                    <label class="checkout-field" id="checkoutOtherAreaField" hidden>
+                      <span>Enter your area</span>
+                      <input id="checkoutOtherArea" type="text" maxlength="160" autocomplete="address-level3" placeholder="Enter your locality or sector">
                       <small class="field-error"></small>
                     </label>
                     <label class="checkout-field">

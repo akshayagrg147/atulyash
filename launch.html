@@ -103,6 +103,7 @@
           <label>Monthly atta consumption<select name="monthly_consumption_band" required><option value="">Select your household range</option><option value="UP_TO_5_KG">Up to 5 kg</option><option value="KG_6_TO_10">6–10 kg</option><option value="KG_11_TO_15">11–15 kg</option><option value="KG_16_TO_20">16–20 kg</option><option value="OVER_20_KG">More than 20 kg</option></select></label>
           <label>PIN code<input id="launchPincode" name="pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit delivery PIN"></label>
           <label>Area<select id="launchArea" name="area_id" required disabled><option value="">Enter a PIN code first</option></select></label>
+          <label id="launchOtherAreaField" hidden>Enter your area<input id="launchOtherArea" type="text" maxlength="160" autocomplete="address-level3" placeholder="Enter your locality or sector"></label>
           <label class="launch-span-two">Complete delivery address<textarea name="address_line" rows="4" required maxlength="1000" placeholder="House number, building, street and nearby landmark"></textarea></label>
         </div>
         <p id="launchServiceability" class="launch-field-note" aria-live="polite"></p>

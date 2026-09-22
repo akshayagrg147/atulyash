@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="styles.css?v=20260907-5">
   <link rel="stylesheet" href="ecommerce.css?v=20260919-1">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
-  <link rel="stylesheet" href="client-design.css?v=20260911-1">
+  <link rel="stylesheet" href="client-design.css?v=20260922-2">
 </head>
 <body data-commerce-page="storefront">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -97,10 +97,6 @@
         <a href="#weekly">Why Weekly</a>
         <a href="#process-film">How We Make It</a>
         <a class="nav-care-link" href="tel:+919818588996">Customer care: 98185 88996</a>
-        <button class="nav-location-button" id="headerLocationButton" type="button">
-          <span class="nav-location-pin" aria-hidden="true"></span>
-          <span id="headerLocationLabel">Check delivery</span>
-        </button>
       </nav>
 
       <a class="header-account" id="headerAccountLink" href="account.html" aria-label="Open your Atulyash account">
@@ -129,33 +125,74 @@
   </div>
 
   <aside class="launch-banner" id="launchBanner" hidden aria-label="Atulyash Launch Experience">
-    <div class="container launch-banner-inner">
-      <div class="launch-banner-seal" aria-hidden="true">
-        <span>Complimentary</span>
-        <strong>1 kg</strong>
-        <small>launch pack</small>
-      </div>
+    <span class="launch-banner-glow launch-banner-glow-left" aria-hidden="true"></span>
+    <span class="launch-banner-glow launch-banner-glow-right" aria-hidden="true"></span>
 
-      <div class="launch-banner-copy">
+    <div class="container launch-banner-inner">
+      <div class="launch-banner-heading">
         <div class="launch-banner-eyebrow">
-          <span>Atulyash Launch Experience</span>
+          <span>Your First Atulyash Experience</span>
           <span class="launch-banner-live"><i aria-hidden="true"></i><b id="launchBannerStatus">Reservations now open</b></span>
         </div>
-        <h2><span>A first taste,</span> with our compliments.</h2>
-        <p>For our first 2,000 families. Reserve a complimentary 1 kg pack, freshly milled from single-origin MP Sharbati wheat. Deliveries begin <strong id="launchBannerDate">12 October</strong>.</p>
-        <ul class="launch-banner-facts" aria-label="Launch Experience details">
-          <li>₹0 payable</li>
-          <li>One per household</li>
-          <li id="launchBannerAvailability">Limited to 2,000 families</li>
-        </ul>
+        <h2><span>1 kg on us</span> for the first <strong id="launchBannerQuota">2,000</strong> families</h2>
+        <p>A freshly milled introduction to single-origin MP Sharbati atta—reserved for your household, with our compliments.</p>
+        <span class="launch-banner-divider" aria-hidden="true"><i></i></span>
       </div>
 
-      <div class="launch-banner-action">
-        <a class="button launch-banner-cta" href="launch.html">
-          <span>Reserve my launch experience</span>
-          <span class="launch-banner-arrow" aria-hidden="true">→</span>
-        </a>
-        <small>Available in select Delhi areas</small>
+      <div class="launch-banner-dashboard">
+        <section class="launch-banner-panel launch-banner-dates" aria-labelledby="launchDatesTitle">
+          <div class="launch-banner-panel-title" id="launchDatesTitle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>
+            <span>Key dates</span>
+          </div>
+          <div class="launch-banner-timeline">
+            <div class="launch-banner-milestone is-live">
+              <span class="launch-banner-milestone-icon" aria-hidden="true">01</span>
+              <div><strong>Reservations are open</strong><small>Secure one complimentary pack</small></div>
+            </div>
+            <div class="launch-banner-milestone">
+              <span class="launch-banner-milestone-icon" aria-hidden="true">02</span>
+              <div><strong>Deliveries begin <span id="launchBannerDate">12 October</span></strong><small>Fresh milling scheduled for launch</small></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="launch-banner-reserve">
+          <a class="button launch-banner-cta" href="launch.html">
+            <span>Reserve now</span>
+            <span class="launch-banner-arrow" aria-hidden="true">→</span>
+          </a>
+          <small>Web reservation · ₹0 payable</small>
+        </div>
+
+        <section class="launch-banner-panel launch-banner-service" aria-label="Serviceable area">
+          <div class="launch-banner-panel-title">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/></svg>
+            <span>Serviceable area</span>
+          </div>
+          <div class="launch-banner-service-body">
+            <strong>Select Delhi areas</strong>
+            <small>Eligible PIN codes only</small>
+          </div>
+        </section>
+
+        <section class="launch-banner-panel launch-banner-counter-card" aria-label="Live availability">
+          <div class="launch-banner-panel-title">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 16v-5M10 16V7M14 16V4M18 16V9"/></svg>
+            <span>Live availability</span>
+          </div>
+          <div class="launch-banner-counter-body">
+            <strong id="launchBannerAvailability">2,000</strong>
+            <span>packs left</span>
+            <small>Updated from the live campaign</small>
+          </div>
+        </section>
+      </div>
+
+      <div class="launch-banner-assurance" aria-label="Launch reservation terms">
+        <span>Complimentary 1 kg pack</span>
+        <span>One per eligible household</span>
+        <span>No payment details required</span>
       </div>
     </div>
   </aside>
@@ -893,7 +930,7 @@
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="ecommerce.js?v=20260922-1"></script>
+  <script src="ecommerce.js?v=20260922-2"></script>
   <script>
     (function () {
       var banner = document.getElementById('launchBanner');
@@ -905,10 +942,12 @@
         var availability = document.getElementById('launchBannerAvailability');
         var status = document.getElementById('launchBannerStatus');
         var deliveryDate = document.getElementById('launchBannerDate');
+        var quota = document.getElementById('launchBannerQuota');
 
         if (availability && Number.isFinite(Number(campaign.remaining_count))) {
-          availability.textContent = Number(campaign.remaining_count).toLocaleString('en-IN') + ' packs remaining';
+          availability.textContent = Number(campaign.remaining_count).toLocaleString('en-IN');
         }
+        if (quota && Number.isFinite(Number(campaign.quota))) quota.textContent = Number(campaign.quota).toLocaleString('en-IN');
         if (status && campaign.status_message) status.textContent = campaign.status_message;
         if (deliveryDate && campaign.delivery_start_date) {
           var parsedDate = new Date(campaign.delivery_start_date + 'T00:00:00+05:30');

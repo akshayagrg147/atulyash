@@ -27,6 +27,9 @@
   const SERVICEABILITY_STORAGE_KEY = 'atulyash-home-serviceability-v1';
   const SERVICEABILITY_MAX_AGE = 6 * 60 * 60 * 1000;
   const CHECKOUT_CONTEXT_TTL = 2 * 60 * 60 * 1000;
+  // Temporarily keep the storefront open for browsing and ordering without a
+  // frontend PIN prompt. Checkout and the backend remain authoritative for delivery validation.
+  const STOREFRONT_SERVICEABILITY_ENABLED = false;
   const API = window.AtulyashAPI || null;
   const currency = new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -568,6 +571,7 @@
   }
 
   function verifiedStorefrontServiceability() {
+    if (!STOREFRONT_SERVICEABILITY_ENABLED) return { serviceable: true, pincode: '' };
     if (!storefrontServiceability) storefrontServiceability = loadStorefrontServiceability();
     return storefrontServiceability?.serviceable === true
       ? storefrontServiceability
@@ -618,6 +622,10 @@
   }
 
   function openStorefrontServiceability({ action = null, label = 'Continue to Atulyash', force = false } = {}) {
+    if (!STOREFRONT_SERVICEABILITY_ENABLED) {
+      if (typeof action === 'function') action();
+      return true;
+    }
     if (!elements.serviceabilityDialog) {
       if (typeof action === 'function') action();
       return false;
@@ -803,6 +811,7 @@
     if (!IS_STOREFRONT_PAGE || !elements.serviceabilityDialog) return;
     storefrontServiceability = loadStorefrontServiceability();
     updateHeaderServiceability(storefrontServiceability);
+    if (!STOREFRONT_SERVICEABILITY_ENABLED) return;
     const hasAccountHandoff = new URLSearchParams(window.location.search).get('checkout') === 'account'
       || loadSessionRecord(STOREFRONT_INTENT_KEY, null)?.origin === 'account';
     if (hasAccountHandoff) return;

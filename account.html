@@ -298,9 +298,13 @@
                   <span id="quickOrderCatalogMessage">Loading today’s live pack sizes…</span>
                   <button id="quickOrderCatalogRetry" type="button" hidden>Try again</button>
                 </div>
-                <fieldset class="quick-pack-grid" id="accountPackSelector" disabled>
-                  <legend class="sr-only">Atta pack size</legend>
-                </fieldset>
+                <label class="quick-pack-select-field" for="accountPackSelector">
+                  <span>Pack size</span>
+                  <select id="accountPackSelector" name="quickPackSize" disabled>
+                    <option value="">Loading live pack sizes…</option>
+                  </select>
+                  <small>Available sizes and prices come directly from the live Atulyash catalogue.</small>
+                </label>
 
                 <div class="quick-quantity-row">
                   <div><strong>Number of packs</strong><small>Up to 10 packs in one order</small></div>

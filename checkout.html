@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260907-5">
-  <link rel="stylesheet" href="ecommerce.css?v=20260902-14">
+  <link rel="stylesheet" href="ecommerce.css?v=20260921-1">
   <link rel="stylesheet" href="checkout-page.css?v=20260902-3">
 </head>
 <body class="checkout-page checkout-handoff-open" data-commerce-page="checkout">
@@ -234,8 +234,8 @@
                       <a id="checkoutPincodeLoginLink" href="account.html?return=checkout#login" hidden>Sign in to check</a>
                     </div>
                     <label class="checkout-field">
-                      <span>State</span>
-                      <select id="checkoutState" name="state" autocomplete="address-level1" required>
+                      <span>State <em>from PIN code</em></span>
+                      <select id="checkoutState" name="state" autocomplete="address-level1" required disabled>
                         <option value="">Select state</option>
                         <option>Delhi</option><option>Haryana</option><option>Punjab</option><option>Rajasthan</option><option>Uttar Pradesh</option><option>Other</option>
                       </select>
@@ -446,6 +446,6 @@
   <noscript><p class="checkout-noscript">JavaScript is required for secure checkout. <a href="index.html#shop">Return to your bag</a>.</p></noscript>
   <script src="api-client.js?v=20260906-3"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="ecommerce.js?v=20260907-2"></script>
+  <script src="ecommerce.js?v=20260921-1"></script>
 </body>
 </html>

@@ -5661,11 +5661,27 @@
     return true;
   }
 
+  function vacationRecordSource(vacation) {
+    const explicit = String(firstValue(vacation?.source, vacation?.postpone_source, '')).toLowerCase();
+    if (explicit === 'skip' || explicit === 'vacation') return explicit;
+
+    // Compatibility for older API responses that predate the additive
+    // `source` field. A same-day postpone is the manual skip record.
+    const startDate = calendarDate(firstValue(vacation?.start_date, vacation?.pause_from));
+    const endDate = calendarDate(firstValue(vacation?.end_date, vacation?.resume_at));
+    return startDate && endDate && startDate === endDate ? 'skip' : 'vacation';
+  }
+
+  function isVacationModeRecord(vacation) {
+    return vacationRecordSource(vacation) === 'vacation';
+  }
+
   function vacationCoveringDate(subscription, date) {
     const targetDate = calendarDate(date);
     if (!targetDate) return null;
     const planId = subscriptionId(subscription);
     return state.vacations.find((vacation) => {
+      if (!isVacationModeRecord(vacation)) return false;
       const relation = firstValue(
         vacation?.subscription,
         vacation?.subscription_id,
@@ -5681,6 +5697,136 @@
     }) || null;
   }
 
+  function subscriptionUpcomingOrder(subscription) {
+    const embedded = firstValue(
+      subscription?.upcoming_order,
+      subscription?.next_order,
+      subscription?.upcoming_delivery,
+      subscription?.next_delivery
+    );
+    if (embedded && typeof embedded === 'object') return embedded;
+
+    const planId = subscriptionId(subscription);
+    if (planId == null || !Array.isArray(state.orders)) return null;
+    const matching = state.orders
+      .filter((order) => String(orderSubscriptionPlanId(order)) === String(planId))
+      .sort((left, right) => {
+        const leftDate = dateValue(orderDeliveryDate(left))?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const rightDate = dateValue(orderDeliveryDate(right))?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return leftDate - rightDate;
+      });
+    return matching.find((order) => !orderIsCancelled(order) && !isCompleted(order)) || matching[0] || null;
+  }
+
+  function subscriptionDeliveryAddress(subscription) {
+    const direct = firstValue(
+      subscription?.customer_address,
+      subscription?.delivery_address,
+      subscription?.address_of_customer,
+      subscription?.address
+    );
+    if (direct && typeof direct === 'object') return addressText(direct);
+    if (typeof direct === 'string' && direct.trim() && !/^\d+$/.test(direct.trim())) return direct.trim();
+
+    const directId = direct && typeof direct === 'object' ? addressId(direct) : direct;
+    const saved = Array.isArray(state.addresses)
+      ? state.addresses.find((address) => String(addressId(address)) === String(directId))
+      : null;
+    if (saved) return addressText(saved);
+
+    const upcoming = subscriptionUpcomingOrder(subscription);
+    const orderAddress = firstValue(
+      upcoming?.delivery_address,
+      upcoming?.customer_address,
+      upcoming?.address,
+      upcoming?.address_of_customer
+    );
+    return orderAddress ? addressText(orderAddress) : 'Address not available';
+  }
+
+  function subscriptionUpcomingStatus(subscription) {
+    if (subscriptionIsCancelled(subscription)) return 'Subscription cancelled';
+    const upcoming = subscriptionUpcomingOrder(subscription);
+    const status = firstValue(
+      upcoming?.delivery_status,
+      upcoming?.order_status,
+      upcoming?.status_display,
+      upcoming?.status
+    );
+    if (status && typeof status === 'object') {
+      return String(firstValue(status.name, status.label, status.status, 'Scheduled'));
+    }
+    if (status) return String(status);
+    return subscriptionNextDateWithVacation(subscription) ? 'Scheduled' : 'Awaiting schedule';
+  }
+
+  function subscriptionFundingSummary(subscription) {
+    const pack = subscriptionCurrentPackObject(subscription);
+    const catalogPlan = subscriptionCatalogPlan(subscription);
+    const required = finiteMoney(firstValue(
+      subscription.current_monthly_price,
+      subscription.current_monthly_amount,
+      pack?.four_delivery_wallet_funding,
+      pack?.minimum_wallet_required,
+      pack?.price,
+      pack?.monthly_price,
+      catalogPlan?.fourDeliveryWalletFunding,
+      subscription.monthly_price
+    ));
+    if (!state.wallet) {
+      return {
+        value: 'Balance unavailable',
+        note: required !== null ? `${formatMoney(required)} funds four deliveries` : 'Open Wallet to check funding'
+      };
+    }
+    const wallet = walletBalanceSnapshot(state.wallet);
+    const available = wallet.available ?? wallet.total;
+    if (available === null) {
+      return {
+        value: 'Balance unavailable',
+        note: required !== null ? `${formatMoney(required)} funds four deliveries` : 'Open Wallet to check funding'
+      };
+    }
+    if (required === null || required <= 0) {
+      return { value: `${formatMoney(available)} available`, note: 'Available wallet balance' };
+    }
+    return {
+      value: available >= required ? 'Funded' : 'Recharge needed',
+      note: `${formatMoney(available)} available · ${formatMoney(required)} funds 4 deliveries`
+    };
+  }
+
+  function subscriberSummaryItem(label, value, note = '', className = '') {
+    const item = create('div', `subscriber-summary-item${className ? ` ${className}` : ''}`);
+    item.append(create('span', '', label), create('strong', '', value || '—'));
+    if (note) item.append(create('small', '', note));
+    return item;
+  }
+
+  function subscriberAction(label, note, className, handler, { disabled = false, title = '' } = {}) {
+    const control = create('button', `subscriber-quick-action${className ? ` ${className}` : ''}`);
+    control.type = 'button';
+    const copy = create('span', 'subscriber-quick-action-copy');
+    copy.append(create('strong', '', label), create('small', '', note));
+    control.append(copy, create('span', 'subscriber-quick-action-arrow', disabled ? '—' : '→'));
+    control.disabled = disabled;
+    control.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    if (title) control.title = title;
+    if (!disabled && typeof handler === 'function') control.addEventListener('click', handler);
+    return control;
+  }
+
+  function openBuyOnceFromSubscription() {
+    showView('shop');
+    setQuickOrderMode('once');
+    window.setTimeout(() => {
+      elements.accountQuickOrderForm?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'start'
+      });
+    }, 80);
+  }
+
   function makeSubscriptionCard(subscription) {
     const card = create('article', 'subscription-card');
     const head = create('div', 'subscription-card-head');
@@ -5688,47 +5834,43 @@
     copy.append(create('h3', '', subscriptionName(subscription)), create('p', '', subscriptionWeight(subscription)));
     head.append(copy, statusPill(subscriptionStatus(subscription)));
 
-    const body = create('div', 'subscription-body');
+    const body = create('section', 'subscriber-dashboard-summary');
+    body.setAttribute('aria-label', 'Subscription summary');
     const pack = subscriptionCurrentPackObject(subscription);
     const catalogPlan = subscriptionCatalogPlan(subscription);
-    [
-      ['Delivery day', firstValue(subscription.delivery_day, subscription.weekday, 'As scheduled')],
-      ['Plan length', subscriptionPlanLength(subscription)],
-      ['Weekly value', formatMoney(firstValue(
-        subscription.current_price_per_delivery,
-        subscription.current_weekly_price,
-        pack?.price_per_delivery,
-        pack?.weekly_price,
-        catalogPlan?.pricePerDelivery,
-        subscription.price_per_delivery,
-        subscription.weekly_price,
-        0
-      ))],
-      ['Wallet cover (4 deliveries)', formatMoney(firstValue(
-        subscription.current_monthly_price,
-        subscription.current_monthly_amount,
-        pack?.four_delivery_wallet_funding,
-        pack?.minimum_wallet_required,
-        pack?.price,
-        pack?.monthly_price,
-        catalogPlan?.fourDeliveryWalletFunding,
-        subscription.monthly_price,
-        0
-      ))],
-      ['Plan reference', `#${subscriptionId(subscription) || '—'}`]
-    ].forEach(([label, value]) => {
-      const stat = create('div', 'subscription-stat');
-      stat.append(create('span', '', label), create('strong', '', value));
-      body.append(stat);
-    });
+    const funding = subscriptionFundingSummary(subscription);
+    const deliveryDay = String(firstValue(subscription.delivery_day, subscription.weekday, 'As scheduled'));
+    const nextDeliveryDate = subscriptionNextDateWithVacation(subscription);
+    const weeklyPrice = finiteMoney(firstValue(
+      subscription.current_price_per_delivery,
+      subscription.current_weekly_price,
+      pack?.price_per_delivery,
+      pack?.weekly_price,
+      catalogPlan?.pricePerDelivery,
+      subscription.price_per_delivery,
+      subscription.weekly_price
+    ));
+    body.append(
+      subscriberSummaryItem('Subscription status', subscriptionStatus(subscription), `Plan #${subscriptionId(subscription) || '—'}`, 'is-status'),
+      subscriberSummaryItem('Weekly quantity', subscriptionWeight(subscription), weeklyPrice !== null ? `${formatMoney(weeklyPrice)} per delivery` : 'Fresh batch every week', 'is-quantity'),
+      subscriberSummaryItem('Weekly delivery day', deliveryDay.charAt(0).toUpperCase() + deliveryDay.slice(1), subscriptionPlanLength(subscription), 'is-day'),
+      subscriberSummaryItem('Next delivery date', nextDeliveryDate ? formatDate(nextDeliveryDate) : 'Not scheduled', 'Based on the current live schedule', 'is-next-date'),
+      subscriberSummaryItem('Delivery address', subscriptionDeliveryAddress(subscription), 'Used for the next eligible delivery', 'is-address'),
+      subscriberSummaryItem('Wallet / funding status', funding.value, funding.note, 'is-wallet'),
+      subscriberSummaryItem('Upcoming order status', subscriptionUpcomingStatus(subscription), nextDeliveryDate ? `Expected ${formatDate(nextDeliveryDate)}` : 'No upcoming date available', 'is-order-status')
+    );
 
     const next = create('div', `subscription-next${subscriptionIsCancelled(subscription) ? ' is-cancelled' : ''}`);
     if (subscriptionIsCancelled(subscription)) {
       next.append(create('p', '', 'This plan is cancelled. Restart to continue with the same weekly quantity, delivery day and address.'));
-      const actions = create('div', 'subscription-actions');
+      const actions = create('section', 'subscriber-quick-actions');
+      const actionsHeading = create('div', 'subscriber-quick-actions-heading');
+      actionsHeading.append(create('span', '', 'Quick action'), create('h4', '', 'Restart this subscription'));
+      const actionGrid = create('div', 'subscriber-quick-actions-grid');
       const restartButton = button('Restart subscription', 'card-action is-restart', () => restartSubscription(subscription));
       restartButton.dataset.restartId = String(subscriptionId(subscription));
-      actions.append(restartButton);
+      actionGrid.append(restartButton, subscriberAction('Buy Once', 'Order a fresh pack without restarting', 'is-buy-once', openBuyOnceFromSubscription));
+      actions.append(actionsHeading, actionGrid);
       card.append(head, body, next, actions);
       return card;
     }
@@ -5755,41 +5897,48 @@
     }
     next.append(tile, nextCopy);
 
-    const actions = create('div', 'subscription-actions');
+    const actions = create('section', 'subscriber-quick-actions');
+    const actionsHeading = create('div', 'subscriber-quick-actions-heading');
+    actionsHeading.append(
+      create('span', '', 'Quick actions'),
+      create('h4', '', 'Manage this subscription'),
+      create('p', '', 'Each action changes only the item named below.')
+    );
+    const actionGrid = create('div', 'subscriber-quick-actions-grid');
     const planChangeLock = subscriptionPlanChangeLock(subscription);
     if (subscriptionAllowsPlanChanges(subscription) && !planChangeLock) {
-      actions.append(button('Change plan', 'card-action', () => openChangeSubscriptionPlan(subscription)));
+      actionGrid.append(subscriberAction('Change Quantity', 'Choose a new weekly atta quantity', 'is-quantity', () => openChangeSubscriptionPlan(subscription)));
     } else {
-      const lockedButton = button('Change plan locked', 'card-action is-plan-locked-button', null);
-      lockedButton.disabled = true;
-      lockedButton.setAttribute('aria-disabled', 'true');
-      lockedButton.title = planChangeLock
+      const lockMessage = planChangeLock
         ? planChangeLockMessage(planChangeLock)
-        : 'A batch from this subscription has already been delivered. Finish the current delivery cycle before changing quantity.';
-      actions.append(lockedButton);
-      const note = create(
-        'small',
-        'subscription-action-note is-plan-locked',
-        planChangeLock ? planChangeLockMessage(planChangeLock) : 'Plan changes unlock after this subscription is complete.'
-      );
-      actions.append(note);
+        : 'Quantity changes unlock after this subscription is complete.';
+      actionGrid.append(subscriberAction('Change Quantity', 'Locked for the protected delivery window', 'is-quantity is-locked', null, {
+        disabled: true,
+        title: lockMessage
+      }));
     }
-    actions.append(
-      button('Add atta to a delivery', 'card-action is-quantity-addon', () => openDeliveryQuantityAddOn(subscription)),
-      button('Change address', 'card-action', () => openSubscriptionAddressChange(subscription)),
-      button('Vacation', 'card-action', () => openVacationForm(subscription)),
-      button('Cancel plan', 'card-action is-rust', () => openCancelSubscription(subscription))
+    actionGrid.append(
+      subscriberAction('Change Delivery Day', 'Move future batches to another weekday', 'is-delivery-day', () => openSubscriptionScheduleRequest(subscription)),
+      subscriberAction('Change Address', 'Choose another saved delivery home', 'is-address', () => openSubscriptionAddressChange(subscription)),
+      subscriberAction('Add Atta to Next Delivery', 'Add 1, 2, or 3 kg to one delivery', 'is-add-atta', () => openDeliveryQuantityAddOn(subscription))
     );
     if (subscriptionAllowsDeliveryChanges(subscription)) {
-      actions.insertBefore(
-        button('Manage deliveries', 'card-action', () => openManageDeliveries(subscription)),
-        actions.children[1]
-      );
+      actionGrid.append(subscriberAction('Skip Delivery', 'Skip one eligible upcoming date', 'is-skip', () => openManageDeliveries(subscription, {
+        dialogTitle: 'Skip delivery',
+        showScheduleAction: false
+      })));
     } else {
-      const note = create('small', 'subscription-action-note', 'Delivery skips are available for continuous plans.');
-      note.title = 'This plan contains a fixed four-delivery cycle, so its delivery dates cannot be skipped.';
-      actions.append(note);
+      actionGrid.append(subscriberAction('Skip Delivery', 'Available for continuous weekly plans', 'is-skip is-locked', null, {
+        disabled: true,
+        title: 'This plan contains a fixed four-delivery cycle, so its delivery dates cannot be skipped.'
+      }));
     }
+    actionGrid.append(
+      subscriberAction('Vacation Mode', 'Pause deliveries for a date range', 'is-vacation', () => openVacationForm(subscription)),
+      subscriberAction('Buy Once', 'Order an extra pack separately', 'is-buy-once', openBuyOnceFromSubscription),
+      subscriberAction('Cancel Subscription', 'Stop this weekly plan', 'is-cancel', () => openCancelSubscription(subscription))
+    );
+    actions.append(actionsHeading, actionGrid);
     card.append(head, body, next, actions);
     return card;
   }
@@ -6522,7 +6671,7 @@
   }
 
   function renderVacationBanner() {
-    const active = state.vacations[0];
+    const active = state.vacations.find(isVacationModeRecord);
     if (!active) {
       elements.vacationBanner.replaceChildren();
       const left = create('div');
@@ -6567,7 +6716,14 @@
   async function renderSubscriptions(force = false) {
     renderLoading(elements.subscriptionsList, 'Checking your weekly freshness plans…');
     try {
-      const subscriptions = await loadSubscriptions(force);
+      const [subscriptionsResult] = await Promise.allSettled([
+        loadSubscriptions(force),
+        loadWalletSummary(force),
+        ensureAddresses(force),
+        getOrders({ page: 1, force })
+      ]);
+      if (subscriptionsResult.status === 'rejected') throw subscriptionsResult.reason;
+      const subscriptions = subscriptionsResult.value;
       const activePlanCount = subscriptions.filter(subscriptionIsActive).length;
       if (elements.weeklyPlanCount) elements.weeklyPlanCount.textContent = String(activePlanCount);
       if (elements.weeklyPlanCountLabel) elements.weeklyPlanCountLabel.textContent = activePlanCount === 1 ? 'Active weekly plan' : activePlanCount ? 'Active weekly plans' : 'No active plan';
@@ -6876,11 +7032,14 @@
     }
   }
 
-  async function openManageDeliveries(subscription) {
+  async function openManageDeliveries(subscription, {
+    dialogTitle = 'Manage deliveries',
+    showScheduleAction = true
+  } = {}) {
     if (!subscriptionAllowsDeliveryChanges(subscription)) {
       openDialog(
         'Weekly plan',
-        'Manage deliveries',
+        dialogTitle,
         makeState(
           'empty',
           'This plan has a fixed delivery cycle.',
@@ -6891,7 +7050,7 @@
     }
     const id = subscriptionId(subscription);
     const loading = makeState('loading', 'Checking your schedule.', 'Finding the dates that can still be changed…');
-    openDialog('Weekly plan', 'Manage deliveries', loading);
+    openDialog('Weekly plan', dialogTitle, loading);
     try {
       const [deliveriesResult, summaryResult] = await Promise.allSettled([
         apiCall('subscriptions', ['skippableDeliveries', 'getSkippableDeliveries'], { id, subscriptionId: id, subPlanId: id }, {
@@ -7045,14 +7204,16 @@
         });
         body.append(list);
       }
-      const scheduleHelp = create('div', 'schedule-change-help');
-      const scheduleCopy = create('div');
-      scheduleCopy.append(
-        create('strong', '', 'Need a different delivery weekday or date?'),
-        create('p', '', 'Choose a supported weekday and effective date. Existing deliveries before that date stay unchanged.')
-      );
-      scheduleHelp.append(scheduleCopy, button('Change schedule', 'card-action', () => openSubscriptionScheduleRequest(subscription)));
-      body.append(scheduleHelp);
+      if (showScheduleAction) {
+        const scheduleHelp = create('div', 'schedule-change-help');
+        const scheduleCopy = create('div');
+        scheduleCopy.append(
+          create('strong', '', 'Need a different delivery weekday or date?'),
+          create('p', '', 'Choose a supported weekday and effective date. Existing deliveries before that date stay unchanged.')
+        );
+        scheduleHelp.append(scheduleCopy, button('Change schedule', 'card-action', () => openSubscriptionScheduleRequest(subscription)));
+        body.append(scheduleHelp);
+      }
       elements.dialogBody.replaceChildren(body);
     } catch (error) {
       console.warn('Atulyash delivery schedule could not be loaded.', error);
@@ -7063,8 +7224,10 @@
         'No delivery was changed. You can try again or send your preferred weekday and effective date to Atulyash care.'
       ));
       const actions = create('div', 'dialog-actions');
-      actions.append(button('Try again', 'secondary-button', () => openManageDeliveries(subscription)));
-      actions.append(button('Change schedule →', 'primary-button', () => openSubscriptionScheduleRequest(subscription)));
+      actions.append(button('Try again', 'secondary-button', () => openManageDeliveries(subscription, { dialogTitle, showScheduleAction })));
+      if (showScheduleAction) {
+        actions.append(button('Change schedule →', 'primary-button', () => openSubscriptionScheduleRequest(subscription)));
+      }
       body.append(actions);
       elements.dialogBody.replaceChildren(body);
     }
@@ -9157,42 +9320,20 @@
 
   function renderQuickProductPacks() {
     if (!elements.accountPackSelector) return;
-    const previousWeight = Number(
-      document.querySelector('input[name="quickPackSize"]:checked')?.value
-    );
+    const previousPackId = String(elements.accountPackSelector.value || '');
     const fragment = document.createDocumentFragment();
-    const legend = create('legend', 'sr-only', 'Atta pack size');
-    fragment.append(legend);
 
-    state.quickProductPacks.forEach((pack, index) => {
-      const label = document.createElement('label');
-      const input = document.createElement('input');
-      input.type = 'radio';
-      input.name = 'quickPackSize';
-      input.value = String(pack.weight);
-      input.dataset.price = String(pack.price);
-      input.dataset.apiPackId = String(pack.apiId);
-      input.checked = (
-        Number.isFinite(previousWeight)
-          ? pack.weight === previousWeight
-          : index === 0
-      );
-
-      const content = document.createElement('span');
-      const weight = create('b', '', `${bagWeightLabel(pack.weight)} kg`);
-      const note = create(
-        'small',
+    state.quickProductPacks.forEach((pack) => {
+      const option = create(
+        'option',
         '',
-        index === 0
-          ? 'Compact fresh batch'
-          : index === state.quickProductPacks.length - 1
-            ? 'Family fresh batch'
-            : 'Fresh-batch pack'
+        `${bagWeightLabel(pack.weight)} kg · ${currency.format(pack.price)}`
       );
-      const price = create('em', '', currency.format(pack.price));
-      content.append(weight, note, price);
-      label.append(input, content);
-      fragment.append(label);
+      option.value = String(pack.apiId);
+      option.dataset.weight = String(pack.weight);
+      option.dataset.price = String(pack.price);
+      if (String(pack.apiId) === previousPackId) option.selected = true;
+      fragment.append(option);
     });
 
     elements.accountPackSelector.replaceChildren(fragment);
@@ -9206,7 +9347,9 @@
     state.quickProductPacks = [];
     if (elements.accountPackSelector) {
       elements.accountPackSelector.disabled = true;
-      elements.accountPackSelector.replaceChildren();
+      const loadingOption = create('option', '', 'Loading live pack sizes…');
+      loadingOption.value = '';
+      elements.accountPackSelector.replaceChildren(loadingOption);
     }
     setQuickProductCatalogStatus('Loading today’s live pack sizes…', { state: 'loading' });
     renderQuickOrder();
@@ -9233,10 +9376,11 @@
           && (firstFinite(pack?.stock_quantity) ?? 1) > 0
         ))
         .map((pack) => {
+          const backendWeight = firstFinite(pack?.weight_kg, pack?.weight, pack?.amount);
           const labelledWeight = weightFromLabel(pack?.name);
-          const weight = Number.isFinite(labelledWeight) && labelledWeight > 0
-            ? labelledWeight
-            : firstFinite(pack?.weight, pack?.amount);
+          const weight = Number.isFinite(backendWeight) && backendWeight > 0
+            ? backendWeight
+            : labelledWeight;
           const price = firstFinite(pack?.price);
           const apiId = firstValue(pack?.id, pack?.pk);
           if (
@@ -9370,13 +9514,13 @@
   }
 
   function selectedQuickPack() {
-    const input = document.querySelector('input[name="quickPackSize"]:checked')
-      || document.querySelector('input[name="quickPackSize"]');
-    const weight = Number(input?.value);
-    const price = Number(input?.dataset.price);
-    const apiId = Number(input?.dataset.apiPackId);
+    const option = elements.accountPackSelector?.selectedOptions?.[0];
+    const weight = Number(option?.dataset.weight);
+    const price = Number(option?.dataset.price);
+    const apiId = Number(option?.value);
     if (
-      !input
+      !option
+      || option.disabled
       || state.quickProductCatalogStatus !== 'ready'
       || !Number.isFinite(weight)
       || weight <= 0
@@ -9538,9 +9682,6 @@
         : 'Add to bag';
 
     document.querySelectorAll('input[name="quickOrderMode"]').forEach((input) => {
-      input.closest('label')?.classList.toggle('is-selected', input.checked);
-    });
-    document.querySelectorAll('input[name="quickPackSize"]').forEach((input) => {
       input.closest('label')?.classList.toggle('is-selected', input.checked);
     });
     if (animate) animateQuickOrderPack(displayWeight);

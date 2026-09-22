@@ -332,6 +332,9 @@
   let pincodeCheckInFlight = false;
   let checkedServiceabilityPincode = '';
   let checkedServiceabilityResult = null;
+  let checkoutServiceabilityRequest = 0;
+  let checkoutVerifiedState = '';
+  let checkoutVerifiedStatePincode = '';
   let checkoutAreaLookupRequest = 0;
   const CHECKOUT_OTHER_AREA_VALUE = '__atulyash_other_area__';
   let accountHandoffActive = false;
@@ -3969,7 +3972,11 @@
         ]);
       }
       if (!fields.city.value.trim()) errors.push([fields.city, 'Please enter your city.']);
-      if (!fields.state.value) errors.push([fields.state, 'Please select your state.']);
+      const pincode = fields.pincode.value.trim();
+      const stateMatchesPincode = checkoutStateMatchesPincode(pincode);
+      if (!stateMatchesPincode) {
+        errors.push([fields.pincode, 'Verify this PIN code to confirm its matching state before continuing.']);
+      }
     }
     const hasWeekly = cart.some((item) => item.purchaseType === 'weekly');
     if (hasWeekly && requireSchedule && !DELIVERY_DAYS.includes(fields.deliveryDay.value)) {
@@ -4084,7 +4091,32 @@
     return selected;
   }
 
-  function setGoogleAddressContext(result) {
+  function checkoutStateFromLookup(value, stateField) {
+    const key = String(value || '').trim().toLocaleLowerCase('en-IN')
+      .replace(/,\s*india$/i, '')
+      .replace(/[^a-z]/g, '');
+    const aliases = {
+      delhi: 'Delhi',
+      newdelhi: 'Delhi',
+      nctofdelhi: 'Delhi',
+      nationalcapitalterritoryofdelhi: 'Delhi',
+      haryana: 'Haryana',
+      hr: 'Haryana',
+      punjab: 'Punjab',
+      pb: 'Punjab',
+      rajasthan: 'Rajasthan',
+      rj: 'Rajasthan',
+      uttarpradesh: 'Uttar Pradesh',
+      up: 'Uttar Pradesh'
+    };
+    const canonical = aliases[key];
+    if (!canonical) return '';
+    return [...stateField.options].find((option) => option.value === canonical)?.value || '';
+  }
+
+  function setGoogleAddressContext(result, pincode) {
+    const normalizedPincode = String(pincode || '').replace(/\D/g, '').slice(0, 6);
+    if (!/^\d{6}$/.test(normalizedPincode) || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return false;
     const city = String(result?.city || '').trim();
     const state = String(result?.state || '').trim();
     const cityField = document.getElementById('checkoutCity');
@@ -4093,9 +4125,34 @@
     // when the customer changes the PIN after a previous lookup.
     if (city && cityField) cityField.value = city;
     if (state && stateField) {
-      const option = [...stateField.options].find((entry) => entry.value.localeCompare(state, 'en', { sensitivity: 'accent' }) === 0);
-      if (option) stateField.value = option.value;
+      const canonicalState = checkoutStateFromLookup(state, stateField);
+      if (!canonicalState) {
+        checkoutVerifiedState = '';
+        checkoutVerifiedStatePincode = '';
+        stateField.value = '';
+        stateField.disabled = true;
+        return false;
+      }
+      stateField.value = canonicalState;
+      stateField.disabled = true;
+      checkoutVerifiedState = canonicalState;
+      checkoutVerifiedStatePincode = normalizedPincode;
     }
+    return Boolean(
+      checkoutVerifiedState
+      && checkoutVerifiedStatePincode === normalizedPincode
+      && stateField?.value === checkoutVerifiedState
+    );
+  }
+
+  function checkoutStateMatchesPincode(pincodeValue = fieldValue('checkoutPincode')) {
+    const pincode = String(pincodeValue || '').trim();
+    const stateField = document.getElementById('checkoutState');
+    return Boolean(
+      checkoutVerifiedState
+      && checkoutVerifiedStatePincode === pincode
+      && stateField?.value === checkoutVerifiedState
+    );
   }
 
   async function lookupCheckoutArea(pincode) {
@@ -4161,7 +4218,7 @@
       if (request !== checkoutAreaLookupRequest || normalizedPincode !== String(elements.checkoutPincode?.value || '')) return null;
       const area = renderCheckoutGoogleAreas(result);
       if (!area) throw new Error('Choose an area, or select Others to enter your locality.');
-      setGoogleAddressContext(result);
+      setGoogleAddressContext(result, normalizedPincode);
       await checkPincodeServiceability({ force: true });
       return result;
     } catch (error) {
@@ -4227,8 +4284,7 @@
     if (!force && checkedServiceabilityPincode === pincode && checkedServiceabilityResult !== null) {
       return checkedServiceabilityResult;
     }
-    if (pincodeCheckInFlight) return null;
-
+    const request = ++checkoutServiceabilityRequest;
     pincodeCheckInFlight = true;
     renderPincodeServiceability('checking', {
       title: 'Checking your PIN code',
@@ -4241,15 +4297,22 @@
         options: { method: 'GET', auth: false, cache: 'no-store', query }
       });
       const result = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+      if (request !== checkoutServiceabilityRequest || pincode !== String(elements.checkoutPincode?.value || '')) return null;
+      const responsePincode = String(result?.pincode || '').replace(/\D/g, '').slice(0, 6);
+      if (responsePincode && responsePincode !== pincode) {
+        throw new Error(`The PIN lookup returned ${responsePincode} instead of ${pincode}. Please verify the PIN again.`);
+      }
+      if (result?.serviceable === true && !setGoogleAddressContext(result, pincode)) {
+        throw new Error('We could not confirm the state for this PIN code. Please verify the PIN again.');
+      }
       checkedServiceabilityPincode = pincode;
       checkedServiceabilityResult = result?.serviceable === true;
       if (checkedServiceabilityResult) {
-        setGoogleAddressContext(result);
         renderPincodeServiceability('success', {
           title: 'Fresh-batch delivery is available',
           message: area
-            ? `${area}, ${pincode} is inside the current Atulyash delivery area.`
-            : `PIN ${pincode} is covered. Your entered locality will be saved with this delivery address.`
+            ? `${area}, ${pincode} is inside the current Atulyash delivery area. State: ${checkoutVerifiedState}.`
+            : `PIN ${pincode} is covered. State: ${checkoutVerifiedState}; your entered locality will be saved with this delivery address.`
         });
         return true;
       }
@@ -4260,6 +4323,7 @@
       });
       return false;
     } catch (error) {
+      if (request !== checkoutServiceabilityRequest || pincode !== String(elements.checkoutPincode?.value || '')) return null;
       checkedServiceabilityPincode = pincode;
       checkedServiceabilityResult = null;
       renderPincodeServiceability('error', {
@@ -4268,12 +4332,14 @@
       });
       return null;
     } finally {
-      pincodeCheckInFlight = false;
-      const state = elements.checkoutPincodeServiceability?.dataset.state || 'idle';
-      renderPincodeServiceability(state, {
-        title: elements.checkoutPincodeTitle?.textContent,
-        message: elements.checkoutPincodeStatus?.textContent
-      });
+      if (request === checkoutServiceabilityRequest) {
+        pincodeCheckInFlight = false;
+        const state = elements.checkoutPincodeServiceability?.dataset.state || 'idle';
+        renderPincodeServiceability(state, {
+          title: elements.checkoutPincodeTitle?.textContent,
+          message: elements.checkoutPincodeStatus?.textContent
+        });
+      }
     }
   }
 
@@ -4427,6 +4493,9 @@
   }
 
   async function saveNewAddress() {
+    if (!checkoutStateMatchesPincode()) {
+      throw new Error('The state must match the latest verified PIN code. Please verify your PIN code again.');
+    }
     const payload = newAddressPayload();
     const response = await invokeApi('addresses', 'create', [payload], {
       path: '/customers/customer-addresses/',
@@ -4509,7 +4578,7 @@
       && /^\d{6}$/.test(pincode)
       && selectedCheckoutArea()
       && fieldValue('checkoutCity')
-      && fieldValue('checkoutState')
+      && checkoutStateMatchesPincode(pincode)
       && checkedServiceabilityPincode === pincode
       && checkedServiceabilityResult === true
     );
@@ -6418,11 +6487,20 @@
   });
   elements.checkoutPincode?.addEventListener('input', (event) => {
     event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
+    // Invalidate any older in-flight lookup so only the latest PIN can set
+    // the address state or authorize checkout.
+    checkoutServiceabilityRequest += 1;
+    pincodeCheckInFlight = false;
+    checkoutVerifiedState = '';
+    checkoutVerifiedStatePincode = '';
     // Never carry the previous PIN's city into a new address lookup.
     const cityField = document.getElementById('checkoutCity');
     const stateField = document.getElementById('checkoutState');
     if (cityField) cityField.value = '';
-    if (stateField) stateField.value = '';
+    if (stateField) {
+      stateField.value = '';
+      stateField.disabled = true;
+    }
     // Clear areas returned for the previous PIN before the new lookup starts.
     resetCheckoutAreaOptions();
     if (event.target.value !== checkedServiceabilityPincode) resetPincodeServiceability();

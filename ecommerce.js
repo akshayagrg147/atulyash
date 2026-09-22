@@ -81,6 +81,7 @@
     productUnitPrice: document.getElementById('productUnitPrice'),
     addToCartPrice: document.getElementById('addToCartPrice'),
     packSelector: document.getElementById('packSelector'),
+    packSizeSelect: document.getElementById('packSizeSelect'),
     purchaseSelector: document.getElementById('purchaseSelector'),
     weeklyPlanPanel: document.getElementById('weeklyPlanPanel'),
     weeklyPlanSelect: document.getElementById('weeklyPlanSelect'),
@@ -928,7 +929,7 @@
   }
 
   function renderCatalogPackOptions() {
-    const host = elements.packSelector?.querySelector('.pack-options');
+    const host = elements.packSizeSelect;
     if (!host) return;
     const variants = Object.values(PRODUCT.variants)
       .filter((variant) => variant.available !== false)
@@ -936,30 +937,15 @@
     if (!variants.length) return;
 
     const fragment = document.createDocumentFragment();
-    variants.forEach((variant, index) => {
-      const label = document.createElement('label');
-      label.className = `pack-option${variant.weight === selectedWeight ? ' is-selected' : ''}`;
-      const input = document.createElement('input');
-      input.type = 'radio';
-      input.name = 'packSize';
-      input.value = String(variant.weight);
-      input.checked = variant.weight === selectedWeight;
-      const copy = document.createElement('span');
-      const title = document.createElement('strong');
-      const note = document.createElement('small');
-      const price = document.createElement('b');
-      title.textContent = `${formatWeight(variant.weight)} kg`;
-      note.textContent = index === 0
-        ? 'Total quantity · compact need'
-        : index === variants.length - 1
-          ? 'Total quantity · larger household'
-          : 'Total quantity';
-      price.textContent = formatPrice(variant.price);
-      copy.append(title, note);
-      label.append(input, copy, price);
-      fragment.append(label);
+    variants.forEach((variant) => {
+      const option = document.createElement('option');
+      option.value = String(variant.weight);
+      option.textContent = `${formatWeight(variant.weight)} kg · ${formatPrice(variant.price)}`;
+      option.selected = variant.weight === selectedWeight;
+      fragment.append(option);
     });
     host.replaceChildren(fragment);
+    host.value = String(selectedWeight);
   }
 
   function setWeeklyCatalogControls(available, message = 'Loading weekly plans…') {
@@ -2512,13 +2498,7 @@
     }
     renderWeeklyCalculatorSuggestion();
 
-    document.querySelectorAll('input[name="packSize"]').forEach((input) => {
-      const selected = Number(input.value) === selectedWeight;
-      input.checked = selected;
-      input.closest('.pack-option')?.classList.toggle('is-selected', selected);
-      const price = input.closest('.pack-option')?.querySelector('b');
-      if (price) price.textContent = formatPrice(getVariant(Number(input.value)).price);
-    });
+    if (elements.packSizeSelect) elements.packSizeSelect.value = String(selectedWeight);
 
     document.querySelectorAll('input[name="purchaseType"]').forEach((input) => {
       const selected = input.value === selectedPurchaseType;
@@ -2538,7 +2518,7 @@
     if (scroll) {
       elements.packSelector?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520;
-      window.setTimeout(() => document.querySelector(`input[name="packSize"][value="${nextWeight}"]`)?.focus({ preventScroll: true }), delay);
+      window.setTimeout(() => elements.packSizeSelect?.focus({ preventScroll: true }), delay);
     }
     if (notify) announce(`${nextWeight} kg pack selected from your weekly estimate.`);
   }
@@ -6327,15 +6307,13 @@
         });
         const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520;
         window.setTimeout(() => {
-          elements.packSelector?.querySelector('input[name="packSize"]:checked')?.focus({ preventScroll: true });
+          elements.packSizeSelect?.focus({ preventScroll: true });
         }, delay);
       }, 'Continue to choose a fresh batch');
     });
   });
 
-  elements.packSelector?.addEventListener('change', (event) => {
-    if (event.target.matches('input[name="packSize"]')) selectWeight(event.target.value);
-  });
+  elements.packSizeSelect?.addEventListener('change', (event) => selectWeight(event.target.value));
 
   elements.purchaseSelector?.addEventListener('change', (event) => {
     if (!event.target.matches('input[name="purchaseType"]')) return;
@@ -6626,7 +6604,7 @@
     const target = weeklyMode ? elements.weeklyPlanPanel : elements.packSelector;
     const focusTarget = weeklyMode
       ? elements.weeklyPlanSelect
-      : elements.packSelector?.querySelector('input[name="packSize"]:checked');
+      : elements.packSizeSelect;
     target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     window.setTimeout(() => focusTarget?.focus({ preventScroll: true }), window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520);
   });

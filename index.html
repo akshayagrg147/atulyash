@@ -349,27 +349,17 @@
           <fieldset class="pack-selector" id="packSelector">
             <legend>Select Quantity</legend>
             <p class="quantity-architecture-note">Choose the total quantity you need. We fulfil it using convenient 1 kg and 2 kg packets.</p>
-            <div class="pack-options">
-              <label class="pack-option is-selected">
-                <input type="radio" name="packSize" value="2" checked>
-                <span><strong>2 kg</strong><small>Total quantity · compact need</small></span>
-                <b>₹240</b>
-              </label>
-              <label class="pack-option">
-                <input type="radio" name="packSize" value="4">
-                <span><strong>4 kg</strong><small>Total quantity</small></span>
-                <b>₹480</b>
-              </label>
-              <label class="pack-option">
-                <input type="radio" name="packSize" value="6">
-                <span><strong>6 kg</strong><small>Large pack</small></span>
-                <b>₹720</b>
-              </label>
-              <label class="pack-option">
-                <input type="radio" name="packSize" value="8">
-                <span><strong>8 kg</strong><small>Extra-large pack</small></span>
-                <b>₹960</b>
-              </label>
+            <div class="pack-select-field">
+              <label for="packSizeSelect">Choose your total atta quantity</label>
+              <div class="pack-select-wrap">
+                <select id="packSizeSelect" name="packSize" aria-label="Choose your total atta quantity">
+                  <option value="2" selected>2 kg · ₹240</option>
+                  <option value="4">4 kg · ₹480</option>
+                  <option value="6">6 kg · ₹720</option>
+                  <option value="8">8 kg · ₹960</option>
+                </select>
+              </div>
+              <small>Pack sizes and prices are confirmed from today’s live catalogue.</small>
             </div>
             <div class="pack-selection-scene" id="packSelectionScene" aria-hidden="true">
               <div class="pack-selection-scene-copy">
@@ -903,7 +893,7 @@
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="ecommerce.js?v=20260919-1"></script>
+  <script src="ecommerce.js?v=20260922-1"></script>
   <script>
     (function () {
       var banner = document.getElementById('launchBanner');

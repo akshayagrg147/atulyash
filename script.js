@@ -129,6 +129,7 @@ staggerGroups.forEach(({ selector, columns, delay }) => {
 
 const motionHeadings = document.querySelectorAll([
   '.signature-orbit-heading > h2',
+  '.asha-intro > h2',
   '.weekly-copy > h2',
   '.awareness-statement > h2',
   '.questions-heading > h2',

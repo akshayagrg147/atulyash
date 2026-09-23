@@ -5757,3 +5757,116 @@ h3 {
     padding-top: 24px;
   }
 }
+
+/* Keep the six commitments readable on narrow screens instead of letting the
+   animated rings stack their labels on top of the mascot. */
+@media (max-width: 680px) {
+  .signature-orbit-stage {
+    width: min(100%, 360px);
+    height: 390px;
+    min-height: 390px;
+    aspect-ratio: auto;
+  }
+
+  .signature-orbit-stage .orbit-ring {
+    position: static;
+    width: 0;
+    height: 0;
+    margin: 0;
+    border: 0;
+    animation: none;
+  }
+
+  .signature-orbit-stage .orbit-ring .orbit-node {
+    position: absolute;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: 0;
+    height: 0;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  .signature-orbit-stage .orbit-ring-outer .orbit-node:nth-child(1) {
+    top: 8px;
+    left: 50%;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner .orbit-node:nth-child(1) {
+    top: 98px;
+    left: 0;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner .orbit-node:nth-child(2) {
+    top: 98px;
+    right: 0;
+  }
+
+  .signature-orbit-stage .orbit-ring-outer .orbit-node:nth-child(2) {
+    top: 230px;
+    left: 0;
+  }
+
+  .signature-orbit-stage .orbit-ring-outer .orbit-node:nth-child(3) {
+    top: 230px;
+    right: 0;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner .orbit-node:nth-child(3) {
+    bottom: 106px;
+    left: 50%;
+  }
+
+  .signature-orbit-stage .orbit-node span {
+    width: 92px;
+    min-height: 34px;
+    padding: 6px 7px;
+    border-radius: 24px;
+    font-size: 0.48rem;
+    letter-spacing: 0.025em;
+    line-height: 1.16;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .signature-orbit-stage .orbit-ring-outer .orbit-node:nth-child(1) span,
+  .signature-orbit-stage .orbit-ring-inner .orbit-node:nth-child(3) span {
+    transform: translateX(-50%) !important;
+  }
+
+  .signature-orbit-stage .orbit-ring-inner .orbit-node:nth-child(2) span,
+  .signature-orbit-stage .orbit-ring-outer .orbit-node:nth-child(3) span {
+    transform: translateX(-100%) !important;
+  }
+
+  .signature-orbit-stage .orbit-core-veer {
+    top: 50%;
+    left: 50%;
+    width: 166px;
+    height: 166px;
+    transform: translate(-50%, -50%);
+  }
+
+  .signature-orbit-stage .orbit-veer-caption {
+    top: auto;
+    bottom: 8px;
+    width: min(100% - 112px, 260px);
+    transform: translateX(-50%);
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .signature-orbit-stage .orbit-node span {
+    width: 80px;
+    padding-inline: 5px;
+    font-size: 0.44rem;
+  }
+
+  .signature-orbit-stage .orbit-core-veer {
+    width: 154px;
+    height: 154px;
+  }
+}

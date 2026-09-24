@@ -2925,8 +2925,7 @@
     );
     return !subscription
       && !oneTimeOrderLockInfo(order)
-      && !orderHasSuccessfulPayment(order)
-      && !/deliver|complete|fulfilled|cancel|fail|refund|paid|payment|received|success|captur/.test(status);
+      && !/deliver|complete|fulfilled|cancel|fail|refund/.test(status);
   }
 
   function canChangeOneTimeOrderAddress(order) {
@@ -4387,6 +4386,9 @@
       previewPanel.setAttribute('aria-live', 'polite');
       previewPanel.setAttribute('aria-label', 'Revised order total');
 
+      const modificationAttemptId = window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const modificationPayload = () => ({
         address_id: Number(addressSelect.value),
         delivery_date: deliveryDate.value,
@@ -4394,7 +4396,8 @@
           order_item_id: entry.itemId,
           quantity: Number(entry.quantity.value),
           product_pack_id: Number(entry.pack.value)
-        }))
+        })),
+        modification_attempt_id: modificationAttemptId
       });
 
       const validModificationPayload = (payload) => Boolean(
@@ -4437,6 +4440,10 @@
         const difference = modificationPreviewAmount(preview, 'difference');
         const deliveryCharge = modificationPreviewAmount(preview, 'delivery');
         const discount = modificationPreviewAmount(preview, 'discount');
+        const paidOrder = orderHasSuccessfulPayment(detail);
+        const availableWallet = finiteMoney(preview?.available_balance, preview?.wallet_balance);
+        const balanceCheckRequired = preview?.balance_check_required === true;
+        const balanceSufficient = preview?.balance_sufficient !== false;
         const fallbackOriginal = orderAmount(detail);
         const resolvedOriginal = original === null ? fallbackOriginal : original;
         const resolvedDifference = difference === null && revised !== null && resolvedOriginal !== null
@@ -4469,17 +4476,29 @@
             resolvedDifference > 0 ? 'is-due' : 'is-reduced'
           );
         }
+        if (paidOrder && balanceCheckRequired) {
+          addFigure('Available wallet', availableWallet, balanceSufficient ? 'is-wallet' : 'is-due');
+        }
         previewPanel.append(figures);
 
         let guidance = 'Saving updates the order only; no wallet debit happens while you edit.';
         if (resolvedDifference !== null && resolvedDifference > 0.005) {
-          guidance = `₹${formatMoney(resolvedDifference).replace(/^₹/, '')} more will be due when this unpaid order is paid.`;
+          guidance = paidOrder
+            ? `₹${formatMoney(resolvedDifference).replace(/^₹/, '')} will be debited from your available wallet when you save this paid order.`
+            : `₹${formatMoney(resolvedDifference).replace(/^₹/, '')} more will be due when this unpaid order is paid.`;
         } else if (resolvedDifference !== null && resolvedDifference < -0.005) {
-          guidance = `Your amount due will be reduced by ₹${formatMoney(Math.abs(resolvedDifference)).replace(/^₹/, '')}.`;
+          guidance = paidOrder
+            ? `₹${formatMoney(Math.abs(resolvedDifference)).replace(/^₹/, '')} will be returned to your wallet after this paid order is reduced.`
+            : `Your amount due will be reduced by ₹${formatMoney(Math.abs(resolvedDifference)).replace(/^₹/, '')}.`;
+        }
+        if (paidOrder && balanceCheckRequired && !balanceSufficient) {
+          guidance = `Your available wallet balance is not enough for this increase. Recharge at least ₹${formatMoney(Math.max(0, resolvedDifference || 0) - (availableWallet || 0)).replace(/^₹/, '')} before saving.`;
         }
         previewPanel.append(
           create('p', 'modification-preview-message', guidance),
-          create('small', '', 'No money is taken in this editing step. The revised total must be reviewed and paid through the Atulyash Wallet after the order is confirmed.')
+          create('small', '', paidOrder
+            ? 'The live service rechecks the lock and wallet balance before changing this paid order. A retry with the same request cannot debit the wallet twice.'
+            : 'No money is taken in this editing step. The revised total must be reviewed and paid through the normal Atulyash payment flow after the order is confirmed.')
         );
       };
 
@@ -4528,8 +4547,10 @@
 
       const policy = create('div', 'confirmation-panel');
       policy.append(
-        create('strong', '', 'Payment is due after this edit'),
-        create('p', '', 'This is an unpaid, open one-time order. Changing the pack or quantity recalculates the amount due and delivery charge. Saving here does not debit your wallet; review the revised total above, then complete payment through your Atulyash Wallet.')
+        create('strong', '', orderHasSuccessfulPayment(detail) ? 'Wallet check before saving' : 'Payment is due after this edit'),
+        create('p', '', orderHasSuccessfulPayment(detail)
+          ? 'This paid one-time order can be changed before the cutoff. If the revised total is higher, the extra amount is taken only from the available wallet balance; if it is lower, the difference is returned to the wallet.'
+          : 'This is an unpaid, open one-time order. Changing the pack or quantity recalculates the amount due and delivery charge. Saving here does not debit your wallet; review the revised total above, then complete payment through the normal payment flow.')
       );
       const actions = create('div', 'dialog-actions');
       actions.append(button('Cancel', 'secondary-button', closeDialog));
@@ -4546,6 +4567,11 @@
         try {
           const previewReady = await requestModificationPreview();
           if (!previewReady) showToast('Preview is unavailable; the live service will validate the final amount while saving.', 'error');
+          if (latestPreview?.balance_check_required === true && latestPreview?.balance_sufficient === false) {
+            showToast('Please recharge your wallet before increasing this paid order.', 'error');
+            setButtonBusy(submit, false);
+            return;
+          }
           setButtonBusy(submit, true, 'Saving…');
           const result = await apiCall('orders', ['modify', 'modifyOrder'], {
             id,

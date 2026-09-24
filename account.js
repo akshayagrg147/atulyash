@@ -4301,44 +4301,54 @@
 
         const wrapper = create('fieldset', 'order-modification-item');
         const legend = create('legend', '', `Item ${index + 1} · ${firstValue(item.product_name, packObject?.product?.name, 'Atulyash Whole Wheat Atta')}`);
-        const grid = create('div', 'form-grid');
-        const packLabel = create('label', '', 'Pack size');
-        const pack = create('select');
-        pack.required = true;
-        const availablePacks = [...state.quickProductPacks];
-        if (!availablePacks.some((candidate) => String(candidate.apiId) === String(packId))) {
-          availablePacks.push({
-            apiId: packId,
-            weight: firstFinite(packObject?.weight, item.weight, weightFromLabel(packObject?.name)),
-            price: firstFinite(packObject?.price, item.unit_price, item.price)
-          });
-        }
-        availablePacks
-          .filter((candidate) => candidate?.apiId != null)
-          .sort((left, right) => Number(left.weight || 0) - Number(right.weight || 0))
-          .forEach((candidate) => {
-            const option = create('option', '', [
-              candidate.weight ? `${bagWeightLabel(candidate.weight)} kg` : `Pack #${candidate.apiId}`,
-              Number.isFinite(Number(candidate.price)) ? formatMoney(candidate.price) : ''
-            ].filter(Boolean).join(' · '));
-            option.value = String(candidate.apiId);
-            option.selected = String(candidate.apiId) === String(packId);
-            pack.append(option);
-          });
-        packLabel.append(pack);
-
-        const quantityLabel = create('label', '', 'Quantity');
-        const quantity = create('input');
-        quantity.type = 'number';
-        quantity.min = '1';
-        quantity.max = '50';
-        quantity.step = '1';
-        quantity.required = true;
-        quantity.value = String(Math.max(1, Math.round(firstFinite(item.quantity, item.qty) || 1)));
-        quantityLabel.append(quantity);
-        grid.append(packLabel, quantityLabel);
-        wrapper.append(legend, grid);
-        return { wrapper, itemId, pack, quantity };
+        const currentPackWeight = firstFinite(
+          packObject?.weight_kg,
+          packObject?.weight,
+          item.product_pack_weight,
+          item.pack_weight,
+          item.weight_kg,
+          item.weight,
+          item.pack_size,
+          weightFromLabel(packObject?.name),
+          weightFromLabel(item.product_pack_name)
+        );
+        const currentPackCount = Math.max(1, Math.round(firstFinite(item.quantity, item.qty, item.count) || 1));
+        const currentTotalWeight = firstFinite(
+          item.total_weight_kg,
+          item.total_weight,
+          currentPackWeight === null ? null : currentPackWeight * currentPackCount
+        );
+        const additionLabel = create('label', '', 'Additional atta for this delivery');
+        const addition = create('select');
+        addition.required = true;
+        const currentText = currentTotalWeight === null
+          ? 'Keep current quantity'
+          : `Keep current · ${bagWeightLabel(currentTotalWeight)} kg`;
+        const keepOption = create('option', '', currentText);
+        keepOption.value = '0';
+        keepOption.selected = true;
+        addition.append(keepOption);
+        [1, 2, 3].forEach((delta) => {
+          const targetWeight = currentTotalWeight === null ? null : currentTotalWeight + delta;
+          const targetPack = targetWeight === null
+            ? null
+            : state.quickProductPacks.find((candidate) => Math.abs(Number(candidate.weight) - targetWeight) < 0.01);
+          const option = create('option', '', targetWeight === null || !targetPack
+            ? `Add ${delta} kg · unavailable`
+            : `Add ${delta} kg → ${bagWeightLabel(targetWeight)} kg · ${formatMoney(targetPack.price)}`);
+          option.value = String(delta);
+          option.disabled = !targetPack;
+          addition.append(option);
+        });
+        additionLabel.append(addition);
+        wrapper.append(
+          legend,
+          create('p', 'dialog-item-copy', currentTotalWeight === null
+            ? 'Choose an additional weight. The live service will validate the matching pack.'
+            : `Current delivery: ${bagWeightLabel(currentTotalWeight)} kg. Add only the extra kilograms you need; the order quantity is not changed.`),
+          additionLabel
+        );
+        return { wrapper, itemId, addition };
       });
 
       if (!rawItems.length || itemControls.some((entry) => !entry)) {
@@ -4346,7 +4356,7 @@
       }
 
       const form = create('form', 'dialog-form');
-      form.append(create('p', 'dialog-copy', 'Update the delivery home, date, pack or quantity below. The live service will reprice the order and confirm the change before it is saved.'));
+      form.append(create('p', 'dialog-copy', 'Choose the additional kilograms for this delivery. The existing delivery charge is already included and will not be added again.'));
       const detailsGrid = create('div', 'form-grid');
       const addressLabel = create('label', '', 'Delivery home');
       const addressSelect = create('select');
@@ -4392,11 +4402,12 @@
       const modificationPayload = () => ({
         address_id: Number(addressSelect.value),
         delivery_date: deliveryDate.value,
-        items: itemControls.map((entry) => ({
-          order_item_id: entry.itemId,
-          quantity: Number(entry.quantity.value),
-          product_pack_id: Number(entry.pack.value)
-        })),
+        items: itemControls.map((entry) => {
+          const item = { order_item_id: entry.itemId };
+          const additionalKg = Number(entry.addition.value);
+          if (Number.isInteger(additionalKg) && additionalKg > 0) item.additional_quantity_kg = additionalKg;
+          return item;
+        }),
         modification_attempt_id: modificationAttemptId
       });
 
@@ -4405,10 +4416,10 @@
         && /^\d{4}-\d{2}-\d{2}$/.test(payload.delivery_date)
         && payload.items.length
         && payload.items.every((item) => (
-          Number.isInteger(item.quantity)
-          && item.quantity > 0
-          && Number.isFinite(item.product_pack_id)
-          && item.product_pack_id > 0
+          Number.isInteger(item.order_item_id)
+          && item.order_item_id > 0
+          && (item.additional_quantity_kg == null
+            || [1, 2, 3].includes(item.additional_quantity_kg))
         ))
       );
 
@@ -4422,7 +4433,7 @@
         previewPanel.append(header);
 
         if (state === 'loading') {
-          previewPanel.append(create('p', 'modification-preview-message', 'Checking pack, quantity and delivery-charge changes with Atulyash.'));
+          previewPanel.append(create('p', 'modification-preview-message', 'Checking the added kilograms and delivery charge with Atulyash.'));
           return;
         }
         if (state === 'error') {
@@ -4546,9 +4557,7 @@
       addressSelect.addEventListener('change', scheduleModificationPreview);
       deliveryDate.addEventListener('change', scheduleModificationPreview);
       itemControls.forEach((entry) => {
-        entry.pack.addEventListener('change', scheduleModificationPreview);
-        entry.quantity.addEventListener('input', scheduleModificationPreview);
-        entry.quantity.addEventListener('change', scheduleModificationPreview);
+        entry.addition.addEventListener('change', scheduleModificationPreview);
       });
 
       const policy = create('div', 'confirmation-panel');
@@ -4556,7 +4565,7 @@
         create('strong', '', orderHasSuccessfulPayment(detail) ? 'Wallet check before saving' : 'Payment is due after this edit'),
         create('p', '', orderHasSuccessfulPayment(detail)
           ? 'This paid one-time order can be changed before the cutoff. If the revised total is higher, the extra amount is taken only from the available wallet balance; if it is lower, the difference is returned to the wallet.'
-          : 'This is an unpaid, open one-time order. Changing the pack or quantity recalculates the amount due and delivery charge. Saving here does not debit your wallet; review the revised total above, then complete payment through the normal payment flow.')
+          : 'This is an unpaid, open one-time order. Adding atta recalculates the amount due while keeping the original delivery charge. Saving here does not debit your wallet; review the revised total above, then complete payment through the normal payment flow.')
       );
       const actions = create('div', 'dialog-actions');
       actions.append(button('Cancel', 'secondary-button', closeDialog));

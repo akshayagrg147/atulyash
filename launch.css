@@ -297,50 +297,6 @@
   letter-spacing: -0.04em;
 }
 
-.launch-seal {
-  position: absolute;
-  z-index: 5;
-  top: clamp(26px, 4vw, 52px);
-  right: clamp(24px, 3vw, 42px);
-  width: 132px;
-  aspect-ratio: 1;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  color: var(--launch-green);
-  background: linear-gradient(145deg, #f6e8c5, var(--launch-wheat));
-  border: 1px solid rgba(255, 253, 248, 0.72);
-  border-radius: 50%;
-  box-shadow: 0 18px 40px rgba(2, 14, 11, 0.28);
-  transform: rotate(4deg);
-}
-
-.launch-seal::before {
-  position: absolute;
-  inset: 8px;
-  border: 1px dotted rgba(11, 39, 33, 0.32);
-  border-radius: inherit;
-  content: "";
-}
-
-.launch-seal span,
-.launch-seal small {
-  position: relative;
-  z-index: 1;
-  font-size: 0.55rem;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.launch-seal strong {
-  position: relative;
-  z-index: 1;
-  font: 500 1.3rem/1 var(--serif);
-}
-
-.launch-seal small { margin-top: 6px; }
-
 .launch-reservation {
   position: relative;
   padding: clamp(80px, 9vw, 132px) 0;
@@ -790,9 +746,6 @@
   .launch-visual::before { inset: 11px; }
   .launch-visual-copy { left: 27px; bottom: 28px; }
   .launch-visual-copy strong { max-width: 250px; font-size: 2.35rem; }
-  .launch-seal { top: 26px; right: 22px; width: 106px; }
-  .launch-seal strong { font-size: 1.05rem; }
-
   .launch-reservation { padding-block: 70px; }
   .launch-guide h2 { font-size: clamp(2.8rem, 14vw, 4rem); }
   .launch-card { padding: 34px 22px; }

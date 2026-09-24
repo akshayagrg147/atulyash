@@ -32,6 +32,14 @@
   </div>
 
   <div class="checkout-route-main" id="checkoutMount">
+    <section class="checkout-commerce-paused" id="checkoutCommercePaused" role="status" hidden>
+      <div class="checkout-commerce-paused-card">
+        <p class="checkout-kicker">Ordering pause</p>
+        <h1>Online ordering is temporarily paused.</h1>
+        <p>We are not accepting paid orders right now. You can return to Atulyash and continue browsing while we prepare the next ordering window.</p>
+        <a class="button button-dark" href="index.html#shop">Continue browsing <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
     <section class="checkout-modal checkout-page-surface" id="checkoutModal" role="main" aria-labelledby="checkoutTitle" aria-hidden="true" inert>
       <div class="checkout-shell">
         <header class="checkout-header">
@@ -446,6 +454,7 @@
   <noscript><p class="checkout-noscript">JavaScript is required for secure checkout. <a href="index.html#shop">Return to your bag</a>.</p></noscript>
   <script src="api-client.js?v=20260906-3"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
+  <script src="commerce-paused.js?v=20260925-1"></script>
   <script src="ecommerce.js?v=20260924-1"></script>
 </body>
 </html>

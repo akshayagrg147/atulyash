@@ -46,6 +46,7 @@
     checkoutHandoffActions: document.getElementById('checkoutHandoffActions'),
     checkoutHandoffReview: document.getElementById('checkoutHandoffReview'),
     checkoutHandoffReturn: document.getElementById('checkoutHandoffReturn'),
+    checkoutCommercePaused: document.getElementById('checkoutCommercePaused'),
     headerCartButton: document.getElementById('headerCartButton'),
     headerCartCount: document.getElementById('headerCartCount'),
     heroUnitPrice: document.getElementById('heroUnitPrice'),
@@ -276,6 +277,9 @@
   const IS_CHECKOUT_PAGE = document.body?.dataset.commercePage === 'checkout';
   const IS_STOREFRONT_PAGE = Boolean(elements.productShowcase);
   if (!IS_STOREFRONT_PAGE && !IS_CHECKOUT_PAGE) return;
+  const COMMERCE_PAUSED = window.AtulyashCommercePaused === true;
+  const COMMERCE_PAUSE_MESSAGE = window.AtulyashCommercePauseMessage
+    || 'Online ordering is temporarily paused.';
 
   let selectedWeight = 2;
   let selectedPurchaseType = 'once';
@@ -906,10 +910,13 @@
   function setPurchaseButtonsBusy(busy) {
     purchaseButtonsBusy = busy;
     if (elements.addToCartLabel) {
-      elements.addToCartLabel.textContent = busy ? 'Adding…' : 'Add to bag';
+      elements.addToCartLabel.textContent = COMMERCE_PAUSED ? 'Ordering paused' : busy ? 'Adding…' : 'Add to bag';
     }
     if (elements.mobileAddButton) {
-      elements.mobileAddButton.textContent = busy ? 'Adding…' : 'Add to bag';
+      elements.mobileAddButton.textContent = COMMERCE_PAUSED ? 'Ordering paused' : busy ? 'Adding…' : 'Add to bag';
+    }
+    if (COMMERCE_PAUSED && elements.buyNowButton) {
+      elements.buyNowButton.textContent = 'Ordering paused';
     }
     syncPurchaseAvailability();
   }
@@ -925,9 +932,16 @@
     const orderable = currentSelectionHasLiveCatalog() && !pendingOrder;
     [elements.addToCartButton, elements.buyNowButton, elements.mobileAddButton].forEach((button) => {
       if (!button) return;
-      button.disabled = purchaseButtonsBusy || !orderable;
+      button.disabled = COMMERCE_PAUSED || purchaseButtonsBusy || !orderable;
       button.setAttribute('aria-busy', String(purchaseButtonsBusy));
-      if (!orderable) {
+      if (COMMERCE_PAUSED) {
+        if (button === elements.addToCartButton && elements.addToCartLabel) {
+          elements.addToCartLabel.textContent = 'Ordering paused';
+        }
+        if (button === elements.mobileAddButton) button.textContent = 'Ordering paused';
+        if (button === elements.buyNowButton) button.textContent = 'Ordering paused';
+        button.title = COMMERCE_PAUSE_MESSAGE;
+      } else if (!orderable) {
         button.title = pendingOrder
           ? 'Complete the pending order payment before changing your bag.'
           : 'Live availability is required before this selection can be ordered.';
@@ -969,9 +983,14 @@
     }
     [elements.heroWeeklyButton, elements.startWeeklyButton].forEach((button) => {
       if (!button) return;
-      if ('disabled' in button) button.disabled = !available;
-      button.setAttribute('aria-disabled', String(!available));
-      if (!available) button.title = message;
+      if ('disabled' in button) button.disabled = COMMERCE_PAUSED || !available;
+      button.setAttribute('aria-disabled', String(COMMERCE_PAUSED || !available));
+      if (COMMERCE_PAUSED) {
+        button.textContent = 'Ordering paused';
+        button.title = COMMERCE_PAUSE_MESSAGE;
+      } else if (!available) {
+        button.title = message;
+      }
       else button.removeAttribute('title');
     });
   }
@@ -2554,6 +2573,11 @@
   }
 
   async function addSelectionToCart({ openAfter = false, openBagAfter = !openAfter } = {}) {
+    if (COMMERCE_PAUSED) {
+      lastCartFailureMessage = COMMERCE_PAUSE_MESSAGE;
+      announce(lastCartFailureMessage);
+      return false;
+    }
     lastCartFailureMessage = '';
     if (pendingOrder) {
       lastCartFailureMessage = 'Complete the pending order payment before changing your bag.';
@@ -3199,15 +3223,17 @@
     if (elements.cartFooter) elements.cartFooter.hidden = cart.length === 0 && !pendingOrder;
     if (elements.checkoutButton) {
       const blocked = cartHasConfigurationIssues() && !pendingOrder;
-      elements.checkoutButton.disabled = blocked;
+      elements.checkoutButton.disabled = COMMERCE_PAUSED || blocked;
       elements.checkoutButton.replaceChildren(
-        document.createTextNode(pendingOrder ? `${pendingOrderActionLabel()} ` : 'Proceed to delivery '),
+        document.createTextNode(COMMERCE_PAUSED ? 'Ordering paused ' : pendingOrder ? `${pendingOrderActionLabel()} ` : 'Proceed to delivery '),
         Object.assign(document.createElement('span'), {
           textContent: '→',
           ariaHidden: 'true'
         })
       );
-      if (blocked) {
+      if (COMMERCE_PAUSED) {
+        elements.checkoutButton.title = COMMERCE_PAUSE_MESSAGE;
+      } else if (blocked) {
         elements.checkoutButton.title = 'Remove unavailable items or reconnect the live catalogue before checkout.';
       } else {
         elements.checkoutButton.removeAttribute('title');
@@ -3424,6 +3450,10 @@
   }
 
   function openCheckout() {
+    if (COMMERCE_PAUSED) {
+      announce(COMMERCE_PAUSE_MESSAGE);
+      return false;
+    }
     if (!cart.length && !pendingOrder) {
       announce('Choose a pack before continuing to delivery.');
       return false;
@@ -6423,6 +6453,10 @@
   [elements.heroWeeklyButton, elements.startWeeklyButton].forEach((button) => {
     button?.addEventListener('click', (event) => {
       event.preventDefault();
+      if (COMMERCE_PAUSED) {
+        announce(COMMERCE_PAUSE_MESSAGE);
+        return;
+      }
       if (!selectedWeeklyPlanId || !catalogReadiness.subscriptions) {
         announce('Weekly plans are not available right now.');
         return;
@@ -6437,6 +6471,10 @@
   elements.continueShoppingButton?.addEventListener('click', () => closeCart());
   elements.checkoutCloseButton?.addEventListener('click', closeCheckout);
   elements.checkoutButton?.addEventListener('click', () => {
+    if (COMMERCE_PAUSED) {
+      announce(COMMERCE_PAUSE_MESSAGE);
+      return;
+    }
     requireStorefrontServiceability(openCheckout, 'Continue to delivery details');
   });
   [elements.storeServiceRetryButton, elements.catalogRetryButton].forEach((button) => {
@@ -7045,7 +7083,7 @@
     updateMobileBuyBar();
     initializeStorefrontServiceability();
     await hydratePublicCommerce();
-    if (await resumeStorefrontIntent()) return;
+    if (!COMMERCE_PAUSED && await resumeStorefrontIntent()) return;
     closeCheckoutHandoff();
     if (!isApiAuthenticated()) return;
     apiSession = getApiSession();
@@ -7063,6 +7101,15 @@
   }
 
   async function initializeDedicatedCheckout() {
+    if (COMMERCE_PAUSED) {
+      elements.checkoutHandoff?.setAttribute('hidden', '');
+      document.body.classList.remove('checkout-handoff-open');
+      elements.checkoutModal?.classList.remove('is-open');
+      elements.checkoutModal?.setAttribute('aria-hidden', 'true');
+      if (elements.checkoutModal) elements.checkoutModal.inert = true;
+      elements.checkoutCommercePaused?.removeAttribute('hidden');
+      return;
+    }
     const context = readCheckoutContext();
     checkoutReturnUrl = checkoutReturnForOrigin(context.origin);
     updateCheckoutContextUI(context.origin);

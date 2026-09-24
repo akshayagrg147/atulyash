@@ -2655,6 +2655,28 @@ body.serviceability-open {
   transform: translateY(0);
 }
 
+.commerce-paused-notice {
+  display: grid;
+  gap: 5px;
+  margin-top: 16px;
+  padding: 15px 18px;
+  color: var(--forest-950);
+  background: rgba(238, 245, 226, 0.92);
+  border: 1px solid rgba(58, 123, 59, 0.28);
+  border-left: 4px solid var(--green-500, #8fce28);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.commerce-paused-notice strong {
+  font-size: 0.9rem;
+}
+
+button:disabled,
+button[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 .mobile-buy-bar {
   display: none;
 }

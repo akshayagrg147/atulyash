@@ -29,6 +29,9 @@
   });
 
   const $ = (id) => document.getElementById(id);
+  const COMMERCE_PAUSED = window.AtulyashCommercePaused === true;
+  const COMMERCE_PAUSE_MESSAGE = window.AtulyashCommercePauseMessage
+    || 'Online ordering is temporarily paused.';
 
   function rememberCheckoutOrigin(origin = 'account') {
     sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify({
@@ -1323,11 +1326,19 @@
     if (elements.accountBagFooter) elements.accountBagFooter.hidden = state.accountBagItems.length === 0;
     if (elements.accountBagCheckoutButton) {
       elements.accountBagCheckoutButton.disabled = (
-        state.accountBagItems.length === 0
+        COMMERCE_PAUSED
+        || state.accountBagItems.length === 0
         || state.accountBagLoading
         || state.accountBagItems.some((item) => item.unavailable)
         || summary.deliveryRequiresSupport
       );
+      if (COMMERCE_PAUSED) {
+        elements.accountBagCheckoutButton.replaceChildren(
+          document.createTextNode('Ordering paused '),
+          Object.assign(document.createElement('span'), { textContent: '→', ariaHidden: 'true' })
+        );
+        elements.accountBagCheckoutButton.title = COMMERCE_PAUSE_MESSAGE;
+      }
     }
   }
 
@@ -1369,9 +1380,17 @@
       state.accountBagLoading = false;
       if (elements.accountBagCheckoutButton) {
         elements.accountBagCheckoutButton.disabled = (
-          state.accountBagItems.length === 0
+          COMMERCE_PAUSED
+          || state.accountBagItems.length === 0
           || state.accountBagItems.some((item) => item.unavailable)
         );
+        if (COMMERCE_PAUSED) {
+          elements.accountBagCheckoutButton.replaceChildren(
+            document.createTextNode('Ordering paused '),
+            Object.assign(document.createElement('span'), { textContent: '→', ariaHidden: 'true' })
+          );
+          elements.accountBagCheckoutButton.title = COMMERCE_PAUSE_MESSAGE;
+        }
       }
     }
   }
@@ -1496,6 +1515,10 @@
   }
 
   function continueAccountBagCheckout() {
+    if (COMMERCE_PAUSED) {
+      showToast(COMMERCE_PAUSE_MESSAGE, 'error');
+      return;
+    }
     if (!state.accountBagItems.length) return;
     try {
       rememberCheckoutOrigin('account');
@@ -4873,6 +4896,10 @@
   }
 
   function confirmReorder(order) {
+    if (COMMERCE_PAUSED) {
+      showToast(COMMERCE_PAUSE_MESSAGE, 'error');
+      return;
+    }
     const body = create('div');
     const note = create('div', 'confirmation-panel');
     note.append(
@@ -8621,6 +8648,10 @@
     amount,
     { subscriptionId: restartId = null, deliveryAddOn = null } = {}
   ) {
+    if (COMMERCE_PAUSED) {
+      showToast(COMMERCE_PAUSE_MESSAGE, 'error');
+      return;
+    }
     const requestedAmount = amount == null || amount === '' ? null : numberFrom(amount);
     if (requestedAmount !== null && (!Number.isFinite(requestedAmount) || requestedAmount <= 0)) return;
     const rechargeAmount = requestedAmount === null ? null : Math.ceil(requestedAmount);
@@ -8790,6 +8821,10 @@
 
   async function previewRecharge(event) {
     event.preventDefault();
+    if (COMMERCE_PAUSED) {
+      showToast(COMMERCE_PAUSE_MESSAGE, 'error');
+      return;
+    }
     const amount = numberFrom(elements.rechargeAmount.value);
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.previewRechargeButton, true, 'Preparing preview…');
@@ -8887,6 +8922,10 @@
   }
 
   async function initiateRecharge() {
+    if (COMMERCE_PAUSED) {
+      showToast(COMMERCE_PAUSE_MESSAGE, 'error');
+      return;
+    }
     const amount = authoritativeRechargeAmount(state.walletPreview, elements.rechargeAmount.value);
     if (amount <= 0) return showToast('Enter a valid recharge amount.', 'error');
     setButtonBusy(elements.initiateRechargeButton, true, 'Starting payment…');
@@ -9713,7 +9752,7 @@
       return;
     }
 
-    submit.disabled = state.quickOrderSubmitting;
+    submit.disabled = COMMERCE_PAUSED || state.quickOrderSubmitting;
     const displayWeight = weekly ? plan.weeklyKg : pack.weight;
     const total = weekly ? plan.fourDeliveryWalletFunding : pack.price * quantity;
     const compactWeight = Number.isInteger(displayWeight) ? String(displayWeight) : displayWeight.toFixed(1);
@@ -9731,11 +9770,16 @@
       ? `${compactWeight} kg every week · ${currency.format(plan.pricePerDelivery)} per delivery`
       : `${quantity} × ${compactWeight} kg · one-time order`;
     elements.quickOrderPrice.textContent = weekly ? `${currency.format(total)} wallet funding` : currency.format(total);
-    elements.quickOrderCtaLabel.textContent = state.quickOrderSubmitting
-      ? 'Adding to your bag…'
-      : weekly
-        ? 'Add weekly plan to bag'
-        : 'Add to bag';
+    elements.quickOrderCtaLabel.textContent = COMMERCE_PAUSED
+      ? 'Ordering paused'
+      : state.quickOrderSubmitting
+        ? 'Adding to your bag…'
+        : weekly
+          ? 'Add weekly plan to bag'
+          : 'Add to bag';
+    if (COMMERCE_PAUSED && elements.quickOrderAssuranceText) {
+      elements.quickOrderAssuranceText.textContent = COMMERCE_PAUSE_MESSAGE;
+    }
 
     document.querySelectorAll('input[name="quickOrderMode"]').forEach((input) => {
       input.closest('label')?.classList.toggle('is-selected', input.checked);
@@ -9797,6 +9841,10 @@
 
   async function continueQuickOrder(event) {
     event.preventDefault();
+    if (COMMERCE_PAUSED) {
+      showToast(COMMERCE_PAUSE_MESSAGE, 'error');
+      return;
+    }
     if (state.quickOrderSubmitting) return;
     const weekly = quickOrderMode() === 'weekly';
     const pack = selectedQuickPack();

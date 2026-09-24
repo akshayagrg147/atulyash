@@ -40,6 +40,7 @@
 
   const elements = {
     skipLink: $('skipLink'),
+    accountEntryLoader: $('accountEntryLoader'),
     authShell: $('authShell'),
     accountShell: $('accountShell'),
     mobileStep: $('mobileStep'),
@@ -1980,6 +1981,8 @@
     window.clearInterval(state.resendTimer);
     elements.authShell.hidden = true;
     elements.accountShell.hidden = false;
+    elements.accountEntryLoader.hidden = true;
+    elements.skipLink.hidden = false;
     elements.skipLink.href = '#portalMain';
     elements.skipLink.textContent = 'Skip to My Atulyash';
     updateIdentityUI();
@@ -2010,6 +2013,8 @@
     state.customer = null;
     elements.accountShell.hidden = true;
     elements.authShell.hidden = false;
+    elements.accountEntryLoader.hidden = true;
+    elements.skipLink.hidden = false;
     elements.skipLink.href = '#authTitle';
     elements.skipLink.textContent = 'Skip to sign in';
     closeDialog();
@@ -10216,15 +10221,25 @@
 
   async function initialise() {
     if (!client()) {
+      elements.accountEntryLoader.hidden = true;
+      elements.authShell.hidden = false;
+      elements.skipLink.hidden = false;
       elements.mobileError.textContent = 'The secure account service could not load. Please refresh the page.';
       return;
     }
     updateAuthReturnNotice();
-    const authenticated = await restoreSession();
+    let authenticated = false;
+    try {
+      authenticated = await restoreSession();
+    } catch (error) {
+      authenticated = false;
+    }
     if (authenticated) enterAccount();
     else {
+      elements.accountEntryLoader.hidden = true;
       elements.authShell.hidden = false;
       elements.accountShell.hidden = true;
+      elements.skipLink.hidden = false;
     }
   }
 

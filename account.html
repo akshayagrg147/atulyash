@@ -10,13 +10,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="account.css?v=20260920-1">
+  <link rel="stylesheet" href="account.css?v=20260924-2">
   <link rel="stylesheet" href="commerce-shared.css?v=20260902-5">
 </head>
 <body>
-  <a class="skip-link" id="skipLink" href="#authTitle">Skip to sign in</a>
+  <a class="skip-link" id="skipLink" href="#authTitle" hidden>Skip to sign in</a>
 
-  <main class="auth-shell" id="authShell">
+  <main class="account-entry-loader" id="accountEntryLoader" role="status" aria-live="polite" aria-label="Opening My Atulyash">
+    <div class="account-entry-loader-inner">
+      <img class="account-entry-loader-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+      <div class="account-entry-loader-scene" aria-hidden="true">
+        <span class="account-entry-loader-roti"></span>
+        <span class="account-entry-loader-pin"><i></i></span>
+      </div>
+      <p class="account-entry-loader-eyebrow">MY ATULYASH</p>
+      <h1>Preparing your home.</h1>
+      <p>Checking your saved sign-in…</p>
+    </div>
+  </main>
+
+  <main class="auth-shell" id="authShell" hidden>
     <section class="auth-story" aria-labelledby="authStoryTitle">
       <a class="auth-brand" href="index.html" aria-label="Atulyash home">
         <img src="images/brand-mark.webp" width="630" height="550" alt="">
@@ -682,6 +695,6 @@
 
   <script src="api-client.js?v=20260920-1"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="account.js?v=20260920-1"></script>
+  <script src="account.js?v=20260924-2"></script>
 </body>
 </html>

@@ -10120,3 +10120,133 @@ body.account-bag-open {
     padding: 12px;
   }
 }
+
+/* Account entry: keep the sign-in form out of view until the saved session is checked. */
+.account-entry-loader {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  padding: 32px 20px;
+  background: radial-gradient(circle at 50% 40%, #fffdf8 0, #f7f1e6 65%, #eee4d0 100%);
+  text-align: center;
+}
+
+.account-entry-loader-inner {
+  width: min(100%, 390px);
+}
+
+.account-entry-loader-mark {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  object-fit: contain;
+}
+
+.account-entry-loader-scene {
+  position: relative;
+  width: 200px;
+  height: 150px;
+  margin: 0 auto 18px;
+}
+
+.account-entry-loader-scene::before {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 18px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(78, 55, 26, .1);
+  content: '';
+  filter: blur(9px);
+}
+
+.account-entry-loader-roti {
+  position: absolute;
+  bottom: 13px;
+  left: 50%;
+  width: 104px;
+  height: 104px;
+  border: 2px solid #dab879;
+  border-radius: 50%;
+  background: radial-gradient(circle at 31% 36%, #cb9e59 0 2px, transparent 3px),
+    radial-gradient(circle at 69% 54%, #d2a662 0 3px, transparent 4px),
+    radial-gradient(circle at 47% 73%, #ddb979 0 2px, transparent 3px),
+    radial-gradient(circle at 55% 40%, #fff8de, #efd8a9 76%);
+  box-shadow: 0 9px 18px rgba(97, 69, 29, .12), inset 0 0 0 7px rgba(255, 253, 248, .2);
+  transform: translateX(-50%);
+  animation: account-roti-roll 1.8s ease-in-out infinite;
+}
+
+.account-entry-loader-pin {
+  position: absolute;
+  top: 19px;
+  left: 14px;
+  width: 172px;
+  height: 32px;
+  transform: rotate(-18deg);
+  animation: account-pin-roll 1.8s ease-in-out infinite;
+}
+
+.account-entry-loader-pin i {
+  position: absolute;
+  top: 1px;
+  left: 21px;
+  width: 130px;
+  height: 30px;
+  border: 1px solid #ad793b;
+  border-radius: 16px;
+  background: linear-gradient(#edce95 0%, #c59152 52%, #e5bb7b 100%);
+  box-shadow: 0 5px 10px rgba(78, 55, 26, .18);
+}
+
+.account-entry-loader-pin::before,
+.account-entry-loader-pin::after {
+  position: absolute;
+  top: 11px;
+  width: 24px;
+  height: 9px;
+  border-radius: 5px;
+  background: #a56d36;
+  content: '';
+}
+
+.account-entry-loader-pin::before { left: 0; }
+.account-entry-loader-pin::after { right: 0; }
+
+.account-entry-loader-eyebrow {
+  margin: 0 0 10px;
+  color: var(--forest-700);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+
+.account-entry-loader h1 {
+  margin-bottom: 10px;
+  font-size: clamp(2rem, 6vw, 2.8rem);
+}
+
+.account-entry-loader-inner > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+@keyframes account-pin-roll {
+  0%, 100% { transform: translateY(0) rotate(-18deg); }
+  50% { transform: translateY(61px) rotate(-18deg); }
+}
+
+@keyframes account-roti-roll {
+  0%, 100% { transform: translateX(-50%) scale(.88); }
+  50% { transform: translateX(-50%) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-entry-loader-pin,
+  .account-entry-loader-roti {
+    animation: none;
+  }
+}

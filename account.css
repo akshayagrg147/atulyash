@@ -367,7 +367,7 @@ h3 {
   position: absolute;
   z-index: 2;
   right: clamp(-30px, 1vw, 36px);
-  bottom: -10%;
+  bottom: 0;
   width: clamp(310px, 38vw, 590px);
   pointer-events: none;
 }
@@ -6226,7 +6226,7 @@ select {
 
   .auth-product {
     right: clamp(-12px, 1.5vw, 28px);
-    bottom: -10%;
+    bottom: 0;
     width: clamp(300px, 33vw, 500px);
   }
 

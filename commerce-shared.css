@@ -64,7 +64,7 @@
 .unified-bag .unified-bag-header p {
   margin: 0 0 5px;
   color: #b84f31;
-  font-size: .61rem;
+  font-size: .72rem;
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -74,7 +74,7 @@
   margin: 0;
   color: #18231f;
   font-family: "Newsreader", Georgia, serif;
-  font-size: 2.4rem;
+  font-size: 2.7rem;
   font-weight: 500;
   letter-spacing: -.025em;
 }
@@ -180,6 +180,7 @@
 .unified-bag .unified-bag-status p,
 .unified-bag .unified-bag-status > span:nth-child(2) {
   margin: 0;
+  font-size: .78rem;
 }
 
 .unified-bag .unified-bag-status button {
@@ -358,7 +359,7 @@
   margin: 0;
   color: #18231f;
   font-family: "DM Sans", system-ui, sans-serif;
-  font-size: .88rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.35;
@@ -368,14 +369,14 @@
   flex: 0 0 auto;
   color: #08251f;
   font-family: "Newsreader", Georgia, serif;
-  font-size: 1.12rem;
+  font-size: 1.35rem;
   font-weight: 600;
 }
 
 .unified-bag .unified-bag-item-meta {
   margin: 7px 0 15px;
   color: #65706a;
-  font-size: .68rem;
+  font-size: .78rem;
   line-height: 1.5;
 }
 
@@ -411,7 +412,7 @@
 .unified-bag .unified-bag-quantity output,
 .unified-bag .unified-bag-quantity span {
   border-inline: 1px solid rgba(17, 55, 46, .13);
-  font-size: .7rem;
+  font-size: .82rem;
   font-weight: 700;
 }
 
@@ -423,7 +424,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid currentColor;
-  font-size: .67rem;
+  font-size: .75rem;
   font-weight: 600;
 }
 
@@ -503,7 +504,7 @@
 }
 
 .unified-bag .unified-bag-subtotal span {
-  font-size: .75rem;
+  font-size: .85rem;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -511,7 +512,7 @@
 
 .unified-bag .unified-bag-subtotal strong {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   font-weight: 600;
 }
 
@@ -526,13 +527,13 @@
 }
 
 .unified-bag .unified-bag-credit span {
-  font-size: .65rem;
+  font-size: .75rem;
   font-weight: 700;
 }
 
 .unified-bag .unified-bag-credit strong {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
 }
 
 .unified-bag .unified-bag-delivery {
@@ -548,7 +549,7 @@
 
 .unified-bag .unified-bag-delivery b {
   color: #194b3e;
-  font-size: .68rem;
+  font-size: .78rem;
   font-weight: 800;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -557,14 +558,14 @@
 .unified-bag .unified-bag-delivery small {
   max-width: 260px;
   color: #65706a;
-  font-size: .62rem;
+  font-size: .74rem;
   line-height: 1.4;
 }
 
 .unified-bag .unified-bag-delivery strong {
   white-space: nowrap;
   font-family: "Newsreader", Georgia, serif;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   font-weight: 600;
 }
 
@@ -576,7 +577,7 @@
 }
 
 .unified-bag .unified-bag-total span {
-  font-size: .72rem;
+  font-size: .82rem;
   font-weight: 800;
   letter-spacing: .07em;
   text-transform: uppercase;
@@ -584,14 +585,14 @@
 
 .unified-bag .unified-bag-total strong {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 1.85rem;
+  font-size: 2.1rem;
   font-weight: 600;
 }
 
 .unified-bag .unified-bag-footer > p {
   margin: 0 0 18px;
   color: #65706a;
-  font-size: .66rem;
+  font-size: .74rem;
   line-height: 1.45;
 }
 
@@ -607,7 +608,7 @@
   border: 1px solid #0d342a;
   border-radius: 0;
   box-shadow: none;
-  font-size: .69rem;
+  font-size: .8rem;
   font-weight: 700;
   gap: 18px;
   letter-spacing: .06em;
@@ -656,7 +657,7 @@
   }
 
   .unified-bag .unified-bag-header h2 {
-    font-size: 2.1rem;
+    font-size: 2.2rem;
   }
 
   .unified-bag .unified-bag-status {
@@ -829,11 +830,11 @@
 
   .unified-bag .unified-bag-header p {
     margin-bottom: 2px;
-    font-size: .54rem;
+    font-size: .64rem;
   }
 
   .unified-bag .unified-bag-header h2 {
-    font-size: 1.75rem;
+    font-size: 2rem;
   }
 
   .unified-bag .unified-bag-status {
@@ -865,7 +866,7 @@
   }
 
   .unified-bag .unified-bag-item-top h3 {
-    font-size: .82rem;
+    font-size: .94rem;
   }
 
   .unified-bag .unified-bag-item-controls {

@@ -164,10 +164,8 @@
         <div class="launch-banner-heading">
           <div class="launch-banner-eyebrow">
             <span>Your First Atulyash Experience</span>
-            <span class="launch-banner-live"><i aria-hidden="true"></i><b id="launchBannerStatus">Reservations now open</b></span>
           </div>
-          <h2><span>1 kg on us</span> for the first <strong id="launchBannerQuota">2,000</strong> families</h2>
-          <p>A freshly milled introduction to single-origin MP Sharbati atta—reserved for your household, with our compliments.</p>
+          <h2><span>1 kg on us</span> for the first <strong id="launchBannerQuota">2,000</strong> orders</h2>
           <span class="launch-banner-divider" aria-hidden="true"><i></i></span>
         </div>
 
@@ -179,12 +177,22 @@
             </div>
             <div class="launch-banner-timeline">
               <div class="launch-banner-milestone is-live">
-                <span class="launch-banner-milestone-icon" aria-hidden="true">01</span>
-                <div><strong>Reservations are open</strong><small>Secure one complimentary pack</small></div>
+                <span class="launch-banner-milestone-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M8 19c2.2-2.1 2.4-5.2 1.1-8.1M12 20c2.2-2.1 2.7-5.3 1.5-8.9M7.5 8.7c-1.8-.4-3.3-1.6-4.2-3.3 2.1-.2 4 .6 5.2 2.2M13.4 8.7c1.7-.4 3.2-1.6 4-3.2-2-.2-3.8.6-5 2.1M10 12.5c1.1-1.5 2.7-2.4 4.4-2.6-.2 1.9-1.2 3.5-2.8 4.4"/></svg>
+                </span>
+                <div><strong id="launchBannerStatus">Reservations are open now</strong><small>Reserve your complimentary pack</small></div>
               </div>
               <div class="launch-banner-milestone">
-                <span class="launch-banner-milestone-icon" aria-hidden="true">02</span>
-                <div><strong>Deliveries begin <span id="launchBannerDate">12 October</span></strong><small>Fresh milling scheduled for launch</small></div>
+                <span class="launch-banner-milestone-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 9h14v10H5zM7 9V5h10v4M9 12h6M9 15h6"/></svg>
+                </span>
+                <div><strong>Milling begins on<br><span id="launchBannerMillingDate">11th October 2026</span></strong><small>First Navratra</small></div>
+              </div>
+              <div class="launch-banner-milestone">
+                <span class="launch-banner-milestone-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7zM6.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+                </span>
+                <div><strong>Deliveries begin from<br><span id="launchBannerDate">12th October 2026</span></strong><small>Second Navratra</small></div>
               </div>
             </div>
           </section>
@@ -194,7 +202,7 @@
               <span>Reserve now</span>
               <span class="launch-banner-arrow" aria-hidden="true">→</span>
             </a>
-            <small>Web reservation · ₹0 payable</small>
+            <small>Web &amp; App booking only</small>
           </div>
 
           <section class="launch-banner-panel launch-banner-service" aria-label="Serviceable area">
@@ -208,23 +216,16 @@
             </div>
           </section>
 
-          <section class="launch-banner-panel launch-banner-counter-card" aria-label="Live availability">
+          <section class="launch-banner-panel launch-banner-counter-card" aria-label="Live counter">
             <div class="launch-banner-panel-title">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 16v-5M10 16V7M14 16V4M18 16V9"/></svg>
-              <span>Live availability</span>
+              <span>Live counter</span>
             </div>
             <div class="launch-banner-counter-body">
               <strong id="launchBannerAvailability">2,000</strong>
-              <span>packs left</span>
-              <small>Updated from the live campaign</small>
+              <span>left</span>
             </div>
           </section>
-        </div>
-
-        <div class="launch-banner-assurance" aria-label="Launch reservation terms">
-          <span>Complimentary 1 kg pack</span>
-          <span>One per eligible household</span>
-          <span>No payment details required</span>
         </div>
       </div>
     </aside>
@@ -1017,6 +1018,12 @@
         var campaign = payload && payload.campaign;
         if (!campaign || !campaign.can_reserve) return;
 
+        function ordinalDay(day) {
+          var value = Number(day);
+          if (value % 100 >= 11 && value % 100 <= 13) return value + 'th';
+          return value + ({ 1: 'st', 2: 'nd', 3: 'rd' }[value % 10] || 'th');
+        }
+
         var availability = document.getElementById('launchBannerAvailability');
         var status = document.getElementById('launchBannerStatus');
         var deliveryDate = document.getElementById('launchBannerDate');
@@ -1030,7 +1037,11 @@
         if (deliveryDate && campaign.delivery_start_date) {
           var parsedDate = new Date(campaign.delivery_start_date + 'T00:00:00+05:30');
           if (!Number.isNaN(parsedDate.getTime())) {
-            deliveryDate.textContent = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(parsedDate);
+            var parts = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }).formatToParts(parsedDate);
+            var day = parts.find(function (part) { return part.type === 'day'; });
+            var month = parts.find(function (part) { return part.type === 'month'; });
+            var year = parts.find(function (part) { return part.type === 'year'; });
+            if (day && month && year) deliveryDate.textContent = ordinalDay(day.value) + ' ' + month.value + ' ' + year.value;
           }
         }
 

@@ -129,6 +129,7 @@
 @media (min-width: 781px) {
   .hero-product {
     left: -10%;
+    bottom: clamp(18px, 3vh, 32px);
   }
 }
 

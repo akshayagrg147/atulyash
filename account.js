@@ -4301,9 +4301,10 @@
 
         const wrapper = create('fieldset', 'order-modification-item');
         const legend = create('legend', '', `Item ${index + 1} · ${firstValue(item.product_name, packObject?.product?.name, 'Atulyash Whole Wheat Atta')}`);
-        const currentPackWeight = firstFinite(
+        const currentPackWeight = quantityKg(
           packObject?.weight_kg,
           packObject?.weight,
+          packObject?.unit_of_measure?.value,
           item.product_pack_weight,
           item.pack_weight,
           item.weight_kg,
@@ -4313,10 +4314,20 @@
           weightFromLabel(item.product_pack_name)
         );
         const currentPackCount = Math.max(1, Math.round(firstFinite(item.quantity, item.qty, item.count) || 1));
-        const currentTotalWeight = firstFinite(
+        const detailDeliveryWeight = quantityKg(
+          detail.delivery_quantity,
+          detail.delivery_quantity_kg,
+          detail.total_weight_kg,
+          detail.total_weight
+        );
+        const currentTotalWeight = quantityKg(
           item.total_weight_kg,
           item.total_weight,
-          currentPackWeight === null ? null : currentPackWeight * currentPackCount
+          item.quantity_kg
+        ) ?? (
+          currentPackWeight === null
+            ? (rawItems.length === 1 ? detailDeliveryWeight : null)
+            : currentPackWeight * currentPackCount
         );
         const additionLabel = create('label', '', 'Additional atta for this delivery');
         const addition = create('select');

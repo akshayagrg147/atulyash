@@ -28,6 +28,7 @@
     return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(parsed);
   }
   function setCounter(value) {
+    if (!counter) return;
     var c = value && value.campaign;
     if (!c) { counter.textContent = 'Launch Experience availability is being prepared.'; return; }
     var reserved = Number(c.reserved_count ?? c.reservation_count ?? 0);

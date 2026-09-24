@@ -3388,7 +3388,6 @@
         );
       } else {
         const fragment = document.createDocumentFragment();
-        if (page === 1) state.launchReservations.forEach((reservation) => fragment.append(makeLaunchReservationCard(reservation, { compact: true })));
         orders.forEach((order) => fragment.append(makeOrderCard(order)));
         elements.ordersList.replaceChildren(fragment);
       }

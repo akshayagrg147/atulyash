@@ -2240,6 +2240,7 @@
         ONE_TIME_2_TO_6_KG: 'One-time delivery · 2–6 kg',
         ONE_TIME_7_TO_10_KG: 'One-time delivery · 7–10 kg',
         ONE_TIME_11_TO_40_KG: 'One-time delivery · 11–40 kg',
+        ACTIVE_SUBSCRIPTION_ONE_TIME: 'Active subscriber benefit',
         ABOVE_40_KG_CUSTOMER_CARE: 'Large-order delivery'
       };
       return {
@@ -2250,6 +2251,8 @@
           || (hasWeekly ? 'Fresh-batch delivery' : `One-time delivery · ${formatWeight(oneTimeWeight)} kg`),
         note: requiresSupport
           ? 'This order needs confirmation from Atulyash Customer Care before checkout.'
+          : serverCartSummary.deliveryReason === 'ACTIVE_SUBSCRIPTION_ONE_TIME'
+            ? 'Free delivery because your active weekly subscription includes delivery coverage for this one-time order.'
           : amount === 0
             ? 'The live cart confirms free delivery.'
             : `The live cart confirms a ${formatPrice(amount)} delivery charge.`

@@ -4440,6 +4440,7 @@
         const difference = modificationPreviewAmount(preview, 'difference');
         const deliveryCharge = modificationPreviewAmount(preview, 'delivery');
         const discount = modificationPreviewAmount(preview, 'discount');
+        const deliveryChargeAlreadyApplied = preview?.delivery_charge_already_applied === true;
         const paidOrder = orderHasSuccessfulPayment(detail);
         const availableWallet = finiteMoney(preview?.available_balance, preview?.wallet_balance);
         const balanceCheckRequired = preview?.balance_check_required === true;
@@ -4467,7 +4468,7 @@
         };
         addFigure('Current amount due', resolvedOriginal);
         addFigure('Revised amount due', revised, 'is-primary');
-        addFigure('Delivery charge', deliveryCharge);
+        addFigure(deliveryChargeAlreadyApplied ? 'Existing delivery charge' : 'Delivery charge', deliveryCharge);
         if (discount !== null && discount > 0) addFigure('Discount', -Math.abs(discount), 'is-discount');
         if (resolvedDifference !== null && Math.abs(resolvedDifference) >= 0.005) {
           addFigure(
@@ -4480,6 +4481,11 @@
           addFigure('Available wallet', availableWallet, balanceSufficient ? 'is-wallet' : 'is-due');
         }
         previewPanel.append(figures);
+        if (deliveryChargeAlreadyApplied) {
+          previewPanel.append(
+            create('small', '', 'The original delivery charge is already included and will not be added again for this change.')
+          );
+        }
 
         let guidance = 'Saving updates the order only; no wallet debit happens while you edit.';
         if (resolvedDifference !== null && resolvedDifference > 0.005) {

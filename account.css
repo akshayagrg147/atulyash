@@ -6205,6 +6205,15 @@ select {
 }
 
 @media (min-width: 961px) {
+  /* Keep the launch-return artwork tied to the first viewport. The form can
+     be taller than the screen, but the story panel and packet should not be
+     pushed below the fold with it. */
+  .auth-story {
+    align-self: start;
+    height: 100svh;
+    min-height: 100svh;
+  }
+
   .auth-story-copy {
     width: min(50%, 420px);
     margin-top: clamp(62px, 9vh, 104px);

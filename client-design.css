@@ -1477,12 +1477,11 @@
 
 @media (min-width: 1181px) {
   .asha-main {
-    align-self: stretch;
-    grid-template-rows: auto 1fr;
+    align-self: start;
   }
 
   .asha-media {
-    align-self: end;
+    align-self: start;
   }
 }
 

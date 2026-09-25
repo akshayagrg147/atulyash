@@ -1351,7 +1351,7 @@
   grid-column: 2;
   grid-row: 1;
   display: grid;
-  grid-template-columns: minmax(190px, 0.78fr) minmax(270px, 1.22fr);
+  grid-template-columns: 1fr;
   width: 100%;
   max-width: 560px;
   overflow: hidden;
@@ -1362,7 +1362,8 @@
 }
 
 .asha-portrait {
-  min-height: 560px;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
   margin: 0;
   overflow: hidden;
   background: #713f21;
@@ -1373,7 +1374,7 @@
   height: 100%;
   display: block;
   object-fit: cover;
-  object-position: 53% center;
+  object-position: center center;
   filter: saturate(0.88) contrast(0.98);
 }
 
@@ -1436,7 +1437,7 @@
 .asha-credentials p {
   margin: 2px 0 0;
   color: #4d5953;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   line-height: 1.42;
 }
 
@@ -1444,6 +1445,17 @@
   min-width: 0;
   padding-top: 17px;
   border-top: 1px solid rgba(11, 39, 33, 0.14);
+}
+
+@media (min-width: 1181px) {
+  .asha-main {
+    align-self: stretch;
+    grid-template-rows: auto 1fr;
+  }
+
+  .asha-media {
+    align-self: end;
+  }
 }
 
 .asha-media-heading {
@@ -1627,12 +1639,12 @@
   .asha-profile {
     grid-column: 1;
     grid-row: 1;
-    grid-template-columns: minmax(270px, 0.7fr) minmax(0, 1.3fr);
+    grid-template-columns: 1fr;
     max-width: none;
   }
 
   .asha-portrait {
-    min-height: 500px;
+    min-height: 0;
   }
 
   .asha-profile-copy {

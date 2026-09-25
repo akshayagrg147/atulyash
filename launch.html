@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260907-5">
-  <link rel="stylesheet" href="launch.css?v=20260911-2">
+  <link rel="stylesheet" href="launch.css?v=20260925-1">
 </head>
 <body class="launch-page">
   <a class="skip-link" href="#reservation">Skip to reservation</a>
@@ -32,9 +32,9 @@
           <div class="launch-eyebrow"><span aria-hidden="true"></span> Your reservation</div>
           <h2>Three small steps. One honest first experience.</h2>
           <ol>
-            <li><span>01</span><div><strong>Sign in securely</strong><p>OTP verification keeps the offer to one pack per household.</p></div></li>
-            <li><span>02</span><div><strong>Confirm your area</strong><p>We check your Delhi PIN and locality against the live delivery network.</p></div></li>
-            <li><span>03</span><div><strong>Reserve at ₹0</strong><p>No card or wallet payment is required for this complimentary pack.</p></div></li>
+            <li><span>01</span><div><strong>Check your area</strong><p>We check your Delhi PIN against the live Launch Experience serviceability.</p></div></li>
+            <li><span>02</span><div><strong>Sign in securely</strong><p>OTP verification keeps the offer to one pack per household.</p></div></li>
+            <li><span>03</span><div><strong>Reserve at ₹0</strong><p>Confirm your locality and address. No card or wallet payment is required.</p></div></li>
           </ol>
           <p class="launch-guide-note">Reservation is subject to campaign availability and delivery serviceability.</p>
         </aside>
@@ -57,6 +57,20 @@
         </dl>
         <a class="button button-secondary" href="index.html#shop">Continue shopping <span aria-hidden="true">→</span></a>
       </div>
+      <section id="launchServiceabilityGate" class="launch-serviceability-gate launch-state" aria-labelledby="launchServiceabilityTitle" hidden>
+        <div class="launch-state-icon" aria-hidden="true">01</div>
+        <p class="launch-card-kicker">First, check your area</p>
+        <h2 id="launchServiceabilityTitle">Can we deliver your first pack?</h2>
+        <p>Enter your six-digit PIN code before OTP verification. Launch reservations are currently limited to eligible South Delhi and North Delhi delivery areas.</p>
+        <form id="launchServiceabilityForm" class="launch-serviceability-form" novalidate>
+          <label for="launchServiceabilityPincode">Delivery PIN code</label>
+          <div class="launch-serviceability-input-row">
+            <input id="launchServiceabilityPincode" name="pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter 6-digit PIN" aria-describedby="launchServiceabilityStatus" required>
+            <button class="button button-secondary" type="submit" id="launchServiceabilityCheck">Check availability</button>
+          </div>
+          <p id="launchServiceabilityStatus" class="launch-field-note" role="status" aria-live="polite"></p>
+        </form>
+      </section>
       <form id="launchReservationForm" novalidate hidden>
         <p class="launch-card-kicker">Complimentary reservation</p>
         <h2 id="reservationHeading">Reserve my launch experience</h2>
@@ -104,6 +118,6 @@
     </div>
   </footer>
   <script src="api-client.js?v=20260906-3"></script>
-  <script src="launch.js?v=20260911-2"></script>
+  <script src="launch.js?v=20260925-1"></script>
 </body>
 </html>

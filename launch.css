@@ -489,6 +489,75 @@
   font-weight: 700;
 }
 
+.launch-field-note.is-error {
+  color: #a13f28 !important;
+}
+
+.launch-grid [aria-invalid="true"],
+.launch-serviceability-form [aria-invalid="true"] {
+  border-color: var(--launch-rust);
+  box-shadow: 0 0 0 3px rgba(173, 69, 42, 0.14);
+}
+
+.launch-serviceability-gate {
+  max-width: 700px;
+}
+
+.launch-serviceability-gate > p:not(.launch-card-kicker) {
+  max-width: 600px;
+  margin: 18px 0 28px;
+}
+
+.launch-serviceability-form {
+  width: min(100%, 620px);
+}
+
+.launch-serviceability-form > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #405149;
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.launch-serviceability-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.launch-serviceability-input-row input {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 15px 16px;
+  color: var(--launch-green);
+  background: #fffefa;
+  border: 1px solid #c8d1ca;
+  border-radius: 0;
+  font: 500 0.96rem/1.4 var(--sans);
+  letter-spacing: normal;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.launch-serviceability-input-row input:focus {
+  outline: 0;
+  background: #fff;
+  border-color: var(--launch-green);
+  box-shadow: 0 0 0 3px rgba(174, 243, 46, 0.2);
+}
+
+.launch-serviceability-input-row .button {
+  min-height: 54px;
+  white-space: nowrap;
+}
+
+.launch-serviceability-input-row .button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
 .launch-consent {
   display: flex;
   align-items: flex-start;
@@ -754,6 +823,8 @@
   .launch-span-two { grid-column: auto; }
   .launch-submit { min-height: 62px; padding-inline: 17px; font-size: 0.68rem; }
   .launch-state { min-height: 350px; }
+  .launch-serviceability-input-row { grid-template-columns: 1fr; }
+  .launch-serviceability-input-row .button { width: 100%; }
 
   .launch-footer .launch-container { align-items: flex-start; flex-direction: column; justify-content: center; gap: 2px; padding-block: 18px; }
 }

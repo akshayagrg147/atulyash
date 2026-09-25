@@ -1031,7 +1031,7 @@
         var quota = document.getElementById('launchBannerQuota');
 
         if (availability && Number.isFinite(Number(campaign.remaining_count))) {
-          availability.textContent = Number(campaign.remaining_count).toLocaleString('en-IN');
+          availability.textContent = String(Number(campaign.remaining_count));
         }
         if (quota && Number.isFinite(Number(campaign.quota))) quota.textContent = Number(campaign.quota).toLocaleString('en-IN');
         if (status && campaign.status_message) status.textContent = campaign.status_message;

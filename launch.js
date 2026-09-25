@@ -103,7 +103,7 @@
     var reserved = Number(c.reserved_count ?? c.reservation_count ?? 0);
     var remaining = Number(c.remaining_count ?? c.remaining_reservations ?? 0);
     counter.textContent = c.can_reserve !== false
-      ? (reserved.toLocaleString() + ' reserved · ' + remaining.toLocaleString() + ' remaining')
+      ? (String(reserved) + ' reserved · ' + String(remaining) + ' remaining')
       : (c.status_message || 'Launch Experience reservations are currently unavailable.');
   }
 

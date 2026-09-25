@@ -1,5 +1,9 @@
 /* Dedicated Atulyash checkout — one calm, canonical purchase journey. */
 
+html.commerce-paused-notices-hidden .checkout-commerce-paused {
+  display: none !important;
+}
+
 html {
   min-height: 100%;
   scrollbar-gutter: auto;

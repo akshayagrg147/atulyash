@@ -3,6 +3,7 @@
   'use strict';
 
   window.AtulyashCommercePaused = true;
-  window.AtulyashCommercePauseMessage = 'Online ordering is temporarily paused. You can still browse Atulyash while we prepare the next ordering window.';
-  document.documentElement.classList.add('commerce-paused');
+  window.AtulyashCommercePauseNoticeHidden = true;
+  window.AtulyashCommercePauseMessage = 'Weekly Subscriptions Begin 11 October 2026 : First Navratra';
+  document.documentElement.classList.add('commerce-paused', 'commerce-paused-notices-hidden');
 })();

@@ -18,7 +18,9 @@
   var serviceability = document.getElementById('launchServiceability');
   var submit = document.getElementById('launchSubmit');
   var campaignDate = document.getElementById('launchCampaignDate');
+  var millingDate = document.getElementById('launchMillingDate');
   var successDate = document.getElementById('launchSuccessDate');
+  var launchReference = document.getElementById('launchReference');
   var gate = document.getElementById('launchServiceabilityGate');
   var gateForm = document.getElementById('launchServiceabilityForm');
   var gatePincode = document.getElementById('launchServiceabilityPincode');
@@ -83,6 +85,14 @@
     return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(parsed);
   }
 
+  function formatShortCampaignDate(value, offsetDays) {
+    if (!value) return '';
+    var parsed = new Date(String(value) + 'T00:00:00+05:30');
+    if (Number.isNaN(parsed.getTime())) return '';
+    parsed.setDate(parsed.getDate() + Number(offsetDays || 0));
+    return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' }).format(parsed);
+  }
+
   function setCounter(value) {
     if (!counter) return;
     var c = value && value.campaign;
@@ -128,7 +138,10 @@
       setCounter(payload);
       var formattedDate = formatCampaignDate(campaign && campaign.delivery_start_date);
       if (formattedDate && campaignDate) campaignDate.textContent = formattedDate;
-      if (formattedDate && successDate) successDate.textContent = formattedDate;
+      var shortDeliveryDate = formatShortCampaignDate(campaign && campaign.delivery_start_date);
+      var shortMillingDate = formatShortCampaignDate(campaign && campaign.delivery_start_date, -1);
+      if (shortDeliveryDate && successDate) successDate.textContent = shortDeliveryDate;
+      if (shortMillingDate && millingDate) millingDate.textContent = shortMillingDate;
 
       if (!campaign || !campaign.can_reserve) {
         unavailable.hidden = false;
@@ -323,7 +336,7 @@
     }).then(function (payload) {
       form.hidden = true;
       success.hidden = false;
-      document.getElementById('launchReference').textContent = payload.reference || payload.reservation_reference || 'confirmed';
+      if (launchReference) launchReference.textContent = payload.reference || payload.reservation_reference || 'confirmed';
     }).catch(function (error) {
       setNotice(error && error.message ? error.message : 'We could not reserve this Launch Experience. Please check the details and try again.');
       submit.disabled = false;

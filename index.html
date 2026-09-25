@@ -23,10 +23,10 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="images/atta-packet-2026.webp" fetchpriority="high">
   <link rel="preload" as="image" href="images/natural-stone-hero.webp" fetchpriority="high">
-  <link rel="stylesheet" href="styles.css?v=20260907-5">
+  <link rel="stylesheet" href="styles.css?v=20260925-2">
   <link rel="stylesheet" href="ecommerce.css?v=20260919-1">
   <link rel="stylesheet" href="commerce-shared.css?v=20260924-1">
-  <link rel="stylesheet" href="client-design.css?v=20260925-3">
+  <link rel="stylesheet" href="client-design.css?v=20260925-6">
 </head>
 <body data-commerce-page="storefront">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -233,9 +233,10 @@
         </div>
         <div class="hero-actions hero-actions-client">
           <a class="button button-primary" href="#packSelector" data-serviceability-intent="first-experience">Your First Atulyash Experience <span aria-hidden="true">↓</span></a>
-          <a class="text-action hero-subscribe" id="heroWeeklyButton" href="#shop">Subscribe Weekly <span aria-hidden="true">→</span></a>
+          <a class="text-action hero-subscribe" id="heroWeeklyButton" href="#shop"><span data-weekly-label>Subscribe Weekly</span> <span aria-hidden="true">→</span></a>
           <a class="text-action" href="#weekly">Estimate Your Weekly Requirement <span aria-hidden="true">→</span></a>
         </div>
+        <p class="hero-weekly-note" id="heroWeeklyNote" role="status" hidden>Weekly Subscriptions Begin 11 October 2026 : First Navratra</p>
         <div class="hero-service-facts" aria-label="Price and customer care">
           <span>Atta price <strong id="heroUnitPrice">₹120 per kg</strong></span>
           <a href="tel:+919818588996">Customer care <strong>98185 88996</strong></a>
@@ -294,8 +295,6 @@
               <img src="images/veer-mascot-2026.webp" width="2130" height="2740" alt="">
             </div>
 
-            <p class="orbit-veer-caption">Meet Veer — Your Guide to Better Atta</p>
-
             <ul class="orbit-mobile-list" aria-hidden="true">
               <li>Single-Origin MP Sharbati</li>
               <li>Multi-Stage Cleaning</li>
@@ -305,6 +304,8 @@
               <li>Freshly Milled, Weekly Delivered</li>
             </ul>
           </div>
+
+          <p class="orbit-veer-caption">Meet Veer — Your Guide to Better Atta</p>
         </div>
       </div>
     </section>
@@ -538,8 +539,8 @@
           </div>
 
           <aside class="commerce-paused-notice" id="storefrontCommercePaused" role="status">
-            <strong>Online ordering is temporarily paused.</strong>
-            <span>You can continue browsing the catalogue. Add to Bag and checkout will return when ordering reopens.</span>
+            <strong>Weekly Subscriptions Begin 11 October 2026 : First Navratra</strong>
+            <span>Ordering is paused during Shraddh for now. You can continue browsing the catalogue.</span>
           </aside>
 
           <button class="buy-now-button" id="buyNowButton" type="button">Buy it now <span aria-hidden="true">→</span></button>
@@ -813,7 +814,7 @@
           <p>Freshly milled and delivered weekly, so your atta reaches you closer to when it is meant to be consumed.</p>
           <div class="start-actions">
             <a class="button button-primary" href="#packSelector" data-serviceability-intent="first-experience">Your First Atulyash Experience <span aria-hidden="true">↑</span></a>
-            <button class="text-action text-action-dark start-cart-action" id="startWeeklyButton" type="button">Subscribe Weekly <span aria-hidden="true">→</span></button>
+            <button class="text-action text-action-dark start-cart-action" id="startWeeklyButton" type="button"><span data-weekly-label>Subscribe Weekly</span> <span aria-hidden="true">→</span></button>
             <a class="text-action text-action-dark" href="#weekly">Estimate My Weekly Requirement <span aria-hidden="true">→</span></a>
           </div>
         </div>
@@ -1008,8 +1009,8 @@
   <script src="script.js?v=20260902-3"></script>
   <script src="api-client.js?v=20260906-3"></script>
   <script src="google-area-lookup.js?v=20260823-1"></script>
-  <script src="commerce-paused.js?v=20260925-1"></script>
-  <script src="ecommerce.js?v=20260925-2"></script>
+  <script src="commerce-paused.js?v=20260925-2"></script>
+  <script src="ecommerce.js?v=20260925-3"></script>
   <script>
     (function () {
       var banner = document.getElementById('launchBanner');

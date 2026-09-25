@@ -2,6 +2,11 @@
    The storefront and My Atulyash use this same visual contract before the
    canonical delivery checkout opens. */
 
+/* Keep the commerce lock active while temporarily hiding its explanatory notice. */
+html.commerce-paused-notices-hidden .commerce-paused-notice {
+  display: none !important;
+}
+
 .unified-bag {
   position: fixed;
   top: 0;

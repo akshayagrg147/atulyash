@@ -52,6 +52,7 @@
     heroUnitPrice: document.getElementById('heroUnitPrice'),
     heroVisualUnitPrice: document.getElementById('heroVisualUnitPrice'),
     heroWeeklyButton: document.getElementById('heroWeeklyButton'),
+    heroWeeklyNote: document.getElementById('heroWeeklyNote'),
     startWeeklyButton: document.getElementById('startWeeklyButton'),
     headerLocationButton: document.getElementById('headerLocationButton'),
     headerLocationLabel: document.getElementById('headerLocationLabel'),
@@ -985,14 +986,24 @@
       if (!button) return;
       if ('disabled' in button) button.disabled = COMMERCE_PAUSED || !available;
       button.setAttribute('aria-disabled', String(COMMERCE_PAUSED || !available));
+      button.classList.toggle('is-paused', COMMERCE_PAUSED);
       if (COMMERCE_PAUSED) {
-        button.textContent = 'Ordering paused';
+        const label = button.querySelector('[data-weekly-label]');
+        if (label) label.textContent = 'Ordering paused';
+        else button.textContent = 'Ordering paused';
         button.title = COMMERCE_PAUSE_MESSAGE;
       } else if (!available) {
         button.title = message;
+      } else {
+        const label = button.querySelector('[data-weekly-label]');
+        if (label) label.textContent = 'Subscribe Weekly';
+        button.removeAttribute('title');
       }
-      else button.removeAttribute('title');
     });
+    if (elements.heroWeeklyNote) {
+      elements.heroWeeklyNote.textContent = COMMERCE_PAUSE_MESSAGE;
+      elements.heroWeeklyNote.hidden = !COMMERCE_PAUSED;
+    }
   }
 
   function clearWeeklyCatalog(message = 'Loading weekly plans…') {

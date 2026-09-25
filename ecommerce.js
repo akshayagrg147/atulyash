@@ -1057,7 +1057,7 @@
     clearWeeklyCatalog('Loading weekly plans…');
     syncPurchaseAvailability();
     if (elements.storeServiceStatus) {
-      elements.storeServiceStatus.hidden = false;
+      elements.storeServiceStatus.hidden = true;
       elements.storeServiceStatus.dataset.state = 'idle';
     }
     if (elements.catalogApiStatus) elements.catalogApiStatus.hidden = false;
@@ -1190,6 +1190,7 @@
       }
       if (elements.storeServiceStatus) {
         elements.storeServiceStatus.dataset.state = fullyConnected ? 'success' : 'error';
+        elements.storeServiceStatus.hidden = fullyConnected;
       }
       if (elements.storeServiceStatusLabel) {
         elements.storeServiceStatusLabel.textContent = fullyConnected
@@ -1218,7 +1219,10 @@
       clearWeeklyCatalog('Weekly plans could not be loaded.');
       syncPurchaseAvailability();
       if (stockLabel) stockLabel.lastChild.textContent = ' Ordering temporarily unavailable';
-      if (elements.storeServiceStatus) elements.storeServiceStatus.dataset.state = 'error';
+      if (elements.storeServiceStatus) {
+        elements.storeServiceStatus.dataset.state = 'error';
+        elements.storeServiceStatus.hidden = false;
+      }
       if (elements.storeServiceStatusLabel) elements.storeServiceStatusLabel.textContent = 'Live availability could not be reached. Ordering is temporarily disabled.';
       if (elements.catalogApiStatusLabel) elements.catalogApiStatusLabel.textContent = 'Published pack information remains visible, but checkout needs the live catalogue.';
       if (elements.storeServiceRetryButton) elements.storeServiceRetryButton.hidden = false;

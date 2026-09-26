@@ -161,7 +161,7 @@
           <div class="launch-banner-eyebrow">
             <span>Your First Atulyash Experience</span>
           </div>
-          <h2><span>1 kg on us</span> for the first <strong id="launchBannerQuota">2,000</strong> orders</h2>
+          <h2><span>Complimentary 1 kg Atulyash Atta</span> for the first <strong id="launchBannerQuota">2,000</strong> orders</h2>
           <span class="launch-banner-divider" aria-hidden="true"><i></i></span>
         </div>
 
@@ -1097,6 +1097,17 @@
         }
 
         banner.hidden = false;
+
+        // The launch banner is revealed after the campaign request completes,
+        // so the browser's initial hash navigation can happen too early.
+        if (window.location.hash === '#launchBanner') {
+          window.requestAnimationFrame(function () {
+            var header = document.getElementById('siteHeader');
+            var headerOffset = header ? header.getBoundingClientRect().height + 12 : 0;
+            var targetTop = banner.getBoundingClientRect().top + window.scrollY - headerOffset;
+            window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+          });
+        }
       }).catch(function () {});
     })();
   </script>

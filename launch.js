@@ -11,10 +11,6 @@
   var notice = document.getElementById('launchNotice');
   var counter = document.getElementById('launchCounter');
   var pincode = document.getElementById('launchPincode');
-  var area = document.getElementById('launchArea');
-  var otherAreaField = document.getElementById('launchOtherAreaField');
-  var otherArea = document.getElementById('launchOtherArea');
-  var otherAreaValue = '__atulyash_other_area__';
   var serviceability = document.getElementById('launchServiceability');
   var submit = document.getElementById('launchSubmit');
   var campaignDate = document.getElementById('launchCampaignDate');
@@ -112,7 +108,8 @@
     if (remembered && /^\d{6}$/.test(String(remembered.pincode))) {
       pincode.value = remembered.pincode;
       verifiedPincode = remembered.pincode;
-      loadAreas();
+      verifiedServiceable = true;
+      serviceability.textContent = 'This PIN was already checked for this session.';
     }
     gate.hidden = true;
     loginPrompt.hidden = true;
@@ -228,66 +225,38 @@
     });
   }
 
-  function loadAreas() {
+  function checkPincode() {
     var value = String(pincode.value || '').replace(/\D/g, '');
     pincode.value = value;
-    area.innerHTML = '<option value="">Checking areas…</option>';
-    area.disabled = true;
-    otherArea.value = '';
-    otherArea.required = false;
-    otherAreaField.hidden = true;
     serviceability.textContent = '';
     serviceability.classList.remove('is-error');
     if (value !== verifiedPincode) verifiedServiceable = false;
     if (value.length !== 6) {
       verifiedPincode = '';
-      area.innerHTML = '<option value="">Enter a 6-digit PIN code</option>';
       return;
     }
 
     var requestId = ++serviceabilityRequestId;
     api.request('/launch-experience/campaigns/serviceability/', { method: 'GET', auth: false, query: { pincode: value } }).then(function (payload) {
       if (requestId !== serviceabilityRequestId || value !== String(pincode.value || '')) return;
-      var areas = Array.isArray(payload && payload.available_area_objects)
-        ? payload.available_area_objects
-        : (Array.isArray(payload && payload.available_areas) ? payload.available_areas : []);
-      area.innerHTML = '<option value="">Choose an area</option>' + areas.map(function (row) {
-        var id = (row && typeof row === 'object') ? row.id : '';
-        var label = (row && typeof row === 'object') ? row.area : row;
-        return '<option value="' + String(id || '').replace(/[&<>"']/g, '') + '">' + String(label || '').replace(/[&<>"']/g, '') + '</option>';
-      }).join('');
-      if (payload && payload.allow_custom_area) area.insertAdjacentHTML('beforeend', '<option value="' + otherAreaValue + '">Others</option>');
       verifiedPincode = value;
       verifiedServiceable = Boolean(payload && payload.serviceable);
       if (verifiedServiceable) rememberServiceability(value);
-      area.disabled = !verifiedServiceable;
       serviceability.textContent = verifiedServiceable
-        ? (areas.length ? 'This PIN is eligible for the Launch Experience.' : 'This PIN is covered. Enter your delivery locality to continue.')
+        ? 'This PIN is eligible for the Launch Experience.'
         : 'No eligible Launch Experience area was found for this PIN.';
       serviceability.classList.toggle('is-error', !verifiedServiceable);
       if (!verifiedServiceable) pincode.setAttribute('aria-invalid', 'true');
-      if (!areas.length && payload && payload.allow_custom_area && verifiedServiceable) {
-        area.value = otherAreaValue;
-        otherAreaField.hidden = false;
-        otherArea.required = true;
-      }
     }).catch(function () {
       if (requestId !== serviceabilityRequestId) return;
       verifiedPincode = '';
       verifiedServiceable = false;
-      area.innerHTML = '<option value="">Unable to check this PIN</option>';
       serviceability.textContent = 'We could not check this PIN code. Please try again.';
       serviceability.classList.add('is-error');
     });
   }
 
-  area.addEventListener('change', function () {
-    var isCustom = area.value === otherAreaValue;
-    otherAreaField.hidden = !isCustom;
-    otherArea.required = isCustom;
-  });
-
-  pincode.addEventListener('input', loadAreas);
+  pincode.addEventListener('input', checkPincode);
   gateForm.addEventListener('submit', handleGateSubmit);
 
   form.addEventListener('submit', function (event) {
@@ -298,18 +267,13 @@
     var fullName = String(data.get('full_name') || '').trim();
     var consumption = String(data.get('monthly_consumption_band') || '').trim();
     var pincodeValue = String(data.get('pincode') || '').replace(/\D/g, '');
-    var areaValue = String(data.get('area_id') || '').trim();
     var addressLine = String(data.get('address_line') || '').trim();
-    var customArea = areaValue === otherAreaValue;
-    var areaName = String(otherArea.value || '').trim();
     var consent = form.querySelector('input[name="household_confirmed"]');
 
     if (!fullName) return markInvalid(form.querySelector('[name="full_name"]'), 'Enter your full name to continue.');
     if (!consumption) return markInvalid(form.querySelector('[name="monthly_consumption_band"]'), 'Select your household atta consumption range.');
     if (pincodeValue.length !== 6) return markInvalid(pincode, 'Enter a valid 6-digit PIN code.');
     if (!verifiedServiceable || verifiedPincode !== pincodeValue) return markInvalid(pincode, 'Check this PIN code before continuing. We can only accept eligible Launch Experience areas.');
-    if (!areaValue) return markInvalid(area, 'Choose your delivery area.');
-    if (customArea && !areaName) return markInvalid(otherArea, 'Enter your area or locality to continue.');
     if (!addressLine) return markInvalid(form.querySelector('[name="address_line"]'), 'Enter your complete delivery address.');
     if (!consent || !consent.checked) return markInvalid(consent, 'Please confirm that the delivery details are correct.');
 
@@ -325,9 +289,6 @@
         household_confirmed: consent.checked,
         delivery_address: {
           pincode: pincodeValue,
-          area_id: customArea ? null : Number(areaValue),
-          area: customArea ? areaName : undefined,
-          area_is_custom: customArea,
           address_line: addressLine,
           full_address: addressLine
         }

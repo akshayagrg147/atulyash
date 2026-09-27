@@ -2611,24 +2611,84 @@
 }
 
 @media (max-width: 700px) {
-  .launch-banner-inner { padding-block: 38px 34px; }
-  .launch-banner-eyebrow { display: grid; justify-items: center; font-size: 0.64rem; }
-  .launch-banner h2 { font-size: clamp(2.55rem, 12.5vw, 4.2rem); }
-  .launch-banner-dashboard { grid-template-columns: 1fr; gap: 12px; margin-top: 28px; }
-  .launch-banner-reserve { order: 0; padding: 0 0 4px; }
-  .launch-banner-dates { order: 1; }
-  .launch-banner-service { order: 2; }
-  .launch-banner-counter-card { order: 3; }
-  .launch-banner-cta { min-height: 62px; }
+  .launch-banner-inner { padding-block: 28px 24px; }
+  .launch-banner-eyebrow {
+    display: grid;
+    justify-items: center;
+    margin-bottom: 9px;
+    font-size: 0.59rem;
+    letter-spacing: 0.12em;
+  }
+  .launch-banner h2 {
+    font-size: clamp(2rem, 9.4vw, 3.25rem);
+    line-height: 0.98;
+  }
+  .launch-banner h2 span { display: block; }
+  .launch-banner-divider { height: 12px; margin-top: 10px; }
+  .launch-banner-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .launch-banner-reserve { grid-column: 1 / -1; order: 0; padding: 0; }
+  .launch-banner-service,
+  .launch-banner-counter-card { order: 1; }
+  .launch-banner-dates { grid-column: 1 / -1; order: 2; }
+  .launch-banner-cta {
+    min-height: 56px;
+    padding-inline: 18px 14px;
+    font-size: 1rem;
+  }
+  .launch-banner-panel-title {
+    min-height: 36px;
+    gap: 6px;
+    padding: 8px 7px;
+    font-size: 0.56rem;
+    letter-spacing: 0.1em;
+  }
+  .launch-banner-panel-title svg { width: 15px; height: 15px; flex-basis: 15px; }
   .launch-banner-service-body,
-  .launch-banner-counter-body { min-height: 104px; }
-  .launch-banner-assurance { display: grid; justify-content: start; margin-inline: auto; width: max-content; max-width: 100%; }
+  .launch-banner-counter-body {
+    min-height: 90px;
+    padding: 11px 7px;
+  }
+  .launch-banner-service-body strong { font-size: 0.94rem; }
+  .launch-banner-service-body small,
+  .launch-banner-counter-body small { font-size: 0.55rem; }
+  .launch-banner-counter-body strong {
+    padding-inline: 7px;
+    font-size: clamp(1.35rem, 7vw, 1.9rem);
+    letter-spacing: 0.06em;
+  }
+  .launch-banner-counter-body > span { font-size: 0.86rem; }
+  .launch-banner-assurance { display: none; }
 }
 
 @media (max-width: 430px) {
-  .launch-banner-timeline { grid-template-columns: 1fr; gap: 18px; }
-  .launch-banner-timeline::before { display: none; }
-  .launch-banner-milestone { align-items: center; }
+  .launch-banner-timeline {
+    min-height: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 12px 7px 11px;
+  }
+  .launch-banner-timeline::before {
+    display: block;
+    top: 27px;
+    left: 28px;
+    right: 28px;
+    height: 1px;
+  }
+  .launch-banner-milestone {
+    align-items: center;
+    gap: 5px;
+  }
+  .launch-banner-milestone-icon { width: 28px; height: 28px; }
+  .launch-banner-milestone-icon svg { width: 14px; height: 14px; }
+  .launch-banner-milestone strong {
+    font-size: 0.56rem;
+    line-height: 1.18;
+  }
+  .launch-banner-milestone small { display: none; }
   .launch-banner-live { justify-content: center; }
 }
 

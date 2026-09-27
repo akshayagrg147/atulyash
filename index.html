@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-K2S575QK');</script>
+  <!-- End Google Tag Manager -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Shop Atulyash whole wheat atta in fresh-batch quantities — carefully selected MP Sharbati wheat, slow natural-stone milling and weekly plans.">
@@ -29,6 +32,9 @@
   <link rel="stylesheet" href="client-design.css?v=20260926-1">
 </head>
 <body data-commerce-page="storefront">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K2S575QK" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <div class="checkout-handoff" id="checkoutHandoff" role="status" aria-live="polite" aria-atomic="true" hidden>
@@ -161,7 +167,7 @@
           <div class="launch-banner-eyebrow">
             <span>Your First Atulyash Experience</span>
           </div>
-          <h2><span>1 kg on us</span> for the first <strong id="launchBannerQuota">2,000</strong> orders</h2>
+          <h2><span>Complimentary 1 kg Atulyash Atta</span> for the first <strong id="launchBannerQuota">2,000</strong> orders</h2>
           <span class="launch-banner-divider" aria-hidden="true"><i></i></span>
         </div>
 
@@ -1097,6 +1103,17 @@
         }
 
         banner.hidden = false;
+
+        // The launch banner is revealed after the campaign request completes,
+        // so the browser's initial hash navigation can happen too early.
+        if (window.location.hash === '#launchBanner') {
+          window.requestAnimationFrame(function () {
+            var header = document.getElementById('siteHeader');
+            var headerOffset = header ? header.getBoundingClientRect().height + 12 : 0;
+            var targetTop = banner.getBoundingClientRect().top + window.scrollY - headerOffset;
+            window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+          });
+        }
       }).catch(function () {});
     })();
   </script>

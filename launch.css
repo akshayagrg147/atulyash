@@ -781,11 +781,13 @@
   .launch-visual { min-height: 540px; border-radius: 340px 340px 3px 3px; }
 
   .launch-reservation-layout {
-    grid-template-columns: 1fr;
-    gap: 50px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
   }
 
-  .launch-guide { position: static; max-width: 640px; padding-top: 0; }
+  .launch-card { order: -1; width: 100%; box-sizing: border-box; }
+  .launch-guide { order: 1; position: static; max-width: 640px; padding-top: 0; }
   .launch-guide h2 { max-width: 620px; }
 }
 
@@ -815,14 +817,24 @@
   .launch-visual::before { inset: 11px; }
   .launch-visual-copy { left: 27px; bottom: 28px; }
   .launch-visual-copy strong { max-width: 250px; font-size: 2.35rem; }
-  .launch-reservation { padding-block: 70px; }
-  .launch-guide h2 { font-size: clamp(2.8rem, 14vw, 4rem); }
-  .launch-card { padding: 34px 22px; }
-  .launch-card h2 { font-size: clamp(2.45rem, 12vw, 3.5rem); }
+  .launch-reservation { padding-block: 34px 54px; }
+  .launch-reservation-layout { gap: 30px; }
+  .launch-guide h2 { font-size: clamp(2.25rem, 11vw, 3.1rem); }
+  .launch-guide ol { margin-top: 20px; }
+  .launch-guide li { grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding: 14px 0; }
+  .launch-guide li > span { font-size: 0.6rem; }
+  .launch-guide li strong { font-size: 0.84rem; }
+  .launch-guide li p { font-size: 0.74rem; }
+  .launch-guide-note { margin-top: 16px; font-size: 0.66rem; }
+  .launch-card { padding: 24px 18px 26px; }
+  .launch-card h2 { font-size: clamp(2rem, 10vw, 3rem); }
+  .launch-form-copy { margin-top: 12px; font-size: 0.87rem; }
   .launch-grid { grid-template-columns: 1fr; gap: 17px; margin-top: 28px; }
   .launch-span-two { grid-column: auto; }
   .launch-submit { min-height: 62px; padding-inline: 17px; font-size: 0.68rem; }
-  .launch-state { min-height: 350px; }
+  .launch-state { min-height: 0; padding-block: 6px; }
+  .launch-state-icon { width: 50px; height: 50px; margin-bottom: 16px; font-size: 1.4rem; }
+  .launch-serviceability-gate > p:not(.launch-card-kicker) { margin-block: 14px 22px; }
   .launch-serviceability-input-row { grid-template-columns: 1fr; }
   .launch-serviceability-input-row .button { width: 100%; }
 

@@ -2310,7 +2310,7 @@
 .launch-banner h2 {
   margin: 0;
   color: #171a18;
-  font: 500 clamp(2.8rem, 4.65vw, 5rem)/0.94 var(--serif);
+  font: 500 clamp(2.8rem, 4.65vw, 5rem)/1.02 var(--serif);
   letter-spacing: -0.052em;
   text-wrap: balance;
 }
@@ -2318,6 +2318,15 @@
 .launch-banner h2 span {
   color: var(--launch-gold);
   font-weight: 600;
+}
+
+.launch-banner h2 .launch-banner-worth {
+  display: inline-block;
+  font-size: 0.5em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .launch-banner h2 #launchBannerQuota {
@@ -2621,7 +2630,7 @@
   }
   .launch-banner h2 {
     font-size: clamp(2rem, 9.4vw, 3.25rem);
-    line-height: 0.98;
+    line-height: 1.05;
   }
   .launch-banner h2 span { display: block; }
   .launch-banner-divider { height: 12px; margin-top: 10px; }

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-K2S575QK');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Check delivery availability and reserve your complimentary 1 kg Atulyash Atta launch pack. No payment or subscription required.">
+  <meta name="theme-color" content="#0b2721">
+  <title>Atulyash Launch Offer | Reserve Your Complimentary 1 kg Pack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260925-2">
+  <link rel="stylesheet" href="launch-offer.css?v=20261005-mobile-2">
+</head>
+<body class="launch-page">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K2S575QK" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <a class="skip-link" href="#reservation">Skip to reservation</a>
+
+  <header class="launch-header">
+    <div class="launch-container launch-header-inner">
+      <a class="launch-brand" href="/" aria-label="Atulyash home">
+        <img class="launch-brand-mark" src="images/brand-mark.webp" width="630" height="550" alt="">
+        <img class="launch-brand-wordmark" src="images/brand-wordmark.webp" width="900" height="220" alt="Atulyash — Incomparable Purity. No Compromise.">
+      </a>
+      <a class="launch-back" href="/"><span aria-hidden="true">←</span> Back to Atulyash</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="launch-reservation offer-form-hero" id="reservation" aria-labelledby="offerHeroTitle">
+      <div class="launch-container launch-reservation-layout">
+        <div class="offer-form-intro">
+          <p class="offer-hero-eyebrow">Your first Atulyash experience</p>
+          <h1 id="offerHeroTitle">Reserve Your Complimentary <span>1 kg Atulyash Atta <small>(worth ₹120)</small></span></h1>
+          <p class="offer-hero-note">For the first 2,000 reservations</p>
+          <p class="offer-hero-intro">A first taste of freshly milled Atulyash, reserved for eligible households across South Delhi and North Delhi.</p>
+        </div>
+
+        <div class="launch-card offer-form-card">
+          <div id="launchNotice" class="launch-notice" role="status" aria-live="polite"></div>
+          <div id="launchUnavailable" class="launch-state" hidden>
+            <span class="launch-state-icon" aria-hidden="true">A</span>
+            <h2 id="launchUnavailableTitle">Reservations are currently unavailable.</h2>
+            <p id="launchUnavailableMessage">Your details form is available, but a reservation can only be confirmed while the campaign is open.</p>
+          </div>
+          <div id="launchExisting" class="launch-existing launch-state" hidden>
+            <p class="section-label">Your reservation</p>
+            <h2>Already reserved for your household.</h2>
+            <p>Reference <strong id="launchExistingReference"></strong></p>
+            <dl>
+              <div><dt>Status</dt><dd id="launchExistingStatus"></dd></div>
+              <div><dt>Delivery</dt><dd id="launchExistingDelivery"></dd></div>
+              <div><dt>Scheduled date</dt><dd id="launchExistingDate"></dd></div>
+            </dl>
+            <a class="button button-secondary" href="/#shop">Continue shopping <span aria-hidden="true">→</span></a>
+          </div>
+
+          <form id="launchReservationForm" novalidate>
+            <p class="launch-card-kicker">Complimentary launch pack</p>
+            <h2 id="reservationHeading">Reserve your free pack</h2>
+            <p class="launch-form-copy">Takes about 2 minutes. We check your PIN code first, then confirm your mobile with an OTP.</p>
+            <div class="launch-grid">
+              <label class="launch-span-two">Full name<input name="full_name" required maxlength="255" autocomplete="name" placeholder="Your full name"></label>
+              <label class="launch-span-two">Mobile number<input id="launchMobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[6-9][0-9]{9}" placeholder="10-digit number" required></label>
+              <label class="launch-span-two">House / flat no. and building<input name="house_building" required maxlength="255" autocomplete="address-line1" placeholder="e.g. B-12, Green Apartments"></label>
+              <label class="launch-span-two">Street, area and landmark<input name="street_area_landmark" required maxlength="500" autocomplete="address-line2" placeholder="e.g. Sector 5, near metro station"></label>
+              <label>City<input name="city" required maxlength="100" autocomplete="address-level2" value="New Delhi"></label>
+              <label>PIN code<input id="launchPincode" name="pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="postal-code" placeholder="e.g. 110017"></label>
+            </div>
+            <section id="launchServiceability" class="launch-serviceability-result" aria-live="polite" hidden>
+              <span class="launch-serviceability-kicker">Delivery availability</span>
+              <h3 id="launchServiceabilityTitle"></h3>
+              <p id="launchServiceabilityMessage"></p>
+              <button class="launch-serviceability-edit" id="launchEditPincode" type="button">Change PIN code <span aria-hidden="true">↑</span></button>
+            </section>
+            <label class="launch-consent"><input type="checkbox" name="household_confirmed" required><span>I confirm that the details above are accurate.</span></label>
+            <div id="launchFollowupConsentPanel" class="launch-follow-up-consent" hidden>
+              <p class="launch-follow-up-heading">Optional area update</p>
+              <label class="launch-consent"><input type="checkbox" name="serviceability_followup_consent" aria-describedby="launchFollowupDisclosure"><span>Contact me if delivery becomes available in my area.</span></label>
+              <p id="launchFollowupDisclosure">If you opt in, we’ll securely save these details so our team can review the area and may contact you. This does not reserve a pack.</p>
+            </div>
+            <section id="launchOtpPanel" class="launch-otp-panel" aria-labelledby="launchOtpTitle" hidden>
+              <div class="launch-otp-panel-heading">
+                <p class="launch-card-kicker">Check your phone</p>
+                <h3 id="launchOtpTitle">Enter the 4-digit code</h3>
+                <p>We sent a secure code to <strong id="launchOtpPhone"></strong>.</p>
+              </div>
+              <label class="launch-otp-label" for="launchOtpCode">One-time code
+                <input id="launchOtpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" placeholder="••••" aria-describedby="launchOtpStatus">
+              </label>
+              <div class="launch-otp-actions">
+                <button class="button button-primary" type="button" id="launchOtpVerify">Verify and reserve <span aria-hidden="true">→</span></button>
+                <button class="button button-secondary" type="button" id="launchOtpResend">Resend code</button>
+                <button class="button button-secondary" type="button" id="launchOtpChange">Change number</button>
+              </div>
+              <p id="launchOtpStatus" class="launch-otp-status" role="status" aria-live="polite"></p>
+            </section>
+            <button class="button button-primary launch-submit" type="submit" id="launchSubmit">Check my PIN and reserve</button>
+            <p class="launch-form-footnote">One complimentary reservation is permitted per eligible household.</p>
+          </form>
+
+          <div id="launchServiceabilityLeadSaved" class="launch-serviceability-lead-saved launch-state" role="status" aria-live="polite" hidden>
+            <div class="launch-state-icon launch-state-icon-success" aria-hidden="true">✓</div>
+            <p class="launch-card-kicker">Area interest saved</p>
+            <h2>We’re not delivering to this PIN just yet.</h2>
+            <p>Thank you, <strong id="launchLeadName"></strong>. We’ve saved your interest and our team may contact you if delivery becomes available in your area.</p>
+            <p class="launch-lead-disclaimer">This is not a reservation and does not use a complimentary pack or campaign slot.</p>
+            <button class="button button-secondary" type="button" id="launchLeadEdit">Review my details</button>
+          </div>
+
+          <div id="launchLoginPrompt" class="launch-login-prompt launch-state" hidden>
+            <div class="launch-state-icon" aria-hidden="true">1</div>
+            <p class="launch-card-kicker">Begin your reservation</p>
+            <h2>Sign in to reserve your complimentary pack.</h2>
+            <p>We use a quick OTP verification to protect the one-pack-per-household limit. No password or payment details are required.</p>
+            <a class="button button-primary launch-submit" href="account.html?return=launch">Sign in with OTP <span aria-hidden="true">→</span></a>
+            <div class="launch-login-assurance"><span>Secure OTP</span><span>₹0 payable</span><span>About 2 minutes</span></div>
+          </div>
+
+          <div id="launchSuccess" class="launch-success launch-state" hidden>
+            <div class="launch-state-icon launch-state-icon-success" aria-hidden="true">✓</div>
+            <p class="section-label">Welcome to Atulyash</p>
+            <h2>You are about to experience Atta the Atulyash way.</h2>
+            <div class="launch-success-message" aria-live="polite">
+              <p>Your complimentary 1 kg Atulyash Atta is reserved.</p>
+              <p>Fresh milling begins <span id="launchMillingDate">11 Oct</span>. Deliveries begin <span id="launchSuccessDate">12 Oct</span>.</p>
+              <p>Welcome to Atulyash.<br><strong>Atta, in its Purest Form.</strong></p>
+            </div>
+            <div class="launch-success-actions">
+              <a class="button button-primary" href="account.html#orders">Track my launch pack <span aria-hidden="true">→</span></a>
+              <a class="button button-secondary" href="/#shop">Continue shopping <span aria-hidden="true">→</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="offer-after-form" aria-label="Launch offer details">
+      <div class="launch-container offer-after-form-inner">
+        <section class="offer-panel offer-dates" aria-labelledby="offerDatesTitle">
+          <h2 class="offer-panel-title" id="offerDatesTitle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>
+            <span>Key dates</span>
+          </h2>
+          <ol class="offer-timeline">
+            <li class="offer-milestone is-live">
+              <span class="offer-milestone-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 19c2.2-2.1 2.4-5.2 1.1-8.1M12 20c2.2-2.1 2.7-5.3 1.5-8.9M7.5 8.7c-1.8-.4-3.3-1.6-4.2-3.3 2.1-.2 4 .6 5.2 2.2M13.4 8.7c1.7-.4 3.2-1.6 4-3.2-2-.2-3.8.6-5 2.1M10 12.5c1.1-1.5 2.7-2.4 4.4-2.6-.2 1.9-1.2 3.5-2.8 4.4"/></svg></span>
+              <div><strong id="offerReservationStatus">Reservations are open now</strong><small>Reserve your complimentary pack</small></div>
+            </li>
+            <li class="offer-milestone">
+              <span class="offer-milestone-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 9h14v10H5zM7 9V5h10v4M9 12h6M9 15h6"/></svg></span>
+              <div><strong>Milling begins on <span id="offerMillingDate">11 October 2026</span></strong><small>First Navratra</small></div>
+            </li>
+            <li class="offer-milestone">
+              <span class="offer-milestone-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7zM6.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg></span>
+              <div><strong>Deliveries begin from <span id="offerDeliveryDate">12 October 2026</span></strong><small>Second Navratra</small></div>
+            </li>
+          </ol>
+        </section>
+
+        <div class="offer-after-form-side">
+          <section class="offer-panel offer-service" aria-labelledby="offerServiceTitle">
+            <h2 class="offer-panel-title" id="offerServiceTitle">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/></svg>
+              <span>Serviceable area</span>
+            </h2>
+            <div class="offer-service-body"><strong>South Delhi &amp; North Delhi</strong><p>Serviceable PIN codes only</p></div>
+          </section>
+          <section class="offer-panel offer-assurance" aria-labelledby="offerAssuranceTitle">
+            <h2 class="offer-panel-title" id="offerAssuranceTitle">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Launch details</span>
+            </h2>
+            <ul class="offer-assurance-list">
+              <li>No payment required</li>
+              <li>No purchase required</li>
+              <li>No subscription required</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="launch-faq-section" id="faq" aria-labelledby="launchFaqTitle">
+      <div class="launch-container launch-faq-inner">
+        <div class="launch-faq-heading">
+          <p class="launch-faq-eyebrow">A little more clarity</p>
+          <h2 id="launchFaqTitle">Common questions</h2>
+        </div>
+        <div class="launch-faq-list">
+          <details>
+            <summary>Is it really free?</summary>
+            <p>Yes. There is no payment, purchase or subscription required. Your complimentary 1 kg pack is worth ₹120.</p>
+          </details>
+          <details>
+            <summary>Who can reserve?</summary>
+            <p>Households in serviceable PIN codes across South Delhi and North Delhi can reserve. We’ll check your PIN code before confirming your mobile with an OTP.</p>
+          </details>
+          <details>
+            <summary>Why do you ask for an OTP?</summary>
+            <p>The OTP confirms your mobile number and helps us keep the offer to one complimentary pack per household. You don’t need a password or payment details.</p>
+          </details>
+          <details>
+            <summary>What if you don’t deliver to my area yet?</summary>
+            <p>We’ll let you know if your PIN code isn’t serviceable yet. An unavailable area won’t create a reservation or use a complimentary pack.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="launch-mobile-cta" id="launchMobileCta" hidden>
+    <a href="#reservation">Reserve my free 1 kg pack <span aria-hidden="true">↑</span></a>
+  </div>
+
+  <footer class="launch-footer">
+    <div class="launch-container">
+      <p>Atulyash Foods Private Limited</p>
+      <span>Incomparable purity. No compromise.</span>
+    </div>
+  </footer>
+  <script src="api-client.js?v=20260906-3"></script>
+  <script src="launch-offer.js?v=20261005-mobile-2"></script>
+</body>
+</html>

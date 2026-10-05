@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260925-2">
-  <link rel="stylesheet" href="launch-offer.css?v=20261005-mobile-2">
+  <link rel="stylesheet" href="launch-offer.css?v=20261006-compact-form-1">
 </head>
 <body class="launch-page">
   <!-- Google Tag Manager (noscript) -->
@@ -62,13 +62,11 @@
 
           <form id="launchReservationForm" novalidate>
             <p class="launch-card-kicker">Complimentary launch pack</p>
-            <h2 id="reservationHeading">Reserve your free pack</h2>
-            <p class="launch-form-copy">Takes about 2 minutes. We check your PIN code first, then confirm your mobile with an OTP.</p>
             <div class="launch-grid">
-              <label class="launch-span-two">Full name<input name="full_name" required maxlength="255" autocomplete="name" placeholder="Your full name"></label>
-              <label class="launch-span-two">Mobile number<input id="launchMobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[6-9][0-9]{9}" placeholder="10-digit number" required></label>
-              <label class="launch-span-two">House / flat no. and building<input name="house_building" required maxlength="255" autocomplete="address-line1" placeholder="e.g. B-12, Green Apartments"></label>
-              <label class="launch-span-two">Street, area and landmark<input name="street_area_landmark" required maxlength="500" autocomplete="address-line2" placeholder="e.g. Sector 5, near metro station"></label>
+              <label class="launch-contact-field"><span class="sr-only">Full name</span><input name="full_name" required maxlength="255" autocomplete="name" placeholder="Your full name"></label>
+              <label class="launch-contact-field"><span class="sr-only">Mobile number</span><input id="launchMobile" name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[6-9][0-9]{9}" placeholder="10-digit number" required></label>
+              <label class="launch-span-two"><span class="sr-only">House / flat number and building</span><input name="house_building" required maxlength="255" autocomplete="address-line1" placeholder="House / flat no. and building"></label>
+              <label class="launch-span-two"><span class="sr-only">Street, area and landmark</span><input name="street_area_landmark" required maxlength="500" autocomplete="address-line2" placeholder="Street, area and landmark"></label>
               <label>City<input name="city" required maxlength="100" autocomplete="address-level2" value="New Delhi"></label>
               <label>PIN code<input id="launchPincode" name="pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="postal-code" placeholder="e.g. 110017"></label>
             </div>

@@ -6036,26 +6036,113 @@
   }
 
   function openRestartFunding(subscription, funding) {
-    const body = create('div');
+    const deliveryDates = Array.isArray(funding.data.delivery_dates)
+      ? funding.data.delivery_dates
+      : [];
+    const deliveryDay = String(firstValue(funding.data.delivery_day, subscription.delivery_day, 'As scheduled'));
+    const body = create('div', 'restart-review');
     body.append(create(
       'p',
       'modification-preview-message',
-      `Your available wallet balance is ${formatMoney(funding.wallet)}. ${formatMoney(funding.required)} is needed to cover the first ${firstValue(funding.data.minimum_deliveries_required, 4)} deliveries.`
+      'This starts a fresh weekly cycle using the details from your last plan. Your cancelled cycle stays in order history.'
     ));
+
+    const summary = create('dl', 'restart-review-summary');
+    const summaryRows = [
+      ['Weekly quantity', firstValue(subscriptionWeight(subscription), `${funding.data.weekly_quantity || '—'} kg/week`)],
+      ['Delivery day', `${deliveryDay.charAt(0).toUpperCase()}${deliveryDay.slice(1)}`],
+      ['Delivery address', subscriptionDeliveryAddress(subscription)]
+    ];
+    summaryRows.forEach(([label, value]) => {
+      const row = create('div', 'restart-review-row');
+      row.append(create('dt', '', label), create('dd', '', value));
+      summary.append(row);
+    });
+    body.append(summary);
+
+    if (deliveryDates.length) {
+      const schedule = create('section', 'restart-review-schedule');
+      schedule.append(create('h3', '', `Next ${deliveryDates.length} planned deliveries`));
+      const dates = create('ol');
+      deliveryDates.forEach((date) => dates.append(create('li', '', formatDate(date))));
+      schedule.append(dates);
+      body.append(schedule);
+    }
+
+    const fundingCard = create('section', `restart-review-wallet${funding.canStart ? ' is-funded' : ' is-short'}`);
+    fundingCard.setAttribute('role', 'status');
+    fundingCard.append(create('h3', '', funding.canStart ? 'Your wallet is ready' : 'Add wallet funds to continue'));
+    const walletFigures = create('div', 'restart-review-wallet-figures');
+    const availableFigure = create('div');
+    availableFigure.append(create('span', '', 'Available balance'), create('strong', '', formatMoney(funding.wallet)));
+    const requiredFigure = create('div');
+    requiredFigure.append(create('span', '', `Required for ${firstValue(funding.data.minimum_deliveries_required, 4)} deliveries`), create('strong', '', formatMoney(funding.required)));
+    walletFigures.append(availableFigure, requiredFigure);
+    fundingCard.append(walletFigures);
+    fundingCard.append(create(
+      'p',
+      '',
+      funding.canStart
+        ? 'Your balance covers the required delivery window. This amount is not charged upfront; each delivery is charged after rider confirmation.'
+        : `Your available balance is short by ${formatMoney(funding.shortfall)}. Add this amount to your Atulyash Wallet; the plan will not start unless the server confirms sufficient funds.`
+    ));
+    body.append(fundingCard);
+
     const due = create('div', 'restart-funding-due');
-    due.append(create('span', '', 'Add to wallet'), create('strong', '', formatMoney(funding.shortfall)));
-    body.append(due);
+    if (!funding.canStart) {
+      due.append(create('span', '', 'Minimum amount to add'), create('strong', '', formatMoney(funding.shortfall)));
+      body.append(due);
+    }
     const actions = create('div', 'dialog-actions');
-    actions.append(button(`Add funds · ${formatMoney(funding.shortfall)}`, 'primary-button', () => {
-      const id = subscriptionId(subscription);
-      if (id != null) {
-        state.pendingSubscriptionRestartId = String(id);
-        sessionStorage.setItem('atulyash.pendingSubscriptionRestartId', String(id));
-      }
-      openWalletRecharge(funding.shortfall, { subscriptionId: id });
-    }));
+    actions.append(button('Not now', 'secondary-button', closeDialog));
+    if (funding.canStart) {
+      const confirm = button('Confirm fresh weekly plan →', 'primary-button', () => confirmSubscriptionRestart(subscription, confirm));
+      actions.append(confirm);
+    } else {
+      actions.append(button(`Add funds · ${formatMoney(funding.shortfall)}`, 'primary-button', () => {
+        const id = subscriptionId(subscription);
+        if (id != null) {
+          state.pendingSubscriptionRestartId = String(id);
+          sessionStorage.setItem('atulyash.pendingSubscriptionRestartId', String(id));
+        }
+        openWalletRecharge(funding.shortfall, { subscriptionId: id });
+      }));
+    }
     body.append(actions);
-    openDialog('Weekly plan', 'Add funds to restart', body);
+    openDialog('Weekly plan', 'Review your fresh cycle', body);
+  }
+
+  async function confirmSubscriptionRestart(subscription, control) {
+    const id = subscriptionId(subscription);
+    if (id == null || !subscriptionIsCancelled(subscription)) return;
+    setButtonBusy(control, true, 'Starting fresh cycle…');
+    try {
+      const result = responseData(await apiCall('subscriptions', ['reactivate'], { id }, {
+        path: `/subscription/subscription_plan/${id}/reactivate/`,
+        method: 'POST',
+        body: {}
+      }));
+      if (result.success === false) throw new Error(firstValue(result.message, 'The plan could not be restarted.'));
+      state.pendingSubscriptionRestartId = null;
+      sessionStorage.removeItem('atulyash.pendingSubscriptionRestartId');
+      state.loaded.delete('subscriptions');
+      closeDialog();
+      await renderSubscriptions(true);
+      showToast('Your new weekly cycle is active. Its deliveries are now listed in Orders and charged after rider confirmation.');
+    } catch (error) {
+      const payload = responseData(firstValue(error?.response?.data, error?.data, error?.body, {}));
+      const funding = restartFundingPayload(payload);
+      if (
+        String(payload.code || '').toUpperCase() === 'INSUFFICIENT_WALLET_BALANCE'
+        && funding.shortfall > 0
+      ) {
+        openRestartFunding(subscription, funding);
+      } else {
+        showToast(friendlyError(error), 'error');
+      }
+    } finally {
+      if (control?.isConnected) setButtonBusy(control, false);
+    }
   }
 
   async function restartSubscription(subscription) {
@@ -6070,23 +6157,10 @@
         body: {}
       });
       const funding = restartFundingPayload(previewResponse);
-      if (!funding.canStart) {
-        if (funding.shortfall > 0) openRestartFunding(subscription, funding);
-        else throw new Error('Your wallet could not be verified. Please try again.');
-        return;
+      if (!funding.canStart && funding.shortfall <= 0) {
+        throw new Error('Your wallet could not be verified. Please try again.');
       }
-
-      const result = responseData(await apiCall('subscriptions', ['reactivate'], { id }, {
-        path: `/subscription/subscription_plan/${id}/reactivate/`,
-        method: 'POST',
-        body: {}
-      }));
-      if (result.success === false) throw new Error(firstValue(result.message, 'The plan could not be restarted.'));
-      state.pendingSubscriptionRestartId = null;
-      sessionStorage.removeItem('atulyash.pendingSubscriptionRestartId');
-      state.loaded.delete('subscriptions');
-      await renderSubscriptions(true);
-      showToast('Your weekly subscription has restarted. Wallet charges continue with each delivery as usual.');
+      openRestartFunding(subscription, funding);
     } catch (error) {
       const payload = responseData(firstValue(error?.response?.data, error?.data, error?.body, {}));
       const funding = restartFundingPayload(payload);
